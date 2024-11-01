@@ -1,0 +1,23 @@
+[package]
+name = "genomes1000"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+biocore = { path = "../biocore" }
+utile = { path = "../utile" }
+
+csv = "1"
+flate2 = "1"
+jiff = { version = "0.1", features = ["serde"] }
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+url = { version = "2", features = ["serde"] }
+noodles = { version = "0.84", features = ["core", "fasta"] }
+
+[dev-dependencies]
+pgs_catalog = { path = "../pgs_catalog" }
+
+env_logger = "0.11"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+futures = "0.3"

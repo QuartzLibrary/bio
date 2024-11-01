@@ -1,0 +1,29 @@
+{
+    "files.watcherExclude": {
+        // The defaults https://code.visualstudio.com/docs/getstarted/settings#_default-settings
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/.hg/store/**": true,
+        // Also
+        "**/node_modules/*/**": true,
+        // Additional
+        "target": true,
+        "dist": true,
+    },
+    // Rust Analyzer
+    // Keep in sync with rust-toolchain.toml
+    "rust-analyzer.server.extraEnv": {
+        "RUSTUP_TOOLCHAIN": "nightly-2024-12-14",
+    },
+    // "rust-analyzer.updates.channel": "nightly-2024-12-14",
+    "rust-analyzer.cargo.extraArgs": [
+        "--target-dir",
+        "target\\ra",
+        "--profile",
+        "rust-analyzer"
+    ],
+    "rust-analyzer.files.excludeDirs": [
+        "target",
+        "dist"
+    ],
+}

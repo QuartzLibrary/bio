@@ -1,0 +1,447 @@
+<div class="sect1">
+    <h2 id="_description_of_column_headings_for_downloadable_files">Description of column headings for downloadable
+        files</h2>
+    <div class="sectionbody">
+        <div class="paragraph">
+            <p>Association data in the GWAS Catalog is mapped to the genome using the latest version of Ensembl. For
+                details on genome assembly and dbSNP build, refer to the GWAS Catalog <a
+                    href="https://www.ebi.ac.uk/gwas">homepage</a>.</p>
+        </div>
+        <div class="paragraph">
+            <p><a href="#_file_headers_for_catalog_v1_0">File headers for catalog v1.0</a></p>
+        </div>
+        <div class="paragraph">
+            <p><a href="#_file_headers_for_catalog_v1_0_1">File headers for catalog v1.0.1</a></p>
+        </div>
+        <div class="paragraph">
+            <p><a href="#_file_headers_for_catalog_v1_0_2">File headers for catalog v1.0.2</a></p>
+        </div>
+        <div class="paragraph">
+            <p><a href="#_file_headers_for_catalog_v1_0_2_1">File headers for catalog v1.0.2.1</a></p>
+        </div>
+        <div class="paragraph">
+            <p><a href="#_file_headers_for_ancestry_download">File headers for ancestry download</a></p>
+        </div>
+        <div class="paragraph">
+            <p><a href="#_file_headers_for_unpublished_studies_v1_0_3">File headers for unpublished studies v1.0.3</a>
+            </p>
+        </div>
+        <div class="paragraph">
+            <p><a href="#_file_headers_for_unpublished_studies_v1_0_3_1">File headers for unpublished studies
+                    v1.0.3.1</a></p>
+        </div>
+        <div class="paragraph">
+            <p><a href="#_file_headers_for_unpublished_ancestries">File headers for unpublished ancestries</a></p>
+        </div>
+        <div class="paragraph">
+            <p>*Available in associations download files</p>
+        </div>
+        <div class="paragraph">
+            <p>+Available in studies download files</p>
+        </div>
+        <hr>
+        <div class="sect2">
+            <h3 id="_file_headers_for_catalog_v1_0">File headers for catalog v1.0</h3>
+            <div class="paragraph">
+                <p>DATE ADDED TO CATALOG<sup>*</sup> <sup>+</sup>: Date a study is published in the catalog</p>
+            </div>
+            <div class="paragraph">
+                <p>PUBMEDID<sup>*</sup> <sup>+</sup>: PubMed identification number</p>
+            </div>
+            <div class="paragraph">
+                <p>FIRST AUTHOR<sup>*</sup> <sup>+</sup>: Last name and initials of first author</p>
+            </div>
+            <div class="paragraph">
+                <p>DATE<sup>*</sup> <sup>+</sup>: Publication date (online (epub) date if available)</p>
+            </div>
+            <div class="paragraph">
+                <p>JOURNAL<sup>*</sup> <sup>+</sup>: Abbreviated journal name</p>
+            </div>
+            <div class="paragraph">
+                <p>LINK<sup>*</sup> <sup>+</sup>: PubMed URL</p>
+            </div>
+            <div class="paragraph">
+                <p>STUDY<sup>*</sup> <sup>+</sup>: Title of paper</p>
+            </div>
+            <div class="paragraph">
+                <p>DISEASE/TRAIT<sup>*</sup> <sup>+</sup>: Disease or trait examined in study</p>
+            </div>
+            <div class="paragraph">
+                <p>INITIAL SAMPLE DESCRIPTION<sup>*</sup> <sup>+</sup>: Sample size and ancestry description for stage 1
+                    of GWAS (summing across multiple Stage 1 populations, if applicable)</p>
+            </div>
+            <div class="paragraph">
+                <p>REPLICATION SAMPLE DESCRIPTION<sup>*</sup> <sup>+</sup>: Sample size and ancestry description for
+                    subsequent replication(s) (summing across multiple populations, if applicable)</p>
+            </div>
+            <div class="paragraph">
+                <p>REGION<sup>*</sup>: Cytogenetic region associated with rs number</p>
+            </div>
+            <div class="paragraph">
+                <p>CHR_ID<sup>*</sup>: Chromosome number associated with rs number</p>
+            </div>
+            <div class="paragraph">
+                <p>CHR_POS<sup>*</sup>: Chromosomal position associated with rs number</p>
+            </div>
+            <div class="paragraph">
+                <p>REPORTED GENE(S)<sup>*</sup>: Gene(s) reported by author</p>
+            </div>
+            <div class="paragraph">
+                <p>MAPPED GENE(S)<sup>*</sup>: Gene(s) mapped to the strongest SNP. If the SNP is located within a gene,
+                    that gene is listed. If the SNP is located within multiple genes, these genes are listed separated
+                    by commas. If the SNP is intergenic, the upstream and downstream genes are listed, separated by a
+                    hyphen.</p>
+            </div>
+            <div class="paragraph">
+                <p>UPSTREAM_GENE_ID<sup>*</sup>: Entrez Gene ID for nearest upstream gene to rs number, if not within
+                    gene</p>
+            </div>
+            <div class="paragraph">
+                <p>DOWNSTREAM_GENE_ID<sup>*</sup>: Entrez Gene ID for nearest downstream gene to rs number, if not
+                    within gene</p>
+            </div>
+            <div class="paragraph">
+                <p>SNP_GENE_IDS<sup>*</sup>: Entrez Gene ID, if rs number within gene; multiple genes denotes
+                    overlapping transcripts</p>
+            </div>
+            <div class="paragraph">
+                <p>UPSTREAM_GENE_DISTANCE<sup>*</sup>: distance in kb for nearest upstream gene to rs number, if not
+                    within gene</p>
+            </div>
+            <div class="paragraph">
+                <p>DOWNSTREAM_GENE_DISTANCE<sup>*</sup>: distance in kb for nearest downstream gene to rs number, if not
+                    within gene</p>
+            </div>
+            <div class="paragraph">
+                <p>STRONGEST SNP-RISK ALLELE<sup>*</sup>: SNP(s) most strongly associated with trait + risk allele (?
+                    for unknown risk allele). May also refer to a haplotype.</p>
+            </div>
+            <div class="paragraph">
+                <p>SNPS<sup>*</sup>: Strongest SNP; if a haplotype it may include more than one rs number (multiple SNPs
+                    comprising the haplotype)</p>
+            </div>
+            <div class="paragraph">
+                <p>MERGED<sup>*</sup>: denotes whether the SNP has been merged into a subsequent rs record (0 = no; 1 =
+                    yes;)</p>
+            </div>
+            <div class="paragraph">
+                <p>SNP_ID_CURRENT<sup>*</sup>: current rs number (will differ from strongest SNP when merged = 1)</p>
+            </div>
+            <div class="paragraph">
+                <p>CONTEXT<sup>*</sup>: provides information on a variant’s predicted most severe functional effect from
+                    Ensembl</p>
+            </div>
+            <div class="paragraph">
+                <p>INTERGENIC<sup>*</sup>: denotes whether SNP is in intergenic region (0 = no; 1 = yes)</p>
+            </div>
+            <div class="paragraph">
+                <p>RISK ALLELE FREQUENCY<sup>*</sup>: Reported risk/effect allele frequency associated with strongest
+                    SNP in controls (if not available among all controls, among the control group with the largest
+                    sample size). If the associated locus is a haplotype the haplotype frequency will be extracted.</p>
+            </div>
+            <div class="paragraph">
+                <p>P-VALUE<sup>*</sup>: Reported p-value for strongest SNP risk allele (linked to dbGaP Association
+                    Browser). Note that p-values are rounded to 1 significant digit (for example, a published p-value of
+                    4.8 x 10-7 is rounded to 5 x 10-7).</p>
+            </div>
+            <div class="paragraph">
+                <p>PVALUE_MLOG<sup>*</sup>: -log(p-value)</p>
+            </div>
+            <div class="paragraph">
+                <p>P-VALUE (TEXT)<sup>*</sup>: Information describing context of p-value (e.g. females, smokers).</p>
+            </div>
+            <div class="paragraph">
+                <p>OR or BETA<sup>*</sup>: Reported odds ratio or beta-coefficient associated with strongest SNP risk
+                    allele. Note that prior to 2021, any OR &lt;1 was inverted, along with the reported allele, so that
+                    all ORs included in the Catalog were &gt;1. This is no longer done, meaning that associations added
+                    after 2021 may have OR &lt;1. Appropriate unit and increase/decrease are included for beta
+                    coefficients.</p>
+            </div>
+            <div class="paragraph">
+                <p>95% CI (TEXT)<sup>*</sup>: Reported 95% confidence interval associated with strongest SNP risk
+                    allele, along with unit in the case of beta-coefficients. If 95% CIs are not published, we estimate
+                    these using the standard error, where available.</p>
+            </div>
+            <div class="paragraph">
+                <p>PLATFORM (SNPS PASSING QC)<sup>*</sup>: Genotyping platform manufacturer used in Stage 1; also
+                    includes notation of pooled DNA study design or imputation of SNPs, where applicable</p>
+            </div>
+            <div class="paragraph">
+                <p>CNV<sup>*</sup>: Study of copy number variation (yes/no)</p>
+            </div>
+            <div class="paragraph">
+                <p>ASSOCIATION COUNT<sup>+</sup>: Number of associations identified for this study</p>
+            </div>
+            <div class="paragraph">
+                <p><em>Last updated: 12 January 2016</em></p>
+            </div>
+            <hr>
+        </div>
+        <div class="sect2">
+            <h3 id="_file_headers_for_catalog_v1_0_1">File headers for catalog v1.0.1</h3>
+            <div class="paragraph">
+                <p>As for version 1.0 plus</p>
+            </div>
+            <div class="paragraph">
+                <p>MAPPED_TRAIT<sup>*</sup> <sup>+</sup>: Mapped Experimental Factor Ontology trait for this study</p>
+            </div>
+            <div class="paragraph">
+                <p>MAPPED_TRAIT_URI<sup>*</sup> <sup>+</sup>: URI of the EFO trait</p>
+            </div>
+            <div class="paragraph">
+                <p>STUDY ACCESSION<sup>*</sup> <sup>+</sup>: Accession ID allocated to a GWAS Catalog study</p>
+            </div>
+            <div class="paragraph">
+                <p>Dismissed from 1 May 2018</p>
+            </div>
+            <div class="paragraph">
+                <p><em>Last updated: 24 April 2018</em></p>
+            </div>
+            <hr>
+        </div>
+        <div class="sect2">
+            <h3 id="_file_headers_for_catalog_v1_0_2">File headers for catalog v1.0.2</h3>
+            <div class="paragraph">
+                <p>As for version 1.0.1 plus</p>
+            </div>
+            <div class="paragraph">
+                <p>GENOTYPING_TECHNOLOGY<sup>*</sup> <sup>+</sup>: Genotyping technology/ies used in this study, with
+                    additional array information (ex. Immunochip or Exome array) in brackets.</p>
+            </div>
+            <div class="paragraph">
+                <p><em>Added: 24 April 2018</em></p>
+            </div>
+            <hr>
+        </div>
+        <div class="sect2">
+            <h3 id="_file_headers_for_catalog_v1_0_2_1">File headers for catalog v1.0.2.1</h3>
+            <div class="paragraph">
+                <p>As for version 1.0.2 plus</p>
+            </div>
+            <div class="paragraph">
+                <p>COHORT+: Discovery stage cohorts used in this study. The full list of cohort abbreviations and
+                    definitions can be found <a
+                        href="https://ftp.ebi.ac.uk/pub/databases/spot/pgs/metadata/pgs_all_metadata_cohorts.csv">here</a>.
+                </p>
+            </div>
+            <div class="paragraph">
+                <p>FULL SUMMARY STATISTICS+: Availability of full genome-wide summary statistics files for download</p>
+            </div>
+            <div class="paragraph">
+                <p>SUMMARY STATS LOCATION+: The location of the summary statistics file</p>
+            </div>
+            <div class="paragraph">
+                <p><em>Added: October 2023</em></p>
+            </div>
+            <hr>
+        </div>
+        <div class="sect2">
+            <h3 id="_file_headers_for_ancestry_download">File headers for ancestry download</h3>
+            <div class="paragraph">
+                <p>STUDY ACCESSION: Accession ID allocated to a GWAS Catalog study</p>
+            </div>
+            <div class="paragraph">
+                <p>PUBMEDID: PubMed identification number</p>
+            </div>
+            <div class="paragraph">
+                <p>FIRST AUTHOR: Last name and initials of first author</p>
+            </div>
+            <div class="paragraph">
+                <p>DATE: Publication date (online (epub) date if available)</p>
+            </div>
+            <div class="paragraph">
+                <p>INITIAL SAMPLE DESCRIPTION: Sample size and ancestry description for GWAS stage (summing across
+                    multiple populations, if applicable)</p>
+            </div>
+            <div class="paragraph">
+                <p>REPLICATION SAMPLE DESCRIPTION: Sample size and ancestry description for subsequent replication(s)
+                    (summing across multiple populations, if applicable)</p>
+            </div>
+            <div class="paragraph">
+                <p>STAGE: Stage of the GWAS to which the sample description applies, either initial or replication</p>
+            </div>
+            <div class="paragraph">
+                <p>NUMBER OF INDIVDUALS: Number of individuals in this sample</p>
+            </div>
+            <div class="paragraph">
+                <p>BROAD ANCESTRAL CATEGORY: Broad ancestral category to which the individuals in the sample belong</p>
+            </div>
+            <div class="paragraph">
+                <p>COUNTRY OF ORIGIN: Country of origin of the individuals in the sample</p>
+            </div>
+            <div class="paragraph">
+                <p>COUNTRY OF RECRUITMENT: Country of recruitment of the individuals in the sample</p>
+            </div>
+            <div class="paragraph">
+                <p>ADDITONAL ANCESTRY DESCRIPTION: Any additional ancestry descriptors relevant to the sample
+                    description</p>
+            </div>
+            <div class="paragraph">
+                <p><em>Added: 16 September 2016</em></p>
+            </div>
+            <hr>
+        </div>
+        <div class="sect2">
+            <h3 id="_file_headers_for_unpublished_studies_v1_0_3">File headers for unpublished studies v1.0.3</h3>
+            <div class="paragraph">
+                <p>DATE ADDED TO CATALOG Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>PUBMED ID Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>FIRST AUTHOR Last name and initials of first author</p>
+            </div>
+            <div class="paragraph">
+                <p>DATE Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>JOURNAL Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>LINK URL of the manuscript the GWAS is included in</p>
+            </div>
+            <div class="paragraph">
+                <p>STUDY Title of manuscript the GWAS is included in</p>
+            </div>
+            <div class="paragraph">
+                <p>DISEASE/TRAIT Disease or trait examined in the GWAS</p>
+            </div>
+            <div class="paragraph">
+                <p>INITIAL SAMPLE SIZE Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>REPLICATION SAMPLE SIZE Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>PLATFORM [SNPS PASSING QC] Genotyping platform manufacturer and number of SNPs tested in the
+                    analysis; also includes imputation of SNPs, where applicable</p>
+            </div>
+            <div class="paragraph">
+                <p>ASSOCIATION COUNT Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>MAPPED_TRAIT Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>MAPPED_TRAIT_URI Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>STUDY ACCESSION GWAS Catalog Accession ID</p>
+            </div>
+            <div class="paragraph">
+                <p>GENOTYPING TECHNOLOGY Genotyping technology/ies used in this study, with additional array information
+                    (eg. Immunochip or Exome array) in brackets.</p>
+            </div>
+            <div class="paragraph">
+                <p>BACKGROUND TRAIT Any background trait(s) shared by all individuals in the GWAS</p>
+            </div>
+            <div class="paragraph">
+                <p>MAPPED BACKGROUND TRAIT Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>MAPPED BACKGROUND TRAIT URI Not used</p>
+            </div>
+            <div class="paragraph">
+                <p>SUMMARY STATS LOCATION The location of the summary statistics file</p>
+            </div>
+            <div class="paragraph">
+                <p>SUBMISSION DATE The date the GWAS was submitted to the Catalog</p>
+            </div>
+            <div class="paragraph">
+                <p>STATISTICAL MODEL Details of the statistical model used to determine association significance</p>
+            </div>
+            <div class="paragraph">
+                <p><em>Added: 15 May 2020</em></p>
+            </div>
+            <hr>
+        </div>
+        <div class="sect2">
+            <h3 id="_file_headers_for_unpublished_studies_v1_0_3_1">File headers for unpublished studies v1.0.3.1</h3>
+            <div class="paragraph">
+                <p>As for version 1.0.3 plus</p>
+            </div>
+            <div class="paragraph">
+                <p>COHORT+: Discovery stage cohorts used in this study. The full list of cohort abbreviations and
+                    definitions can be found <a
+                        href="https://ftp.ebi.ac.uk/pub/databases/spot/pgs/metadata/pgs_all_metadata_cohorts.csv">here</a>.
+                </p>
+            </div>
+            <div class="paragraph">
+                <p>FULL SUMMARY STATISTICS+: Availability of full genome-wide summary statistics files for download</p>
+            </div>
+            <div class="paragraph">
+                <p><em>Added October 2023</em></p>
+            </div>
+            <hr>
+        </div>
+        <div class="sect2">
+            <h3 id="_file_headers_for_unpublished_ancestries">File headers for unpublished ancestries</h3>
+            <div class="paragraph">
+                <p>STUDY ACCESSION GWAS Catalog Accession ID</p>
+            </div>
+            <div class="paragraph">
+                <p>PUBMED ID not used</p>
+            </div>
+            <div class="paragraph">
+                <p>FIRST AUTHOR Last name and initials of first author</p>
+            </div>
+            <div class="paragraph">
+                <p>DATE not used</p>
+            </div>
+            <div class="paragraph">
+                <p>INITIAL SAMPLE DESCRIPTION not used</p>
+            </div>
+            <div class="paragraph">
+                <p>REPLICATION SAMPLE DESCRIPTION not used</p>
+            </div>
+            <div class="paragraph">
+                <p>STAGE not used/filled with initial for all</p>
+            </div>
+            <div class="paragraph">
+                <p>NUMBER OF INDIVIDUALS Number of individuals in this sample</p>
+            </div>
+            <div class="paragraph">
+                <p>BROAD ANCESTRAL CATEGORY Broad ancestral category to which the individuals in the sample belong</p>
+            </div>
+            <div class="paragraph">
+                <p>COUNTRY OF ORIGIN not used</p>
+            </div>
+            <div class="paragraph">
+                <p>COUNTRY OF RECRUITMENT Country of recruitment of the individuals in the sample</p>
+            </div>
+            <div class="paragraph">
+                <p>ADDITIONAL ANCESTRY DESCRIPTION Any additional ancestry descriptors relevant to the sample
+                    description</p>
+            </div>
+            <div class="paragraph">
+                <p>ANCESTRY DESCRIPTOR The most detailed ancestry descriptor(s) for the sample.</p>
+            </div>
+            <div class="paragraph">
+                <p>FOUNDER/GENETICALLY ISOLATED POPULATION Description of a founder or genetically isolated population
+                </p>
+            </div>
+            <div class="paragraph">
+                <p>NUMBER OF CASES The number of cases in this broad ancestry group</p>
+            </div>
+            <div class="paragraph">
+                <p>NUMBER OF CONTROLS The number of controls in this broad ancestry group</p>
+            </div>
+            <div class="paragraph">
+                <p>SAMPLE DESCRIPTION Additional sample information required for the interpretation of result</p>
+            </div>
+            <div class="paragraph">
+                <p>COHORT(S) List of cohort(s) represented in the discovery sample (moved to studies download in
+                    v1.0.3.1)</p>
+            </div>
+            <div class="paragraph">
+                <p>COHORT-SPECIFIC REFERENCE List of cohort specific identifier(s) issued to this research study
+                    (removed in v1.0.3.1)</p>
+            </div>
+            <div class="paragraph">
+                <p><em>Added 15 May 2020, updated October 2023</em></p>
+            </div>
+            <hr>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,2035 @@
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description"
+        content="The NHGRI-EBI GWAS Catalog: a curated collection of all published genome-wide association studies, produced by a collaboration between EMBL-EBI and NHGRI">
+    <meta name="keywords" content="GWAS Catalog, GWAS, NHGRI, EBI, EMBL-EBI, SPOT">
+    <meta name="author" content="Tony Burdett, Emma Hastings, Dani Welter, SPOT, EMBL-EBI, NHGRI">
+    <link rel="icon" href="/gwas/images/favicon.ico">
+
+    <title>GWAS Catalog</title>
+
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+    <link href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.2/themes/smoothness/jquery-ui.css" rel="stylesheet">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/bootstrap-table/1.5.0/bootstrap-table.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css">
+
+    <!-- Custom styles for this template -->
+    <link rel="stylesheet" href="/gwas/css/jumbotron.css">
+    <link rel="stylesheet" href="/gwas/css/sticky-footer-navbar.css">
+
+    <!-- Additional styling on top of bootstrap -->
+    <link rel="stylesheet" href="/gwas/css/goci-ui.css">
+    <link rel="stylesheet" href="/gwas/css/ontology-autocomplete.css">
+    <link rel="stylesheet" href="/gwas/css/icons/flaticon.css">
+    <link rel="stylesheet" href="/gwas/css/goci-color-palette-1.css">
+
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+    <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <script src="/gwas/js/console-plugin.js"></script>
+    <script
+        src="https://ebi.emblstatic.net/web_guidelines/EBI-Framework/v1.3/js/ebi-global-includes/script/5_ebiFrameworkNotificationBanner.js?legacyRequest=other"></script>
+</head>
+
+<body>
+
+
+    <div>
+        <div class="autocomplete-suggestions"
+            style="position: absolute; display: none; max-height: 300px; z-index: 9999;"></div>
+
+        <div>
+            <script type="text/javascript">
+                /*<![CDATA[*/
+                var host = window.location.host;
+
+                var gwasProperties = {
+                    contextPath: '/gwas/',
+                    host: host,
+                    // This site doesn't provide https protocol. 
+                    EPMC_URL: "http://www.europepmc.org/abstract/MED/",
+                    NCBI_URL: "//www.ncbi.nlm.nih.gov/pubmed/?term=",
+                    ORCID_URL: "//orcid.org/",
+                    OLS: {
+                        global_color_url_batch: ''
+                    },
+                    GWAS_REST_API: "https://www.ebi.ac.uk/gwas/rest/api",
+                    SNOOPY_REST_API: "http://snoopy.ebi.ac.uk:9680/gwas/rest/api",
+                    SUMMARY_STATS_URL: "https://www.ebi.ac.uk/gwas/summary-statistics/api",
+                    FTP_PATH_PREFIX: "http://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/",
+
+                    // Links to external sources:
+                    EnsemblRestBaseURL: "https://rest.ensembl.org",
+                    EnsemblURL: "http://ensembl.org/Homo_sapiens/",
+                    OpenTargetsURL: "https://www.targetvalidation.org/target/",
+                    PGS_Study_REST_URL: "https://www.pgscatalog.org/rest/gwas/get_score_ids/",
+                    PGS_Study_URL: "https://www.pgscatalog.org/gwas/",
+                    PGS_Publication_REST_URL: "https://www.pgscatalog.org/rest/publication/search?pmid=",
+                    PGS_Publication_URL: "http://www.pgscatalog.org/publication/",
+                    PGS_Trait_REST_URL: "https://www.pgscatalog.org/rest/trait/",
+                    PGS_Trait_URL: "https://www.pgscatalog.org/trait/",
+                    EntrezURL: "https://www.ncbi.nlm.nih.gov/gene/",
+                    OMIMURL: 'https://www.omim.org/entry/',
+                    DEV_SUM_STATS_SERVICE: 'https://wwwdev.ebi.ac.uk/gwas/summary-statistics/api/',
+                    SUM_STATS_SERVICE: 'https://www.ebi.ac.uk/gwas/summary-statistics/api/',
+                    IS_DEV: host !== 'www.ebi.ac.uk',
+                    IMPC_ID_URI: '../v1/impc-mouse-orthologs/',
+                    IMPC_URI: 'https://www.mousephenotype.org/data/genes/'
+                };
+                if (host === "wwwdev.ebi.ac.uk") {
+                    gwasProperties.GWAS_REST_API = "https://wwwdev.ebi.ac.uk/gwas/rest/api";
+                }
+                else if (host !== "www.ebi.ac.uk") {
+                    gwasProperties.GWAS_REST_API = "http://" + host + "/gwas/rest/api";
+                }
+                //console.log(gwasProperties);
+                /*
+                        function imageExists(url, callback) {
+                            var img = new Image();
+                            img.onload = function() { callback(true); };
+                            img.onerror = function() { callback(false); };
+                            img.src = url;
+                        }
+        
+                        // Check beta-icon
+                        var imageUrl = contextPath+'icons/beta-icon.png';
+                        imageExists(imageUrl, function(exists) {
+                            console.log('RESULT: url=' + imageUrl + ', exists=' + exists);
+                            console.log(typeof(exists));
+                            if (exists) {
+                                var element = document.getElementById('beta-icon');
+                                element.style.display = 'inline';
+                            }
+                        }); */
+                /*]]>*/
+            </script>
+
+        </div>
+
+        <nav class="navbar navbar-inverse navbar-fixed-top">
+
+
+            <div class="container">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar"
+                        aria-expanded="false" aria-controls="navbar">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" href="/gwas/home" data-original-title="" title="">GWAS Catalog</a>
+
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                    <ul class="nav navbar-nav navbar-right">
+                        <li id="header-searchbar" style="display: none" class="mg-t-15">
+                            <!-- This is the header search bar -->
+                            <span class="input-group header-input-group">
+                                <input type="text" class="form-control ac_input hidden-sm" placeholder="Search"
+                                    style="width:100%; font-size:14px; display:inline; padding-left: 10px; padding-bottom: 0px;padding-top: 0px;padding-right: 0px;height: 22px;"
+                                    id="header-search-box" name="q" data-widget="select" data-ontology=""
+                                    autocomplete="off">
+                                <span class="input-group-btn" style="height: 20px;width: 0px;">
+                                    <button class="btn btn-default" type="button" id="header-search-button"
+                                        style="                                     padding-top: 0px;                                     padding-left: 3px;                                     padding-bottom: 0px;                                     padding-right: 3px">
+                                        <span class="glyphicon glyphicon-search"></span>
+                                    </button>
+                                </span>
+                            </span>
+                        </li>
+
+                        <li>
+                            <a href="/gwas/diagram" data-original-title="" title="">
+                                Diagram
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="/gwas/deposition" data-original-title="" title="">
+                                Submit
+                            </a>
+                        </li>
+
+                        <li id="downloads-item" class="hidden-sm">
+                            <a href="/gwas/downloads" data-original-title="" title="">
+                                Download
+                            </a>
+                        </li>
+
+                        <li id="documentation-item">
+                            <a href="/gwas/docs" data-original-title="" title="">
+                                Documentation
+                            </a>
+                        </li>
+
+                        <li class="hidden-sm hidden-md">
+                            <a href="/gwas/docs/about" data-original-title="" title="">
+                                About
+                            </a>
+                        </li>
+
+                        <li class="hidden-sm hidden-md">
+                            <a href="https://ebispot.github.io/gwas-blog/" target="_blank" data-original-title=""
+                                title="">
+                                Blog
+                            </a>
+                        </li>
+
+                        <li>
+                            <a class="icon visible-lg visible-xs" id="ebi-logo" href="//www.ebi.ac.uk"
+                                data-original-title="" title="">
+                                <img alt="EBI logo" src="/gwas/icons/EMBL_EBI_Logo_white.png">
+                            </a>
+                            <a class="icon hidden-lg hidden-xs" id="ebi-sm-logo" href="//www.ebi.ac.uk"
+                                data-original-title="" title="">
+                                <img alt="EBI logo" width="27px" height="25px" src="/gwas/icons/EMBL_logo_img_only.png">
+                            </a>
+                        </li>
+
+                        <li>
+                            <a class="icon visible-lg visible-xs" id="nhgri-logo" href="//www.genome.gov"
+                                data-original-title="" title="">
+                                <img alt="GWAS logo" src="/gwas/icons/NHGRI_NIH%20logo%20all%20verions-02-scaled.png">
+                            </a>
+                            <a class="icon hidden-lg hidden-xs" id="nhgri-sm-logo" href="//www.genome.gov"
+                                data-original-title="" title="">
+                                <img alt="GWAS logo" width="30px" height="25px" src="/gwas/icons/NHGRI_logo_sm.png">
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <!--/.navbar-collapse -->
+            </div>
+            <div class="navbar-bottom-banner-1 background-color-complementary">
+            </div>
+            <div class="navbar-bottom-banner-2 background-color-primary-bold">
+            </div>
+            <div class="navbar-bottom-banner-3 background-color-primary">
+            </div>
+        </nav>
+
+        <!-- Feedback Button -->
+        <div class="feedback">
+            <a href="mailto:gwas-info@ebi.ac.uk" data-original-title="" title="">
+                <button type="button" id="feedback-button">feedback</button>
+            </a>
+        </div>
+
+    </div>
+
+    <div>
+        <div class="jumbotron background-color-primary-accent">
+            <div class="container">
+                <div class="gwas-circle">
+                    <img src="/gwas/images/GWAS_Catalog_circle_178x178.png">
+                </div>
+                <div>
+                    <a href="https://globalbiodata.org/" target="_blank" class="resource-img" data-original-title=""
+                        title="">
+                        <img class="gbc-img" src="/gwas/images/GCBR-Logo-RGB.png">
+                    </a>
+                </div>
+                <div>
+                    <a href="https://elixir-europe.org/platforms/data/core-data-resources" target="_blank"
+                        class="resource-img" data-original-title="" title="">
+                        <img class="elixir-img" src="/gwas/images/elixir-core-data-resources-logo.png">
+                    </a>
+                </div>
+                <div>
+
+                </div>
+                <div>
+                    <h1>GWAS Catalog</h1>
+
+                    <h3>The NHGRI-EBI Catalog of human genome-wide association studies</h3>
+
+                    <!-- search box goes here -->
+                    <div class="input-group">
+                        <input type="text" class="form-control ac_input" placeholder="Search the catalog"
+                            id="search-box" name="q" data-widget="select" data-ontology="" autocomplete="off">
+                        <span class="input-group-btn">
+                            <button class="btn btn-default" type="button" id="search-button">
+                                <span class="glyphicon glyphicon-search"></span>
+                            </button>
+                        </span>
+                    </div>
+                    <div class="examples">
+                        Examples:
+                        <a href="/gwas/search?query=Parkinson%20disease" data-original-title="" title="">Parkinson
+                            disease</a>,
+                        <a href="/gwas/search?query=rs3093017" data-original-title="" title="">rs3093017</a>,
+                        <a href="/gwas/search?query=Yao" data-original-title="" title="">Yao</a>,
+                        <a href="/gwas/search?query=2q37.2" data-original-title="" title="">2q37.2</a>,
+                        <a href="/gwas/search?query=HBS1L" data-original-title="" title="">HBS1L</a>,
+                        <a href="/gwas/search?query=6:167120000-167130000" data-original-title=""
+                            title="">6:167120000-167130000</a>,
+                        <a href="/gwas/search?query=GCST90132222" data-original-title="" title="">GCST90132222</a>,
+                        PMID:<a href="/gwas/search?query=35241825" data-original-title="" title="">35241825</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="container-fluid" id="breadcrumb">
+        <ol class="breadcrumb background-color-complementary-accent">
+            <li><a href="/gwas/home" data-original-title="" title="">Home</a></li>
+            <li><a href="/gwas//docs">Documentation</a></li>
+            <li>Faq</li>
+        </ol>
+    </div>
+
+    <div class="container tight-to-top">
+
+        <div id="docs-content">
+            <div class="sect1">
+                <h2 id="_frequently_asked_questions">Frequently Asked Questions</h2>
+                <div class="sectionbody">
+                    <div class="sect2">
+                        <h3 id="_a_general">A. General</h3>
+                        <div class="olist arabic">
+                            <ol class="arabic">
+                                <li>
+                                    <p><a href="#faq-A1">How can I access GWAS Catalog data?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A2">Why did the Catalog move from the NHGRI to the EBI?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A3">How can I learn more about using the GWAS Catalog?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A4">How can I stay informed about new search features and
+                                            developments?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A5">How should I cite the GWAS Catalog?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A6">What are the terms and conditions for accessing the GWAS
+                                            Catalog data and code?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A7">How often are the GWAS Catalog and diagram updated?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A8">A new GWAS study has just been published. Why is it not in the
+                                            GWAS Catalog?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A9">Where can I find the GWAS Catalog infrastructure code?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A10">What is the difference between a publication and a study?</a>
+                                    </p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A11">How do I find out the accession number for my study of
+                                            interest?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A12">What is the difference between a trait and a reported
+                                            trait?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A13">What is a background trait?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A14">How do I identify interaction studies in the GWAS Catalog?</a>
+                                    </p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A15">How do I identify targeted and exome array studies in the
+                                            download?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A16">Why are only certain targeted or exome array studies available
+                                            in the GWAS Catalog?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A17">Does the GWAS Catalog include CNV studies?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A18">How can I separate OR from beta in the Associations
+                                            download?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A19">Is each association in the GWAS Catalog unique?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A20">Are results from sequencing-based association analyses
+                                            included in the GWAS Catalog?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A21">How does the GWAS Catalog represent extremely small
+                                            p-values?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A22">Does the GWAS Catalog include data that isn’t associated with
+                                            a journal publication?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A23">How can I find mouse orthologs for the genes in the GWAS
+                                            Catalog?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-A24">What are "top associations"?</a></p>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_b_searching_the_gwas_catalog">B. Searching the GWAS Catalog</h3>
+                        <div class="olist arabic">
+                            <ol class="arabic">
+                                <li>
+                                    <p><a href="#faq-B1">How do I search the GWAS Catalog?</a></p>
+                                </li>
+                            </ol>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_bi_searching_by_publication">B(i). Searching by publication</h4>
+                            <div class="olist arabic">
+                                <ol class="arabic">
+                                    <li>
+                                        <p><a href="#faq-B2">How do I search by publication?</a></p>
+                                    </li>
+                                    <li>
+                                        <p><a href="#faq-B3">I am searching for the author of a publication. Why do my
+                                                search results also contain traits?</a></p>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_bii_searching_by_variant_or_gene">B(ii). Searching by variant or gene</h4>
+                            <div class="olist arabic">
+                                <ol class="arabic">
+                                    <li>
+                                        <p><a href="#faq-B4">How do I search by variant?</a></p>
+                                    </li>
+                                    <li>
+                                        <p><a href="#faq-B5">How do I search by gene?</a></p>
+                                    </li>
+                                    <li>
+                                        <p><a href="#faq-B6">How do I search by genomic region?</a></p>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_biii_searching_by_trait">B(iii). Searching by trait</h4>
+                            <div class="olist arabic">
+                                <ol class="arabic">
+                                    <li>
+                                        <p><a href="#faq-B8">How do I search by trait?</a></p>
+                                    </li>
+                                    <li>
+                                        <p><a href="#faq-B9">When searching for a trait, do the results include all
+                                                publications for that trait?</a></p>
+                                    </li>
+                                    <li>
+                                        <p><a href="#faq-B10">When I search for a certain trait why are other traits
+                                                returned?</a></p>
+                                    </li>
+                                    <li>
+                                        <p><a href="#faq-B11">How are multiple or compound traits represented in the
+                                                Catalog?</a></p>
+                                    </li>
+                                    <li>
+                                        <p><a href="#faq-B12">Why did my search return no results even though I am sure
+                                                there used to be a trait like this in the Catalog?</a></p>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_biv_searching_by_study">B(iv). Searching by study</h4>
+                            <div class="olist arabic">
+                                <ol class="arabic">
+                                    <li>
+                                        <p><a href="#faq-B13">Can I search for a study?</a></p>
+                                    </li>
+                                    <li>
+                                        <p><a href="#faq-B14">How can I search for targeted and exome array studies and
+                                                associations?</a></p>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_c_exploring_specific_pages">C. Exploring specific pages</h3>
+                        <div class="olist arabic">
+                            <ol class="arabic">
+                                <li>
+                                    <p><a href="#faq-C1">How do I download a list of associations for a given trait,
+                                            publication, study or variant?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-C2">How do I use the association plot on the “Trait” page?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-C3">How do I use the linkage disequilibrium plot on the “Variant”
+                                            page?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-C4">How do I view, search and download information from the
+                                            "Associations" and "Studies" tables?</a></p>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_d_diagram">D. Diagram</h3>
+                        <div class="olist arabic">
+                            <ol class="arabic">
+                                <li>
+                                    <p><a href="#faq-D1">How do I display SNP information for a given dot?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-D2">How do I filter the diagram?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-D3">How do I display the legend?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-D4">How do I display labels?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-D5">How do I zoom and move the diagram?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-D6">How should I cite the diagram?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-D7">How do I download the diagram?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-D8">Can I download a filtered version of the diagram?</a></p>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_e_genomic_mappings">E. Genomic mappings</h3>
+                        <div class="olist arabic">
+                            <ol class="arabic">
+                                <li>
+                                    <p><a href="#faq-E1">How is the genomic annotation for each SNP provided?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-E2">Which genome build is the Catalog on?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-E3">How can I access the GWAS Catalog data on alternative genome
+                                            builds?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-E4">Why do some SNPs not have any corresponding mapping
+                                            information?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-E5">How are SNP-SNP interactions and multi-SNP haplotypes displayed
+                                            and annotated?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-E6">What does the most severe consequence/CONTEXT field
+                                            represent?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-E7">Why does the risk allele of a variant not match either of the
+                                            alleles in the reference genome assembly?</a></p>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_f_ancestry">F. Ancestry</h3>
+                        <div class="olist arabic">
+                            <ol class="arabic">
+                                <li>
+                                    <p><a href="#faq-F1">How is the ancestry data in the GWAS Catalog provided?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-F2">How do I search for ancestry data in the GWAS Catalog?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-F3">Can I find all associations for a particular ancestry?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-F4">What does the "Pre-2011 ancestry not double-curated" flag next
+                                            to some of the ancestry data mean?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-F5">Why is the ancestry information provided in a separate
+                                            downloadable spreadsheet to the rest of the study-level information?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-F6">What is included in the COHORT field?</a></p>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_g_programmatic_access">G. Programmatic access</h3>
+                        <div class="olist arabic">
+                            <ol class="arabic">
+                                <li>
+                                    <p><a href="#faq-G1">How do I use the GWAS Catalog REST API?</a></p>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_h_summary_statistics">H. Summary statistics</h3>
+                        <div class="olist arabic">
+                            <ol class="arabic">
+                                <li>
+                                    <p><a href="#faq-H1">What are summary statistics?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-H2">How do I find out which publications have full summary
+                                            statistics available?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-H3">How do I access summary statistics?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-H4">How should I cite summary statistics downloaded from the GWAS
+                                            Catalog?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-H5">What are harmonised summary statistics?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-H6">What are the risks of subject identification associated with
+                                            sharing of summary statistics?</a></p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-H7">Why do some datasets have the CC0 license mark?</a></p>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_i_submitting_summary_statistics">I. Submitting summary statistics</h3>
+                        <div class="olist arabic">
+                            <ol class="arabic">
+                                <li>
+                                    <p><a href="#faq-I1">How can I submit summary statistics to the GWAS Catalog?</a>
+                                    </p>
+                                </li>
+                                <li>
+                                    <p><a href="#faq-I2">How should summary statistics be formatted for submission?</a>
+                                    </p>
+                                </li>
+                            </ol>
+                        </div>
+                        <hr>
+                    </div>
+                </div>
+            </div>
+            <div class="sect1">
+                <h2 id="_a_general_2">A. General</h2>
+                <div class="sectionbody">
+                    <div class="sect3">
+                        <h4 id="_1_how_can_i_access_gwas_catalog_data"><a id="faq-A1"></a>1. How can I access GWAS
+                            Catalog data?</h4>
+                        <div class="paragraph">
+                            <p>GWAS Catalog data from published studies is available through our <a
+                                    href="https://www.ebi.ac.uk/gwas/search?query=">search interface</a>. Separate pages
+                                are available for each <strong>publication</strong>, <strong>study</strong>,
+                                <strong>trait</strong>, <strong>variant</strong> and <strong>gene</strong> in the
+                                Catalog so that each of these can be explored individually. To get started, search for
+                                any text you wish in the search bar, then select a specific page for more information.
+                                See <a href="#B">Searching in the GWAS Catalog below</a> for further tips on how to find
+                                specific types of information, or see the <a
+                                    href="https://youtu.be/4FplAQzRfh8">introductory video</a>. GWAS Catalog data can
+                                also be downloaded in spreadsheet form. To download full association and study data, see
+                                our <a href="file-downloads">file downloads</a> page. You can also download specific
+                                association data sets from each “Publication”, “Study”, “Trait”, “Variant” and "Gene"
+                                page using the “Download Associations” button.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>Summary statistics files are available to download from our <a
+                                    href="ftp://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/">FTP site</a> via
+                                links from the study in the <a href="https://www.ebi.ac.uk/gwas/search?query=">search
+                                    interface</a> or our designated <a
+                                    href="https://www.ebi.ac.uk/gwas/downloads/summary-statistics">summary statistics
+                                    page</a>. Harmonised summary statistics are also available from our summary
+                                statistics database via <a
+                                    href="https://www.ebi.ac.uk/gwas/summary-statistics/docs/">API</a>.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>The GWAS Catalog <a href="#D">diagram</a> presents a graphical view of the GWAS Catalog
+                                data.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>We also provide REST API access to the GWAS Catalog data. See <a href="#G">Programmatic
+                                    access below</a> for more information.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>From 2020, the GWAS Catalog started accepting submissions for pre-published and
+                                unpublished GWAS. For more information, see <a href="#faq-A21">Does the GWAS Catalog
+                                    include data that isn’t associated with a journal publication?</a></p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_2_why_did_the_catalog_move_from_the_nhgri_to_the_ebi"><a id="faq-A2"></a>2. Why did the
+                            Catalog move from the NHGRI to the EBI?</h4>
+                        <div class="paragraph">
+                            <p>From September 2010 to the present, delivery and development of the Catalog has been a
+                                collaborative project between EMBL-EBI and NHGRI. In March 2015 the Catalog
+                                infrastructure moved to EMBL-EBI to enable delivery of an improved user interface,
+                                including ontology driven Catalog searching, and new curatorial infrastructure,
+                                supporting improved QC processes. Content available from the <a
+                                    href="http://www.genome.gov/gwastudies/">NHGRI site</a> was last updated 20 February
+                                2015 and is now frozen. Updated content is available from <a
+                                    href="http://www.ebi.ac.uk/gwas/">here</a>. The latest updated download file is now
+                                available from <a href="file-downloads">here</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_3_how_can_i_learn_more_about_using_the_gwas_catalog"><a id="faq-A3"></a>3. How can I
+                            learn more about using the GWAS Catalog?</h4>
+                        <div class="paragraph">
+                            <p>Have a look at our <a href="related-resources">Related Resources</a> page for training
+                                materials, or see the <a href="#B">FAQ sections below</a> for some hints and tips. You
+                                can also read a description of our <a href="methods">curation methodology</a>, and find
+                                a <a href="related-resources">list of publications by the GWAS Catalog</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_4_how_can_i_stay_informed_about_new_search_features_and_developments"><a
+                                id="faq-A4"></a>4. How can I stay informed about new search features and developments?
+                        </h4>
+                        <div class="paragraph">
+                            <p>You can subscribe to our announcement list by sending an e-mail to <a
+                                    href="mailto:gwas-announce-join@ebi.ac.uk">gwas-announce-join@ebi.ac.uk</a> with
+                                subject heading "subscribe". Traffic on this list will be limited to important
+                                announcements only so you don’t need to worry about getting bombarded with loads of
+                                emails. For queries and user discussion, we have separate mailing lists, <a
+                                    href="mailto:gwas-info@ebi.ac.uk">gwas-info@ebi.ac.uk</a> to contact the Catalog
+                                team and <a href="mailto:gwas-users@ebi.ac.uk">gwas-users@ebi.ac.uk</a> for user
+                                discussion (subscribe by emailing <a
+                                    href="mailto:gwas-users-join@ebi.ac.uk">gwas-users-join@ebi.ac.uk</a> with subject
+                                heading "subscribe"). You can also follow us on Twitter <a
+                                    href="https://twitter.com/GWASCatalog">@GWASCatalog</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_5_how_should_i_cite_the_gwas_catalog"><a id="faq-A5"></a>5. How should I cite the GWAS
+                            Catalog?</h4>
+                        <div class="paragraph">
+                            <p>Please see the <a href="about">About</a> page for citation guidance.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_6_what_are_the_terms_and_conditions_for_accessing_the_gwas_catalog_data_and_code"><a
+                                id="faq-A6"></a>6. What are the terms and conditions for accessing the GWAS Catalog data
+                            and code?</h4>
+                        <div class="paragraph">
+                            <p>Summary statistics are available under <a
+                                    href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a> terms unless
+                                otherwise indicated - see <a href="#faq-H7">below</a> for more details. Other GWAS
+                                Catalog data can be used under the standard Terms of Use for EBI services which can be
+                                found at <a href="http://www.ebi.ac.uk/about/terms-of-use"
+                                    class="bare">http://www.ebi.ac.uk/about/terms-of-use</a>. Our code is available
+                                under the <a href="http://www.apache.org/licenses/LICENSE-2.0">Apache version 2.0
+                                    license</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_7_how_often_are_the_gwas_catalog_and_diagram_updated"><a id="faq-A7"></a>7. How often
+                            are the GWAS Catalog and diagram updated?</h4>
+                        <div class="paragraph">
+                            <p>New data is added to the GWAS Catalog and diagram every two weeks. Data releases include
+                                all downloadable spreadsheets. You can find the date of the most recent data release at
+                                the bottom of the Catalog home page. Summary statistics files are made available as soon
+                                as possible, even before the study is included in our data release. Therefore, if a
+                                manuscript states that summary statistics are available from the Catalog and you cannot
+                                find them in the <a href="https://www.ebi.ac.uk/gwas/downloads/summary-statistics">list
+                                    of studies with summary statistics files</a> or on our <a
+                                    href="ftp://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/">FTP site</a>
+                                please contact us at <a href="mailto:gwas-info@ebi.ac.uk">gwas-info@ebi.ac.uk</a> and we
+                                can give you direct access to the files.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_8_a_new_gwas_paper_has_just_been_published_why_is_it_not_in_the_gwas_catalog"><a
+                                id="faq-A8"></a>8. A new GWAS paper has just been published. Why is it not in the GWAS
+                            Catalog?</h4>
+                        <div class="paragraph">
+                            <p>Due to the considerable manual curation effort that goes into each publication in the
+                                GWAS Catalog, it takes a while for publications to be included in the Catalog after they
+                                have been first indexed in PubMed. The GWAS Catalog curation team work as fast as they
+                                can to process studies while maintaining the high standard of accuracy our users expect
+                                of the Catalog. If your publication of interest is more than a couple of months old,
+                                please contact us at <a href="mailto:gwas-info@ebi.ac.uk">gwas-info@ebi.ac.uk</a> to
+                                confirm we have identified it and that it is in our curation queue. We will prioritise
+                                publications of particular interest to our users.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_9_where_can_i_find_the_gwas_catalog_infrastructure_code"><a id="faq-A9"></a>9. Where
+                            can I find the GWAS Catalog infrastructure code?</h4>
+                        <div class="paragraph">
+                            <p>All our code is freely available from <a href="https://github.com/EBISPOT/goci">our
+                                    Github repository</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_10_what_is_the_difference_between_a_publication_and_a_study"><a id="faq-A10"></a>10.
+                            What is the difference between a publication and a study?</h4>
+                        <div class="paragraph">
+                            <p>A <strong>publication</strong> refers to an article published in a scientific journal. We
+                                use each publication’s unique PubMed ID to keep track of it in the GWAS Catalog. Some
+                                publications contain multiple genome-wide association studies with distinct traits,
+                                sample cohorts or other unique characteristics. Each of these separate analyses is
+                                stored as a <strong>study</strong> in the Catalog and is given a stable accession number
+                                beginning with “GCST”. You can read more about how we curate publications containing
+                                multiple analyses in our <a href="methods/curation">Curation methods</a> section.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_11_how_do_i_find_out_the_accession_number_for_my_study_of_interest"><a
+                                id="faq-A11"></a>11. How do I find out the accession number for my study of interest?
+                        </h4>
+                        <div class="paragraph">
+                            <p>Each separate study in the GWAS Catalog has an accession number beginning with “GCST”.
+                                Study accessions are visible at the top of each “Study” page and in the “Studies” and
+                                “Associations” data tables on other pages. Accession numbers are included in the v1.0.2
+                                and v1.0.3 spreadsheets for associations and studies as well the ancestry spreadsheets.
+                                Accession numbers are not provided in the v1.0 spreadsheets as these are legacy formats
+                                provided only to support backwards compatibility with the old NHGRI spreadsheet.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_12_what_is_the_difference_between_a_trait_and_a_reported_trait"><a id="faq-A12"></a>12.
+                            What is the difference between a trait and a reported trait?</h4>
+                        <div class="paragraph">
+                            <p>We assign each study in the Catalog one or more standardised <strong>trait</strong> terms
+                                from the <a href="http://www.ebi.ac.uk/efo">Experimental Factor Ontology</a> to
+                                represent the disease, phenotype, measurement or drug response under investigation. For
+                                more information about how ontologies are used in the Catalog, see our <a
+                                    href="ontology">ontology</a> page. Each trait has its own page in the Catalog, where
+                                you can see all of the relevant studies, and any variants associated with the trait.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>In addition, each study has a <strong>reported trait</strong>, based on the authors’
+                                description of the phenotype analysed. The reported trait takes the study design into
+                                account and is useful for understanding the specific details of the phenotype,
+                                especially in complex studies that include SNP-by-environment interactions etc.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_13_what_is_a_background_trait"><a id="faq-A13"></a>13. What is a background trait?</h4>
+                        <div class="paragraph">
+                            <p>A background trait is a characteristic that is shared by all participants in a study, but
+                                is not directly tested in the association analysis. For example, a study of "Allergic
+                                rhinitis in asthma" compares cases (individuals with allergic rhinitis) vs controls
+                                (individuals without allergic rhinitis), where all samples (both cases and controls)
+                                have asthma. The aim of this study would be to identify variants associated with
+                                allergic rhinitis - the <strong>main trait</strong> under investigation. Asthma in this
+                                example is a <strong>background trait</strong>: the study wouldn’t be able to identify
+                                variants associated with asthma, but the fact that all participants have asthma may
+                                provide important context to the allergic rhinitis associations that are reported.
+                                Therefore we display both <strong>main</strong> and <strong>background</strong> traits,
+                                clearly labelled as such, in the GWAS Catalog.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>See <a href="#faq-B12">FAQ B(iii)-5</a> for more information about how background traits
+                                are displayed in the GWAS Catalog.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_14_how_do_i_identify_interaction_studies_in_the_gwas_catalog"><a id="faq-A14"></a>14.
+                            How do I identify interaction studies in the GWAS Catalog?</h4>
+                        <div class="paragraph">
+                            <p>The GWAS Catalog contains SNP-by-SNP and SNP-by-environment interaction studies as long
+                                as the SNPs analysed meet our <a href="methods/criteria">criteria</a> of being
+                                genome-wide. For both types of study, the term “interaction” is included in the reported
+                                trait.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>For SNP-by-SNP interaction studies the term “SNP x SNP interaction” is added in
+                                parenthesis. For SNP-by-environment interaction studies, the environmental component is
+                                included in the reported trait. Since July 2018, we have added information to
+                                distinguish between the different statistical tests for SNP-by-environment interactions:
+                                the 2-degree of freedom test of both the main effect and the interaction term versus the
+                                1-degree of freed test of just the interaction term. For these recent studies, the
+                                reported trait is represented as e.g. “Lung cancer x smoking interaction (1df test)”.
+                                Earlier studies do not include the type of test e.g. “Lung cancer (smoking
+                                interaction)”.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>To identify interaction studies, go to the “Trait” page for either the main phenotype or
+                                an interaction term, e.g. “diastolic blood pressure”. You can then use the search box in
+                                the “Associations” or “Studies” tables to search for “interaction”.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>You can also search for “interaction” in the download spreadsheet.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_15_how_do_i_identify_targeted_and_exome_array_studies_in_the_gwas_catalog"><a
+                                id="faq-A15"></a>15. How do I identify targeted and exome array studies in the GWAS
+                            Catalog??</h4>
+                        <div class="paragraph">
+                            <p>Targeted/exome array studies included in the Catalog are indicated by a small “target”
+                                icon. This icon appears in the search results next to any publication that includes a
+                                targeted array study. It is also displayed in the “Studies” table (on the “Publication”,
+                                “Trait”, “Variant” or "Gene" page), in the “Study accession” column.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>Targeted/exome array studies are identifiable in the download file from the presence of
+                                an extra column displaying the field “Genotyping technology (additional array
+                                information)”, as described in <a
+                                    href="https://www.ebi.ac.uk/gwas/docs/file-downloads">our download section</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_16_why_are_only_certain_targeted_or_exome_array_studies_available_in_the_gwas_catalog">
+                            <a id="faq-A16"></a>16. Why are only certain targeted or exome array studies available in
+                            the GWAS Catalog?</h4>
+                        <div class="paragraph">
+                            <p>We are working on expanding the scope of the GWAS Catalog to include large-scale
+                                targeted/non-genome-wide arrays, including the Metabochip, Immunochip and Exome array.
+                                Feedback from our users has indicated a high demand for studies of this type to be
+                                included in the Catalog. This is currently in a pilot phase where prioritisation of
+                                targeted and exome array studies for inclusion in the Catalog is by 1) relevance of the
+                                trait analysed 2) user request.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_17_does_the_gwas_catalog_include_cnv_studies"><a id="faq-A17"></a>17. Does the GWAS
+                            Catalog include CNV studies?</h4>
+                        <div class="paragraph">
+                            <p>CNV studies are not currently within the scope of the GWAS Catalog for literature
+                                identification and curation of associations. However, we can accept submissions of
+                                summary statistics from CNV studies and will make files and metadata available for these
+                                studies.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_18_how_can_i_separate_or_from_beta_in_the_associations_download"><a
+                                id="faq-A18"></a>18. How can I separate OR from beta in the associations download?</h4>
+                        <div class="paragraph">
+                            <p>It is not currently possible to download the entire Catalog with OR and beta in separate
+                                columns. However, betas and ORs can be distinguished as all betas have a unit and
+                                direction e.g. “unit increase” or “cm decrease”. In the download, this is included in
+                                the "95% CI (TEXT)” column.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>Alternatively, if you download search results directly from the Associations table on the
+                                web interface (using the download button to the top right of the table), the file will
+                                replicate what you see in the table, with OR and beta in separate columns.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_19_is_each_association_in_the_gwas_catalog_unique"><a id="faq-A19"></a>19. Is each
+                            association in the GWAS Catalog unique?</h4>
+                        <div class="paragraph">
+                            <p>Each association in the Catalog comes from a unique analysis. However, certain cohorts
+                                are repeatedly analysed in slightly different ways so the same associations may appear
+                                multiple times in the Catalog. Similarly, the association results from component groups
+                                of a meta-analysis may be represented in the Catalog, as well as the association results
+                                from the meta-analysis itself. Users can check the sample number and ancestry as a clue
+                                to “duplicated” analyses, but we encourage users to examine the source publications
+                                further for more detail.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4
+                            id="_20_are_results_from_sequencing_based_association_analyses_included_in_the_gwas_catalog">
+                            <a id="faq-A20"></a>20. Are results from sequencing-based association analyses included in
+                            the GWAS Catalog?</h4>
+                        <div class="paragraph">
+                            <p>We welcome user submissions of summary statistics for sequencing-based association
+                                analyses, so some sequencing-based associations will appear in the Catalog. However, our
+                                full manual curation process is only routinely applied to array-based association
+                                analyses at the current time. We are investigating expanding the scope to include more
+                                sequencing-based association studies. You can read the results of our review of the
+                                sequencing-based association literature in <a
+                                    href="https://www.cell.com/cell-genomics/fulltext/S2666-979X(21)00005-7">McMahon et
+                                    al, Sequencing-based genome-wide association studies reporting standards, Cell
+                                    Genomics (2021)</a>, and see our list of studies and curated metadata or give us
+                                your input on <a href="https://www.ebi.ac.uk/gwas/docs/pilots">our pilots page</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_21_how_does_the_gwas_catalog_represent_extremely_small_p_values"><a
+                                id="faq-A21"></a>21. How does the GWAS Catalog represent extremely small p-values?</h4>
+                        <div class="paragraph">
+                            <p>Some publications may report a GWAS association p-value of 0 due to the limits of methods
+                                or analysis software to compute very small numbers. Where authors are unable to provide
+                                the precise p-value we will extract the maximum threshold provided to us, e.g.
+                                &lt;1e-300 will be extracted as 1e-300. However it should be noted that the true p-value
+                                may be much smaller.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4
+                            id="_22_does_the_gwas_catalog_include_data_that_isnt_associated_with_a_pubmed_indexed_journal_publication">
+                            <a id="faq-A22"></a>22. Does the GWAS Catalog include data that isn’t associated with a
+                            PubMed-indexed journal publication?</h4>
+                        <div class="paragraph">
+                            <p>From 2020, the GWAS Catalog started accepting submissions for unpublished GWAS (including
+                                pre-published GWAS i.e. data associated with a pre-print or article in press).
+                                Unpublished GWAS metadata is available via the study pages for each accession number and
+                                in more detail in the unpublished <a
+                                    href="https://www.ebi.ac.uk/gwas/downloads">download files</a>. Unpublished summary
+                                statistics are available via our <a
+                                    href="ftp://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/">FTP site</a> and
+                                <a href="https://www.ebi.ac.uk/gwas/downloads/summary-statistics">summary statistics
+                                    page</a> page as well as via the study pages. Unpublished data is made available
+                                exactly as submitted by authors and has not been reviewed by our curators. Upon
+                                publication it is curated, annotated, extended to include top associations and
+                                incorporated into our main database.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_23_how_can_i_find_the_mouse_orthologs_in_impc_for_the_genes_in_the_gwas_catalog"><a
+                                id="faq-A23"></a>23. How can I find the mouse orthologs in IMPC for the genes in the
+                            GWAS Catalog?</h4>
+                        <div class="paragraph">
+                            <p>Each GWAS Catalog gene with a mouse ortholog in <a
+                                    href="https://www.mousephenotype.org/">IMPC</a> is linked via a button on the gene
+                                page. Orthology predictions are provided by IMPC’s reference database which is rebuilt
+                                every week to include the latest HCOP ortholog relationships and data from MGI. For more
+                                information on ortholog mapping, refer to IMPC’s <a
+                                    href="https://www.mousephenotype.org/help/data-integration/how-to-use-the-essential-genes-data-portal/0">documentation</a>
+                                and <a href="https://www.nature.com/articles/s41467-020-14284-2">publication</a>. Where
+                                no ortholog has been established, the button is not displayed.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_24_what_are_top_associations"><a id="faq-A24"></a>24. What are "top associations"?</h4>
+                        <div class="paragraph">
+                            <p>Top associations describe all those which appear within Associations tables of the
+                                Catalog, which have been manually curated from published articles. These are filtered
+                                via our curation process to include only those:</p>
+                        </div>
+                        <div class="ulist">
+                            <ul>
+                                <li>
+                                    <p>significant (p&lt;1e-5) in all stages of an analysis</p>
+                                </li>
+                                <li>
+                                    <p>either described as independent by the authors, or the peak association within
+                                        100kb range</p>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="paragraph">
+                            <p>Top associations are distinguished from full summary statistics which contain all
+                                associations discovered in a GWAS, regardless of independence or significance.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sect1">
+                <h2 id="_b_searching_the_gwas_catalog_2"><a id="B"></a>B. Searching the GWAS Catalog</h2>
+                <div class="sectionbody">
+                    <div class="sect3">
+                        <h4 id="_1_how_do_i_search_the_gwas_catalog"><a id="faq-B1"></a>1. How do I search the GWAS
+                            Catalog?</h4>
+                        <div class="paragraph">
+                            <p>Type your query, e.g. “breast carcinoma”, into the search box and hit return or click the
+                                search icon. You can type any text you wish into the search bar. The search then returns
+                                any <strong>publications</strong> (marked with the letter P), <strong>variants</strong>
+                                (V) or <strong>traits</strong> (T) in the Catalog that contain an exact string match
+                                within a number of data fields. You can use the “Refine search results” box on the left
+                                to show only publications, variants or traits. See B(i-iv) below for more details on how
+                                to search for each specific document type.</p>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_bi_searching_by_publication_2">B(i). Searching by publication</h3>
+                        <div class="sect3">
+                            <h4 id="_1_how_do_i_search_by_publication"><a id="faq-B2"></a>1. How do I search by
+                                publication?</h4>
+                            <div class="paragraph">
+                                <p>You can find a publication by searching for the PubMed ID, any author or any word
+                                    within the publication title. Note that all authors associated with a publication
+                                    are included in our database, so searching for an author name will return all
+                                    publications featuring that author, not only first author publications. This means
+                                    that an author name can return a very large number of results. If you are looking
+                                    for a specific publication we recommend searching by PubMed ID.</p>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4
+                                id="_2_i_am_searching_for_the_author_of_a_publication_why_do_my_search_results_also_contain_traits">
+                                <a id="faq-B3"></a>2. I am searching for the author of a publication. Why do my search
+                                results also contain traits?</h4>
+                            <div class="paragraph">
+                                <p>The search returns all publications, traits and variants that contain a match for the
+                                    text string entered across all fields, so if your search term is for example
+                                    "Parkinson", you will find publications with an author named Parkinson as well as
+                                    publications with “Parkinson” in the title and traits related to Parkinson’s
+                                    disease. If you are looking for a specific publication we recommend searching by
+                                    PubMed ID.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_bii_searching_by_variant_or_gene_2">B(ii). Searching by variant or gene</h3>
+                        <div class="sect3">
+                            <h4 id="_1_how_do_i_search_by_variant"><a id="faq-B4"></a>1. How do I search by variant?
+                            </h4>
+                            <div class="paragraph">
+                                <p>You can find a variant (or single nucleotide polymorphism, SNP) by searching for an
+                                    rsID, a genomic region or a gene mapped to that variant. As mapped genes and genomic
+                                    regions can return a large number of results, we recommend searching by rsID if you
+                                    are looking for a specific variant.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>See <a href="#E">Genomic mappings below</a> for details of how we map variants to
+                                    genes.</p>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_2_how_do_i_search_by_gene"><a id="faq-B5"></a>2. How do I search by gene?</h4>
+                            <div class="paragraph">
+                                <p>You can search for a gene in the main search bar eg. STAT4. This will return any
+                                    matching genes, as well as variants annotated with that gene by out mapping
+                                    pipeline. The results may also include publications with the gene name in the title.
+                                </p>
+                            </div>
+                            <div class="paragraph">
+                                <p>The "Gene" page provides a list of all associations mapped to that gene as well as
+                                    other gene-specific data. See <a href="#E">Genomic mappings below</a> for details of
+                                    how we map variants to genes. Note that this may not always match the gene reported
+                                    by authors for a given variant, as they may use different criteria.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>Author-reported genes can be found in the <a
+                                        href="https://www.ebi.ac.uk/gwas/docs/file-downloads">full data download</a>.
+                                    Opening the file in Excel and applying a <a
+                                        href="https://support.office.com/en-us/article/Quick-start-Filter-data-by-using-an-AutoFilter-08647E19-11D1-42F6-B376-27B932E186E0">filter</a>
+                                    for your gene of interest to the REPORTED GENE(S) column will enable you to extract
+                                    all associations in that gene.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>You can also use our <a href="api">REST API</a> to return associations for a specific
+                                    gene or genomic region.</p>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_3_how_do_i_search_by_genomic_region"><a id="faq-B6"></a>3. How do I search by
+                                genomic region?</h4>
+                            <div class="paragraph">
+                                <p>You can search by genomic region using the format chromNumber:bpLocation-bpLocation,
+                                    for example 6:16000000-25000000. You can also search using cytogenetic nomenclature,
+                                    for example 2q37.1. These searches will return a list of genes and variants within
+                                    the region.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_biii_searching_by_trait_2">B(iii). Searching by trait</h3>
+                        <div class="sect3">
+                            <h4 id="_1_how_do_i_search_by_trait"><a id="faq-B8"></a>1. How do I search by trait?</h4>
+                            <div class="paragraph">
+                                <p>To find a trait, type the name of any disease, phenotype, measurement or drug
+                                    response. The search will return traits matching your search term, synonyms of
+                                    traits matching your search term and child traits of both of these e.g. a search for
+                                    “cancer” would also return all cancer subtypes. Note that it will also return
+                                    publications where the title includes your search term.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>If you can’t find your trait of interest, it may be that it is included in the GWAS
+                                    Catalog under a different name. For example, searching for “general cognitive
+                                    ability” will return the synonym “intelligence”, which is how that trait is stored
+                                    in the GWAS Catalog. Note that the search bar offers suggestions as you type,
+                                    including possible synonyms for your trait of interest.</p>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4
+                                id="_2_when_searching_for_a_trait_do_the_results_include_all_publications_for_that_trait">
+                                <a id="faq-B9"></a>2. When searching for a trait, do the results include all
+                                publications for that trait?</h4>
+                            <div class="paragraph">
+                                <p>A publication is only returned if the publication title, authors or PubMed ID contain
+                                    your search term. If you want to find all of the studies on a particular trait,
+                                    first go to the “Trait” page and then look at the “Studies” table.</p>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_3_when_i_search_for_a_certain_trait_why_are_other_traits_returned"><a
+                                    id="faq-B10"></a>3. When I search for a certain trait why are other traits returned?
+                            </h4>
+                            <div class="paragraph">
+                                <p>Sometimes it may not be immediately obvious why your search has returned a particular
+                                    trait.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>In addition to exact string matches and synonyms for your search term, the search
+                                    results may also include more specific child terms of a trait that matches your
+                                    search. This can be useful, for example, if you want to look for subtypes of a
+                                    particular disease, e.g. searching for “thyroid disease” returns the traits
+                                    “Hashimoto’s thyroiditis” and “Graves disease”, both types of thyroid disease.
+                                    Hierarchical relationships between traits are based on the Experimental Factor
+                                    Ontology (EFO). For more information about how ontologies are used in the Catalog,
+                                    see our <a href="ontology">ontology</a> page.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>The search results may also contain traits that have been studied together with your
+                                    trait of interest in some way, for example in a GWAS for multiple traits or for a
+                                    compound trait. For example, searching for “asthma” also returns the trait “response
+                                    to bronchodilator”. This is because the GWAS Catalog includes a study on response to
+                                    bronchodilator in a sample of people who all have asthma. See <a href="#faq-B11">FAQ
+                                        B(iii)-4</a> and <a href="#faq-B12">-5</a> to find out how more complicated
+                                    phenotypes are represented in the Catalog.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>You may also find a publication in the search results, if the publication title
+                                    contains your trait of interest.</p>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_4_how_are_multiple_or_compound_traits_represented_in_the_catalog"><a
+                                    id="faq-B11"></a>4. How are multiple or compound traits represented in the Catalog?
+                            </h4>
+                            <div class="paragraph">
+                                <p>Some studies are mapped to more than one trait, usually because those studies involve
+                                    a more complex definition of the phenotype under investigation. Currently, the best
+                                    way to understand the relationship between multiple traits in the same study is to
+                                    look at the <strong>reported trait</strong>, which is based on the phenotype
+                                    description used in the original paper.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>Where a study has combined groups of individuals with different traits in the same
+                                    analysis, this is indicated by the use of the word “or” in the reported trait. For
+                                    example, if individuals with bipolar disorder and individuals with schizophrenia
+                                    were compared to controls in the same analysis, the reported trait would be "bipolar
+                                    disorder or schizophrenia”. The study would be mapped to two traits from the
+                                    ontology: “bipolar disorder” and “schizophrenia”.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>Where a study includes individuals each having multiple traits, this is indicated by
+                                    the word “and” in the reported trait. For example, if individuals diagnosed with
+                                    bipolar disorder who show binge-eating behaviour were compared to controls, the
+                                    reported trait would be “bipolar disorder and binge eating”. The study would be
+                                    mapped to two traits from the ontology: “bipolar disorder” and “binge eating”.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p><strong>Please note:</strong> due to issues of scale with the increasing number of
+                                    studies associated with biobanks, where reported traits include the words “UKB data
+                                    field” or ICD codes we cannot guarantee these follow our standard naming conventions
+                                    as they may have been extracted unedited from the paper. Users are recommended to
+                                    refer to the source of the code (e.g. <a
+                                        href="https://biobank.ndph.ox.ac.uk/ukb/index.cgi"
+                                        class="bare">https://biobank.ndph.ox.ac.uk/ukb/index.cgi</a>) to confirm details
+                                    in this case.</p>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_5_how_are_background_traits_represented_in_the_catalog"><a id="faq-B12"></a>5. How
+                                are background traits represented in the Catalog?</h4>
+                            <div class="paragraph">
+                                <p>A background trait is a characteristic that is shared by all participants in a study,
+                                    but is not directly tested in the association analysis. See <a href="#faq-A13">FAQ
+                                        A13</a> for a more detailed introduction to background traits.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>Since July 2021, we present <a href="http://www.ebi.ac.uk/efo">Experimental Factor
+                                        Ontology</a> terms for any <strong>background traits</strong> in a separate
+                                    field to the main <strong>trait</strong>. This can be seen on every Study page, as
+                                    well as in each Studies and Associations data table. Previously, both traits were
+                                    displayed but they were not as straightforward for users to distinguish. The
+                                    <strong>reported trait</strong> continues to include both components in a single
+                                    description, usually written as "[main trait] <em>in</em> [background trait]", e.g.
+                                    "Allergic rhinitis <em>in</em> asthma". For more on the difference between
+                                    <strong>traits</strong> and <strong>reported traits</strong> see <a
+                                        href="#faq-A12">FAQ A12 above</a>.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>The Trait page, by default, only displays studies and associations where the
+                                    currently-viewed trait is the main trait of interest in the GWAS. If you would like
+                                    to also include studies and associations where that trait is a background trait,
+                                    please check the "Include background traits data" box above the data tables. This
+                                    option will also update the association plot at the bottom of the page to include
+                                    background trait data.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>In the full <a href="https://www.ebi.ac.uk/gwas/docs/file-downloads">GWAS Catalog
+                                        spreadsheet downloads</a>, the background trait is only included in the most
+                                    recent version (v1.0.3), under the MAPPED BACKGROUND TRAIT and MAPPED BACKGROUND
+                                    TRAIT URI columns. Earlier versions of the spreadsheet include only the main trait.
+                                </p>
+                            </div>
+                            <div class="paragraph">
+                                <p>Note that the GWAS Catalog API currently returns only main traits, however we hope to
+                                    include an option to access studies and associations by background trait in the
+                                    future.</p>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4
+                                id="_6_why_did_my_search_return_no_results_even_though_i_am_sure_there_used_to_be_a_trait_like_this_in_the_catalog">
+                                <a id="faq-B13"></a>6. Why did my search return no results even though I am sure there
+                                used to be a trait like this in the Catalog?</h4>
+                            <div class="paragraph">
+                                <p>Our search functionality searches for exact text string matches, so if you
+                                    accidentally type "beast cancer" instead of "breast cancer", you will not get any
+                                    results. Equally, "metabolic disorder" won’t return any results while "metabolic
+                                    disease" will return a lot. The search bar provides an autocomplete function that
+                                    will suggest possible search terms as you type. Alternatively, try varying your
+                                    search term or searching for your term in <a href="http://www.ebi.ac.uk/efo">EFO</a>
+                                    to get an idea of what other terms might be available.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sect2">
+                        <h3 id="_biv_searching_by_study_2">B(iv). Searching by study</h3>
+                        <div class="sect3">
+                            <h4 id="_1_can_i_search_for_a_study"><a id="faq-B14"></a>1. Can I search for a study?</h4>
+                            <div class="paragraph">
+                                <p>Individual studies within a particular publication are not currently displayed in the
+                                    search results. To find a study, search for a publication, trait or variant and then
+                                    go to the “Studies” table to click through to the linked studies.</p>
+                            </div>
+                            <div class="paragraph">
+                                <p>If you already know the accession number of a particular study (beginning with
+                                    “GCST”), you can search for this on the homepage to return the publication
+                                    containing that study.</p>
+                            </div>
+                        </div>
+                        <div class="sect3">
+                            <h4 id="_2_how_can_i_search_for_targeted_and_exome_array_studies_and_associations"><a
+                                    id="faq-B15"></a>2. How can I search for targeted and exome array studies and
+                                associations?</h4>
+                            <div class="paragraph">
+                                <p>You can enter the genotyping technology of your interest in the search bar, e.g.
+                                    “targeted genotyping array”, “exome genotyping array”. This will return any
+                                    publication that uses that specific genotyping technology.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sect1">
+                <h2 id="_c_exploring_specific_pages_2">C. Exploring specific pages</h2>
+                <div class="sectionbody">
+                    <div class="sect3">
+                        <h4
+                            id="_1_how_do_i_download_a_list_of_associations_for_a_given_trait_publication_study_or_variant">
+                            <a id="faq-C1"></a>1. How do I download a list of associations for a given trait,
+                            publication, study or variant?</h4>
+                        <div class="paragraph">
+                            <p>There are two ways to download association data on the specific “Trait”, “Publication”,
+                                “Study”, “Variant” or "Gene" pages. The “Download Associations” button downloads a
+                                spreadsheet (.tsv) of the full data for every association displayed on the current page.
+                                This data is formatted in the same way as the full Catalog spreadsheets available from
+                                our <a href="file-downloads">file downloads</a> page and includes study information for
+                                each association.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>The specific pages also contain “Studies” and “Associations” tables, which display a
+                                condensed view of the data with fewer columns. These can be downloaded in .csv format
+                                using the “export” button in the top righthand corner of each table. Columns can be
+                                added or removed from this table using the “Add/Remove Columns” button – only the
+                                selected columns will be included in the exported table.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_2_how_do_i_use_the_association_plot_on_the_trait_page"><a id="faq-C2"></a>2. How do I
+                            use the association plot on the “Trait” page?</h4>
+                        <div class="paragraph">
+                            <p>The association plot displays all associations in the Catalog for the selected trait.
+                                Individual associations are plotted as circles and are coloured according to the same
+                                broad trait categories that are used in the GWAS Catalog <a href="#D">Diagram</a> (see
+                                the legend in the top left of the plot). You can mouse over or click on one of the
+                                circles for more information about a particular variant. You can also download an image
+                                of the plot. The plot is constructed using the LocusZoom <a
+                                    href="http://statgen.github.io/locuszoom">plugin</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_3_how_do_i_use_the_linkage_disequilibrium_ld_plot_on_the_variant_page"><a
+                                id="faq-C3"></a>3. How do I use the linkage disequilibrium (LD) plot on the “Variant”
+                            page?</h4>
+                        <div class="paragraph">
+                            <p>The LD plot integrates data from Ensembl with GWAS Catalog data. It shows the degree of
+                                linkage disequilibrium between the selected variant and other variants within a 50kb
+                                window. You can select the population of interest and LD measurement (r2 or D’) using
+                                the drop-down menus and set your own LD threshold. You can also download the data shown
+                                in the plot as a .tsv file.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>LD information between a variant of interest and the surrounding variants can be accessed
+                                programmatically using the Ensembl REST API (<a
+                                    href="http://rest.ensembl.org/documentation/info/ld_pairwise_get"
+                                    class="bare">http://rest.ensembl.org/documentation/info/ld_pairwise_get</a>) where
+                                you can specify a variant ID, a window size of the region surrounding the variant, a
+                                population and a cut-off for the calculation results.
+                                In case of a dataset with more than 1 variant of interest, several independant calls to
+                                the Ensembl REST API (<a
+                                    href="http://rest.ensembl.org/documentation/info/ld_pairwise_get"
+                                    class="bare">http://rest.ensembl.org/documentation/info/ld_pairwise_get</a>) can be
+                                made.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4
+                            id="_4_how_do_i_view_search_and_download_information_from_the_associations_and_studies_tables">
+                            <a id="faq-C4"></a>4. How do I view, search and download information from the "Associations"
+                            and "Studies" tables?</h4>
+                        <div class="paragraph">
+                            <p>These tables can be found on the each of the specific "Trait", "Variant", "Gene",
+                                "Publication" and "Study" pages. The data displayed is highly customisable. You can
+                                refine the results by typing into a) the search box above the table, to search all
+                                columns, or b) the filter boxes at the top of each column, to search only within a
+                                specific column. You can customise the columns displayed using the "Add/Remove Columns"
+                                button. You can sort by clicking on the column header. Finally, you can use the "Export
+                                data" button to download the table as a csv file. Note that the csv file will contain
+                                the data displayed in the table, taking into account any changes you have made to the
+                                rows, columns displayed or sorting.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sect1">
+                <h2 id="_d_diagram_2"><a id="D"></a>D. Diagram</h2>
+                <div class="sectionbody">
+                    <div class="sect3">
+                        <h4 id="_1_how_do_i_display_snp_information_for_a_given_dot"><a id="faq-D1"></a>1. How do I
+                            display SNP information for a given dot?</h4>
+                        <div class="paragraph">
+                            <p>To view all the SNPs associated with any trait in a given location, simply click on the
+                                trait (coloured circle) you are interested in. An interactive pop-up will display the
+                                SNPs for that trait, the p-value for each SNP-trait association, the study in which the
+                                association was identified, the trait assigned by the GWAS Catalog curators and the EFO
+                                term the SNP-trait association is mapped to. The SNP, disease trait, EFO term and study
+                                fields are interactive, linking to a search of the full Catalog for that particular
+                                field. SNP, EFO term and study also link out via the external link icon to Ensembl, EFO
+                                and UKPMC, respectively. Clicking outside the pop-up automatically closes the current
+                                pop-up. Alternatively, close the pop-up by clicking on the cross in its top right corner
+                                or on the "Close" button.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_2_how_do_i_filter_the_diagram"><a id="faq-D2"></a>2. How do I filter the diagram?</h4>
+                        <div class="paragraph">
+                            <p>The full diagram can be filtered by typing a trait into the search box to the left the
+                                diagram and hitting "Enter" or clicking the "Apply" button. Once you have typed 3 to 4
+                                characters, the text box will offer auto-completed suggestions for your search based on
+                                EFO traits. You can navigate the suggestion list using your mouse or the up and down
+                                keys.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>Once you have filtered the diagram by a selected trait, all other traits will be faded to
+                                a lower visibility to highlight the desired trait. A counter in the top left corner of
+                                the diagram will indicate how many dots on the diagram correspond to your search term.
+                                Searchable traits are based on EFO categories and may not coincide with GWAS Catalog
+                                reported traits, e.g. a search for "hair color" will highlight SNP-trait associations
+                                labelled hair color as well as "black vs blond hair" and "red vs non-red hair".</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_3_how_do_i_display_the_legend"><a id="faq-D3"></a>3. How do I display the legend?</h4>
+                        <div class="paragraph">
+                            <p>A legend of the colour scheme is available to the left of the diagram. The legend
+                                includes a count of the number of dots of each colour in the diagram. You can hide the
+                                sidebar of increase the amount of screen space for the diagram by clicking on the little
+                                chevron icon at the top of the sidebar. Click on any item in the legend to filter the
+                                diagram by that category. This does not work for any of the "other"-type categories
+                                (other measurement, other disease and other trait). Please note that some traits, in
+                                particular some diseases, belong to multiple categories, eg Crohn’s disease is both a
+                                digestive system disease and an immune system disease. Each dot on the diagram can only
+                                be assigned one colour and colour assignment is determined by a term’s most specific
+                                ancestor (ancestor that has itself the most number of ancestors) in EFO so it is
+                                possible to find dots of a different colour when searching for example for "digestive
+                                system disease".</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_4_how_do_i_display_labels"><a id="faq-D4"></a>4. How do I display labels?</h4>
+                        <div class="paragraph">
+                            <p>Chromosomes and traits (coloured circles) have labels that display when hovering the
+                                mouse pointer over a given element. The displayed labels correspond to the EFO term
+                                mapped this SNP.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_5_how_do_i_zoom_and_move_the_diagram"><a id="faq-D5"></a>5. How do I zoom and move the
+                            diagram?</h4>
+                        <div class="paragraph">
+                            <p>The diagram was designed to have GoogleMaps-style interactivity. There are two ways to
+                                zoom in and out. The easiest option is to use the scroll wheel on the mouse or touch pad
+                                on a laptop. Scrolling up zooms in and scrolling down zooms out. This feature may not
+                                work with all touch pads. Alternatively, the top right-hand corner of the diagram
+                                features a zoom bar which can be used to generate exactly the same effect, by dragging
+                                the little square left or right along the bar with the mouse pointer or clicking the
+                                plus and minus buttons.
+                                The diagram can be moved around the viewing area by clicking on any part of the diagram
+                                with the left mouse button and, holding the mouse button down, dragging the diagram
+                                around the screen until the desired part is visible. This feature is particularly useful
+                                for centring the diagram on a specific location at higher zoom levels.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_6_how_should_i_cite_the_diagram"><a id="faq-D6"></a>6. How should I cite the diagram?
+                        </h4>
+                        <div class="paragraph">
+                            <p>Please see the <a href="about">About</a> page for citation guidance.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_7_how_do_i_download_the_diagram"><a id="faq-D7"></a>7. How do I download the diagram?
+                        </h4>
+                        <div class="paragraph">
+                            <p>Download options are listed <a
+                                    href="https://www.ebi.ac.uk/gwas/docs/diagram-downloads">here</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_8_can_i_download_a_filtered_version_of_the_diagram"><a id="faq-D8"></a>8. Can I
+                            download a filtered version of the diagram?</h4>
+                        <div class="paragraph">
+                            <p>The diagram can be filtered by trait to present only a subset of specific associations.
+                                At present we don’t have a native function for downloading diagrams filtered by trait.
+                                We suggest taking a screenshot if a high resolution image is not required.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>As a workaround a high resolution image can be created by saving the web-displayed image
+                                as an .svg (scalable vector graphics format). These instructions are for Firefox, it’s
+                                slightly different in other browsers. Right click on the filtered diagram, click
+                                'inspect element', in the inspector window hover over the svg element (this starts
+                                &lt;svg), right click and 'copy - outer html'. Paste this text into a text editor and
+                                save. Change the file extension from .txt to .svg. You will then be able to open the
+                                image as an .svg in an image processing program (e.g. Inkscape or Illustrator). From
+                                there you can convert to your preferred format.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sect1">
+                <h2 id="_e_genomic_mappings_2"><a id="E"></a>E. Genomic mappings</h2>
+                <div class="sectionbody">
+                    <div class="sect3">
+                        <h4 id="_1_how_is_the_genomic_annotation_for_each_snp_provided"><a id="faq-E1"></a>1. How is the
+                            genomic annotation for each SNP provided?</h4>
+                        <div class="paragraph">
+                            <p>We use an Ensembl mapping pipeline that provides the genomic annotation (chromosome
+                                location, cytogenetic region and mapped genes), alongside the curated content in the
+                                GWAS Catalog. The mapping information is updated at every Ensembl release, every 2-3
+                                months.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>The annotation available on our online search interface includes any Ensembl genes in
+                                which a SNP maps, or the closest upstream and downstream gene within 50kb. More detailed
+                                mapping information is available through our REST API including all Ensembl and RefSeq
+                                genes mapping within 50kb upstream and downstream of each GWAS Catalog variant.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_2_which_genome_build_is_the_catalog_on"><a id="faq-E2"></a>2. Which genome build is the
+                            Catalog on?</h4>
+                        Data in the GWAS Catalog is currently mapped to genome assembly <span
+                            id="genomeBuild">GRCh38.p14</span> and dbSNP Build <span id="dbSNP">156</span>.
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_3_how_can_i_access_the_gwas_catalog_data_on_alternative_genome_builds"><a
+                                id="faq-E3"></a>3. How can I access the GWAS Catalog data on alternative genome builds?
+                        </h4>
+                        <div class="paragraph">
+                            <p>You can use the <a href="http://rest.ensembl.org/">Ensembl API</a> to map the SNP rsIDs
+                                in the GWAS Catalog to previous genome builds. For GRCh37 this is available at <a
+                                    href="http://grch37.rest.ensembl.org/"
+                                    class="bare">http://grch37.rest.ensembl.org/</a>. The variation call <a
+                                    href="http://grch37.rest.ensembl.org/documentation/info/variation_id"
+                                    class="bare">http://grch37.rest.ensembl.org/documentation/info/variation_id</a> can
+                                be used to retrieve the dbSNP mapping of all SNPs on GRCh37. Alternatively, you can also
+                                use <a href="https://www.ncbi.nlm.nih.gov/genome/tools/remap"
+                                    class="bare">https://www.ncbi.nlm.nih.gov/genome/tools/remap</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_4_why_do_some_snps_not_have_any_corresponding_mapping_information"><a
+                                id="faq-E4"></a>4. Why do some SNPs not have any corresponding mapping information?</h4>
+                        <div class="paragraph">
+                            <p>SNPs are extracted from the literature exactly as reported by the authors of a
+                                publication. If there is a typographical error in a publication or the authors report
+                                non-standard SNP identifiers, the subsequent mapping pipeline may not be able to provide
+                                any mapping information for this SNP. Alternatively, if an older SNP is no longer found
+                                on the latest genome build used in the GWAS Catalog, the SNP identifier extracted from
+                                the paper will still be reported in the GWAS Catalog but no mapping information for this
+                                SNP will be provided.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_5_how_are_snp_snp_interactions_and_multi_snp_haplotypes_displayed_and_annotated"><a
+                                id="faq-E5"></a>5. How are SNP-SNP interactions and multi-SNP haplotypes displayed and
+                            annotated?</h4>
+                        <div class="paragraph">
+                            <p>For SNP-SNP interactions, all elements that are specific to a given SNP (rsID, risk
+                                allele, mapped gene, chromosome location etc) are separated by an "x" (eg "rs1336472-A x
+                                rs4715555-G", "1p31.3 x 6p12.1", "3_prime_UTR_variant x upstream_gene_variant"). For
+                                multi-SNP haplotypes, elements are separated by a ";" (eg "rs17310467-?; rs6088735-?;
+                                rs6060278-?; rs867186-?", "MYH7B; EDEM2 - PROCR; EDEM2 - PROCR; PROCR",
+                                "upstream_gene_variant; intergenic_variant; intergenic_variant; missense_variant"). In
+                                both cases, the position of each element is the same across all variables, so the first
+                                rsID corresponds to the first mapped gene or mapped gene range (for intergenic SNPs),
+                                the first bp location etc.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>While we do provide the mapped gene and position information in this format in both the
+                                results page and the download, we excluded some of the additional gene-related
+                                information such as upstream/downstream gene IDs and distances from SNPs to genes from
+                                the download spreadsheet. This decision was made as it is almost impossible to present
+                                this kind of multi-dimensional data cleanly in the current spreadsheet format. In
+                                particular in large multi-SNP haplotypes, it is possible for some of the SNPs to be
+                                located within a gene while others are intergenic. Splitting gene IDs and distances by
+                                in-gene, upstream and downstream position would make the individual values much harder
+                                to pair up.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_6_what_does_the_most_severe_consequencecontext_field_represent"><a id="faq-E6"></a>6.
+                            What does the most severe consequence/CONTEXT field represent?</h4>
+                        <div class="paragraph">
+                            <p>The 'CONTEXT/Most severe consequence' column provides information on a variant’s
+                                predicted most severe functional effect from Ensembl. The effect of the allele of each
+                                variant on different transcripts may differ, but only the most severe consequence is
+                                reported here. Definition of terms and the order of severity is provided in Ensembl’s
+                                documentation: <a
+                                    href="https://www.ensembl.org/info/genome/variation/prediction/predicted_data.html#consequences"
+                                    class="bare">https://www.ensembl.org/info/genome/variation/prediction/predicted_data.html#consequences</a>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4
+                            id="_7_why_does_the_risk_allele_of_a_variant_not_match_either_of_the_alleles_in_the_reference_genome_assembly">
+                            <a id="faq-E7"></a>7. Why does the risk allele of a variant not match either of the alleles
+                            in the reference genome assembly?</h4>
+                        <div class="paragraph">
+                            <p>Variants and their risk alleles are extracted exactly as reported in the paper. In a
+                                small number of cases, the curated risk allele does not match either of the alleles
+                                reported in the reference genome assembly, which are displayed in the Info panel on the
+                                variant page. This may be due to strand flipping between genome builds, where the
+                                association was originally reported on an older genome build. We are unable to account
+                                for this in the curated data as genome build is not consistently reported by authors.
+                                For more detail on this issue, please refer to <a
+                                    href="https://pubmed.ncbi.nlm.nih.gov/36465187/">Sheng et al 2022</a>.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sect1">
+                <h2 id="_f_ancestry_2">F. Ancestry</h2>
+                <div class="sectionbody">
+                    <div class="sect3">
+                        <h4 id="_1_how_is_the_ancestry_data_in_the_gwas_catalog_provided"><a id="faq-F1"></a>1. How is
+                            the ancestry data in the GWAS Catalog provided?</h4>
+                        <div class="paragraph">
+                            <p>The GWAS Catalog team has developed and published a <a
+                                    href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1396-2">framework</a>
+                                to represent, in an accurate and standardized manner, the ancestry of samples. Our
+                                framework involves representing the ancestry of samples in two forms: (1) a detailed
+                                sample description and (2) an ancestry category from a controlled list. Detailed
+                                descriptions aim to capture accurate, informative, and comprehensive information
+                                regarding the ancestry or genealogy of each distinct sample. Category assignment reduces
+                                complexity within data sets and enables the establishment of hierarchical relationships,
+                                placing samples in context with other samples, groups, and populations. For more
+                                information please view our <a href="ancestry">Ancestry Documentation</a> page</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_2_how_do_i_search_for_ancestry_data_in_the_gwas_catalog"><a id="faq-F2"></a>2. How do I
+                            search for ancestry data in the GWAS Catalog?</h4>
+                        <div class="paragraph">
+                            <p>Ancestry data can be searched by entering relevant text in the search bar, including
+                                ancestry category or country (e.g. “European”, “South Africa”). Any publications
+                                containing those ancestries or countries of recruitment will be returned. Ancestry data
+                                can then be found in the "Studies" table within the Publication page. Ancestry data can
+                                also be found on the “Study” page and in the “Studies” table in the Trait and Variant
+                                pages. For more information please view our <a href="ancestry">Ancestry
+                                    Documentation</a> page.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_3_can_i_find_all_associations_for_a_particular_ancestry"><a id="faq-F3"></a>3. Can I
+                            find all associations for a particular ancestry?</h4>
+                        <div class="paragraph">
+                            <p>The GWAS Catalog website does not currently have a way to view all associations for a
+                                particular ancestry. We recommend using our REST API. All Ancestry data, including
+                                Country of Recruitment and Additional information, is also available as a download file
+                                from our <a href="http://www.ebi.ac.uk/gwas/docs/file-downloads">download page.</a> For
+                                an overview of the kind of data found in this file, refer to <a
+                                    href="http://www.ebi.ac.uk/gwas/docs/fileheaders#_file_headers_for_ancestry_download">the
+                                    file header descriptions.</a></p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4
+                            id="_4_what_does_the_pre_2011_ancestry_not_double_curated_flag_next_to_some_of_the_ancestry_data_mean">
+                            <a id="faq-F4"></a>4. What does the "Pre-2011 ancestry not double-curated" flag next to some
+                            of the ancestry data mean?</h4>
+                        <div class="paragraph">
+                            <p>As of September 2016, we release publicly all ancestry data extracted from the GWAS
+                                Catalog. Ancestry data from studies published before 2011 has not been reviewed by a
+                                second curator and so may not always conform to the strict standardised way we present
+                                more recent ancestry data.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4
+                            id="_5_why_is_the_ancestry_information_provided_in_a_separate_downloadable_spreadsheet_to_the_rest_of_the_study_level_information">
+                            <a id="faq-F5"></a>5. Why is the ancestry information provided in a separate downloadable
+                            spreadsheet to the rest of the study-level information?</h4>
+                        <div class="paragraph">
+                            <p>Most GWAS Catalog studies include at least two ancestry entries, one for the initial
+                                stage and one for the replication stage, and some studies may have several entries for
+                                each stage. As there is no way of usefully representing this multi-dimensional data in a
+                                single row in a spreadsheet, this data is instead provided in a separate spreadsheet,
+                                with each ancestry entry in its own row.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_6_what_is_included_in_the_cohort_field"><a id="faq-F6"></a>6. What is included in the
+                            COHORT field?</h4>
+                        <div class="paragraph">
+                            <p>The COHORT field describes the discovery stage (genome-wide) cohorts used in each study.
+                                Cohort abbreviations from discovery stage GWAS are extracted from literature to match a
+                                predefined list shared with the PGS Catalog, and are made available in the COHORT field
+                                of the studies download file. The initial list of common cohorts used in genetics
+                                studies that seeded these annotations is from <a
+                                    href="https://doi.org/10.1038/s42003-018-0261-x">Mills &amp; Rahal. Communications
+                                    Biology (2019)</a>. A full list of abbreviations and corresponding full cohort names
+                                is available to download <a
+                                    href="https://ftp.ebi.ac.uk/pub/databases/spot/pgs/metadata/pgs_all_metadata_cohorts.csv">separately</a>.
+                                Since the list is shared with the PGS Catalog, this may include cohorts that are not
+                                currently associated with a GWAS Catalog study.
+                                Where a sample cohort in the literature was not already in the predefined list, or was
+                                not clearly and unambiguously described by authors, “other” will appear in our studies
+                                download file. Where a sample in literature had no cohort reported, “NR” will appear in
+                                our studies download file. Empty cohort fields will appear for studies which were
+                                curated before the extraction of this information began (~2020).</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>Note: cohorts appearing in the unpublished download files are yet to undergo in-house
+                                curation and therefore may not exactly match against the predefined list.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sect1">
+                <h2 id="_g_programmatic_access_2"><a id="G"></a>G. Programmatic access</h2>
+                <div class="sectionbody">
+                    <div class="sect3">
+                        <h4 id="_1_how_do_i_use_the_gwas_catalog_rest_api"><a id="faq-G1"></a>1. How do I use the GWAS
+                            Catalog REST API?</h4>
+                        <div class="paragraph">
+                            <p>The GWAS Catalog REST API is now available for programmatic access to the Catalog. See
+                                the <a href="http://www.ebi.ac.uk/gwas/rest/docs/api">full technical documentation</a>
+                                here, as well as <a href="http://www.ebi.ac.uk/gwas/rest/docs/sample-scripts">usage
+                                    examples</a>.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sect1">
+                <h2 id="_h_summary_statistics_2"><a id="H"></a>H. Summary statistics</h2>
+                <div class="sectionbody">
+                    <div class="sect3">
+                        <h4 id="_1_what_are_summary_statistics"><a id="faq-H1"></a>1. What are summary statistics?</h4>
+                        <div class="paragraph">
+                            <p>There are thousands of genome-wide association studies and each study yields association
+                                data for hundreds of thousands of variants across the human genome. Manual curation of
+                                each GWAS publication by a dedicated team of scientists ensures that the Catalog
+                                contains the most significant findings (p-value &lt;10<sup>-5</sup>). Studies are often
+                                accompanied with summary statistics providing the association data for all the variants
+                                analysed across the genome in a given study.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_2_how_do_i_find_out_which_publications_have_full_summary_statistics_available"><a
+                                id="faq-H2"></a>2. How do I find out which publications have full summary statistics
+                            available?</h4>
+                        <div class="paragraph">
+                            <p>Published studies with full summary statistics are indicated by an icon in the
+                                “Association count” column of the studies table in the search interface. You can view a
+                                full list of studies with summary statistics files (published and
+                                pre-published/unpublished) <a
+                                    href="https://www.ebi.ac.uk/gwas/downloads/summary-statistics">here</a> together
+                                with links to other summary statistics resources.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>Summary statistics files are available as soon as possible, even before the publication
+                                is included in our data release (approximately every two weeks). Therefore, if a
+                                manuscript states that summary statistics are available from the Catalog and you cannot
+                                find them in the <a href="https://www.ebi.ac.uk/gwas/downloads/summary-statistics">list
+                                    of studies with summary statistics files</a> or on our <a
+                                    href="ftp://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/">FTP site</a>
+                                please contact us at <a href="mailto:gwas-info@ebi.ac.uk">gwas-info@ebi.ac.uk</a> and we
+                                can give you direct access to the files.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_3_how_do_i_access_summary_statistics"><a id="faq-H3"></a>3. How do I access summary
+                            statistics?</h4>
+                        <div class="paragraph">
+                            <p>There are two methods. We have developed a dedicated summary statistics database,
+                                enabling users with searchable, filterable, harmonised data via the summary statistics
+                                <a href="http://www.ebi.ac.uk/gwas/summary-statistics/docs/">REST API</a>.
+                                Alternatively, non-programmatic access to the original, standardised and harmonised data
+                                is available on the <a
+                                    href="ftp://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/">FTP site</a>
+                                (which can be accessed via links in the <a
+                                    href="https://www.ebi.ac.uk/gwas/search?query=">search interface</a> or the <a
+                                    href="https://www.ebi.ac.uk/gwas/downloads/summary-statistics">list of studies with
+                                    summary statistics files</a>).</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_4_how_should_i_cite_summary_statistics_downloaded_from_the_gwas_catalog"><a
+                                id="faq-H4"></a>4. How should I cite summary statistics downloaded from the GWAS
+                            Catalog?</h4>
+                        <div class="paragraph">
+                            <p>Users of summary statistics are requested to cite the data as follows: accession ID of
+                                the GWAS Catalog study e.g. “GCST007240”, the GWAS Catalog, and the date the summary
+                                statistics were downloaded. If the summary statistics originated from a published GWAS,
+                                please also cite the original publication. For example, “Summary statistics were
+                                downloaded from the NHGRI-EBI GWAS Catalog (Sollis et al., 2022) downloaded on
+                                01/11/2020 for study GCST007240 (Riveros-McKay et al., 2019)”.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_5_what_are_standardisedharmonised_summary_statistics"><a id="faq-H5"></a>5. What are
+                            standardised/harmonised summary statistics?</h4>
+                        <div class="paragraph">
+                            <p>Please refer to the documentation <a
+                                    href="https://www.ebi.ac.uk/gwas/docs/methods/summary-statistics">here</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4
+                            id="_6_what_are_the_risks_of_subject_identification_associated_with_sharing_of_summary_statistics">
+                            <a id="faq-H6"></a>6. What are the risks of subject identification associated with sharing
+                            of summary statistics?</h4>
+                        <div class="paragraph">
+                            <p>Currently the feeling in the community is that the unrestricted sharing of summary
+                                statistics holds a great deal of potential benefits, with low risk to participants’
+                                privacy. A study by Homer et al., (PMID:18769715) in 2008 indicated that it was possible
+                                to determine if a specific individual participated in a study based on summary-level
+                                statistics (including allele frequencies of the study participants) and the genotype
+                                information of the individual. However, this would require that an individual had made
+                                public their genotype information, and also participated in a study for which
+                                summary-level allele frequencies were available. Since this publication there has been
+                                widespread discussion in the scientific community, along with several publications
+                                (including Craig et al., 2011, PMID:21921928) on the benefits and risks surrounding
+                                sharing of summary statistics. After considering the risks and benefits the NIH has
+                                published guidance supporting open sharing of summary statistics information, including
+                                allele frequencies (<a href="https://osp.od.nih.gov/2018/11/01/provide-access-gsr/"
+                                    class="bare">https://osp.od.nih.gov/2018/11/01/provide-access-gsr/</a>, <a
+                                    href="https://grants.nih.gov/grants/guide/notice-files/NOT-OD-19-023.html"
+                                    class="bare">https://grants.nih.gov/grants/guide/notice-files/NOT-OD-19-023.html</a>).
+                            </p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_7_why_do_some_datasets_have_the_cc0_license_mark"><a id="faq-H7"></a>7. Why do some
+                            datasets have the CC0 license mark?</h4>
+                        <div class="paragraph">
+                            <p>Since March 2021, we have asked all submitters to agree to share their data under the
+                                terms of <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a>. This
+                                dedicates the data to the public domain, allowing downstream users to consume the data
+                                without restriction. Data submitted prior to March 2021 is made available under the <a
+                                    href="https://www.ebi.ac.uk/about/terms-of-use/">EBI standard terms of use</a>.
+                                Whilst these terms do not themselves impose any restrictions on downstream use, the
+                                application of CC0 license removes any ambiguity. A small number of datasets are made
+                                available under different license terms. We advise consumers of data hosted by the GWAS
+                                Catalog to note the license terms of individual datasets, if applicable to their
+                                specific use case, which are accessible via the <a
+                                    href="https://www.ebi.ac.uk/gwas/downloads/summary-statistics">summary statistics
+                                    page</a> and the individual study pages. Please ensure that the original data are
+                                cited whenever they are used in a publication.
+                                If you have any questions or concerns about licensing, please contact us via <a
+                                    href="mailto:gwas-info@ebi.ac.uk">gwas-info@ebi.ac.uk</a>.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sect1">
+                <h2 id="_i_submitting_summary_statistics_2"><a id="I"></a>I. Submitting summary statistics</h2>
+                <div class="sectionbody">
+                    <div class="sect3">
+                        <h4 id="_1_how_can_i_submit_summary_statistics_to_the_gwas_catalog"><a id="faq-I1"></a>1. How
+                            can I submit summary statistics to the GWAS Catalog?</h4>
+                        <div class="paragraph">
+                            <p>We currently extract summary statistics files from publications where they are made
+                                freely available either as Supplementary files or via a web link. We also accept
+                                submissions of summary statistics for both published and pre-published/unpublished GWAS.
+                                We encourage authors to submit their data directly through our <a
+                                    href="https://www.ebi.ac.uk/gwas/deposition">submission page</a>. Detailed
+                                instructions can be found in our <a
+                                    href="http://www.ebi.ac.uk/gwas/docs/submission">documentation</a>.</p>
+                        </div>
+                        <div class="paragraph">
+                            <p>Note that for summary statistics to be made available through the GWAS Catalog, your
+                                study must fulfil our <a href="methods/criteria">eligibility criteria</a>.</p>
+                        </div>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_2_how_should_summary_statistics_be_formatted_for_submission"><a id="faq-I2"></a>2. How
+                            should summary statistics be formatted for submission?</h4>
+                        <div class="paragraph">
+                            <p>Please refer to the <a
+                                    href="https://www.ebi.ac.uk/gwas/docs/summary-statistics-format">documentation</a>
+                                for the standard format and to access our summary statistics validation tool.</p>
+                        </div>
+                        <hr>
+                    </div>
+                    <div class="sect3">
+                        <h4 id="_got_a_question_that_isnt_answered_here">Got a question that isn’t answered here?</h4>
+                        <div class="paragraph">
+                            <p>Email us at <a href="mailto:gwas-info@ebi.ac.uk">gwas-info@ebi.ac.uk</a>.</p>
+                        </div>
+                        <hr>
+                        <div class="paragraph">
+                            <p><em>Last updated: 16 March 2021</em></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+    </div>
+    <!-- /container -->
+
+    <div>
+        <footer class="footer background-color-primary-accent">
+            <!--<div class="footer-banner background-color-primary"></div>-->
+            <div class="container">
+                <p class="text-muted">
+                    Copyright © EMBL-EBI <span id="year">2024</span> | EMBL-EBI is an Outstation of the
+                    <a href="https://www.embl.org" data-original-title="" title="">European Molecular Biology
+                        Laboratory</a> |
+                    <a href="https://www.ebi.ac.uk/about/terms-of-use" data-original-title="" title="">Terms of use</a>
+                    |
+                    <a href="https://www.ebi.ac.uk/long-term-data-preservation" data-original-title="" title="">Data
+                        Preservation Statement</a>
+                </p>
+            </div>
+        </footer>
+        <script>
+            (function () {
+                if (document.querySelector('#search-box') === null) {
+                    document.getElementById("header-searchbar").style.display = "block";
+                }
+            })();
+            document.getElementById("year").innerHTML = new Date().getFullYear().toString();
+        </script>
+    </div>
+
+
+
+    <!-- Bootstrap core JavaScript
+================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.2/jquery-ui.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <script src="/gwas/js/ie10-viewport-bug-workaround.js"></script>
+
+    <!-- GOCI JavaScript
+================================================== -->
+    <script src="/gwas/js/goci-ui.js"></script>
+    <script src="/gwas/js/goci-documentation.js"></script>
+    <script src="/gwas/js/autocomplete-termselect.js"></script>
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/jquery.devbridge-autocomplete/1.4.10/jquery.autocomplete.min.js"></script>
+
+    <!-- Google analytics
+================================================== -->
+    <!--<script>
+    (function(i, s, o, g, r, a, m) {
+        i['GoogleAnalyticsObject'] = r;
+        i[r] = i[r] || function() {
+                    (i[r].q = i[r].q || []).push(arguments)
+                }, i[r].l = 1 * new Date();
+        a = s.createElement(o),
+                m = s.getElementsByTagName(o)[0];
+        a.async = 1;
+        a.src = g;
+        m.parentNode.insertBefore(a, m)
+    })(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
+
+    ga('create', 'UA-60195133-1', 'auto');
+    ga('send', 'pageview');
+
+</script>-->
+    <div>
+        <!-- Google tag (gtag.js) -->
+        <script async="async" src="https://www.googletagmanager.com/gtag/js?id=G-C4KFST3T0G"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() { dataLayer.push(arguments); }
+            gtag('js', new Date());
+
+            gtag('config', 'G-C4KFST3T0G');
+        </script>
+
+    </div>
+
+
+
+    <div class="autocomplete-suggestions" style="position: absolute; display: none; max-height: 300px; z-index: 9999;">
+    </div>
+    <div class="autocomplete-suggestions" style="position: absolute; display: none; max-height: 300px; z-index: 9999;">
+    </div>
+    <style>
+        #cookie-banner {
+            display: none;
+        }
+
+        .data-protection-banner {
+            box-sizing: border-box;
+        }
+
+        .data-protection-banner a,
+        .data-protection-banner a:hover {
+            cursor: pointer;
+            color: #fff;
+            border-bottom-width: 1px;
+            border-bottom-style: dotted;
+            border-bottom-color: inherit;
+            text-decoration: none;
+        }
+
+        .data-protection-banner .medium-8 {
+            width: 75%;
+            margin-left: 1%;
+            float: left;
+        }
+
+        .data-protection-banner .medium-4 {
+            width: 23%;
+            margin-right: 1%;
+            float: right;
+            text-align: right;
+        }
+    </style>
+</body>
+
+</html>

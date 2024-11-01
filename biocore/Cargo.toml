@@ -1,0 +1,12 @@
+[package]
+name = "biocore"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+utile = { path = "../utile" }
+
+anyhow = "1"
+noodles = { version = "0.84", features = ["core"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"

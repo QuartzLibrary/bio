@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "biocore",
+    "genomes1000",
+    "gwas_catalog",
+    "ids",
+    "liftover",
+    "pgs_catalog",
+]
+resolver = "2"

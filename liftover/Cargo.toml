@@ -1,0 +1,21 @@
+[package]
+name = "liftover"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+biocore = { path = "../biocore" }
+utile = { path = "../utile" }
+
+anyhow = "1"
+flate2 = "1"
+thiserror = "2"
+url = { version = "2", features = ["serde"] }
+
+tempfile = "3"
+reqwest = "0.12"
+regex = "1"
+rand = { version = "0.8", features = ["small_rng"] }
+serde = { version = "1", features = ["derive"] }
+ordered-float = { version = "4", features = ["serde"] }
+tokio = { version = "1.39", features = ["fs", "macros", "rt-multi-thread"] }

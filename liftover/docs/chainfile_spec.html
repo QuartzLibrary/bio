@@ -1,0 +1,459 @@
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>
+        Genome Browser Chain Format
+    </title>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css?family=Oswald:700|Lato:700,700italic,300,400,400italic">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+    <!-- Redirects don't forward ROOT, so can't determine relative paths -->
+
+    <!-- Use ROOT variable set in caller to determine relative path to style sheets -->
+
+
+    <link rel="stylesheet" href="../../style/bootstrap.min.css">
+
+
+    <link rel="stylesheet" href="../../style/gb.css">
+    <link rel="stylesheet" href="../../staticStyle/gbStatic.css">
+
+
+
+</head>
+
+<body>
+    <!-- Blue menu bar / hotlinks -->
+    <noscript>
+        <div class='noscript'>
+            <div class='noscript-inner'>
+                <p><b>JavaScript is disabled in your web browser</b></p>
+                <p>You must have JavaScript enabled in your web browser to use the Genome Browser</p>
+            </div>
+        </div>
+    </noscript>
+    <script type="text/javascript" src="../../js/jquery.js"></script>
+    <script type="text/javascript" src="../../js/jquery.plugins.js"></script>
+    <script type="text/javascript" src="../..//js/utils.js"></script>
+    <link rel="STYLESHEET" href="../../style/nice_menu.css" type="text/css">
+    <div id="main-menu-whole">
+
+        <div id="main-menu">
+            <div id="block-nice_menus-1" class="clear-block block block-nice_menus">
+
+                <div class="upcorner"></div>
+                <div class="blockbg">
+                    <div class="blockcontent">
+                        <div class="content">
+
+                            <ul class="nice-menu nice-menu-down sf-js-enabled" id="nice-menu-1">
+
+                                <li class="first even" id="home"><a href="../../index.html"><span
+                                            id="home-link">Home</span></a></li>
+
+                                <li class="menuparent" id="tools1"><a href="../../cgi-bin/hgGateway">Genomes</a>
+                                    <ul style="display: none; visibility: hidden;">
+                                        <li class="first"><a
+                                                href="../../cgi-bin/hgTracks?db=hg38&amp;position=lastDbPos">Human
+                                                GRCh38/hg38</a></li>
+                                        <li><a href="../../cgi-bin/hgTracks?db=hg19&amp;position=lastDbPos">Human
+                                                GRCh37/hg19</a></li>
+                                        <li><a href="../../cgi-bin/hgTracks?db=hub_3671779_hs1&amp;position=lastDbPos">Human
+                                                T2T-CHM13/hs1</a></li>
+                                        <li><a href="../../cgi-bin/hgTracks?db=mm39&amp;position=lastDbPos">Mouse
+                                                GRCm39/mm39</a></li>
+                                        <li><a href="../../cgi-bin/hgTracks?db=mm10&amp;position=lastDbPos">Mouse
+                                                GRCm38/mm10</a></li>
+                                        <li><a title="Browse thousands of additional assemblies in our Genome Archive"
+                                                href="https://hgdownload.soe.ucsc.edu/hubs/">Genome Archive GenArk</a>
+                                        </li>
+                                        <li><a href="../../cgi-bin/hgTracks?db=wuhCor1&amp;position=lastDbPos">SARS-CoV-2
+                                                (COVID-19)</a></li>
+                                        <li class="last"><a href="../../cgi-bin/hgGateway">Other</a></li>
+                                    </ul>
+                                </li>
+
+                                <li class="menuparent" id="tools2"><a href="../../cgi-bin/hgTracks">Genome Browser</a>
+                                    <ul style="display: none; visibility: hidden;">
+                                        <li id="backToBrowserLi" class="first"><a id="backToGenomeBrowser"
+                                                href="../../cgi-bin/hgTracks">Back to Genome Browser</a></li>
+                                        <li><a id="configureMenuLink"
+                                                title="Configure track display or change the Genome Browser font and other display settings"
+                                                href="../../cgi-bin/hgTracks?hgTracksConfigPage=configure">Configure</a>
+                                        </li>
+                                        <li><a id="trackSearchMenuLink"
+                                                title="Search from all available tracks in the current genome"
+                                                href="../../cgi-bin/hgTracks?hgt_tSearch=track+search">Track Search</a>
+                                        </li>
+                                        <li><a id="shortMatchLink" title="Find short DNA sequences"
+                                                href="../../cgi-bin/hgTrackUi?g=oligoMatch&amp;oligoMatch=pack">Short
+                                                Exact DNA Match</a></li>
+                                        <!-- OPTIONAL_RECOMMENDED_TRACK_SETS_MENU -->
+                                        <!-- OPTIONAL_EXPORTED_TRACK_DATA_HUBS_MENU -->
+                                        <li><a id="cartResetMenuLink"
+                                                title="Reset user settings; Note: this removes customs tracks and track hubs"
+                                                href="../../cgi-bin/cartReset?skipLs=1">Reset All User Settings</a></li>
+                                    </ul>
+                                </li>
+
+
+                                <li class="menuparent" id="tools3"><span>Tools</span>
+                                    <ul style="display: none; visibility: hidden;">
+                                        <li class="first"><a id="blatMenuLink"
+                                                title="Search the genome for sequence matches"
+                                                href="../../cgi-bin/hgBlat?command=start">Blat</a></li>
+                                        <li><a id="ispMenuLink" title="Check the specificity of short primers"
+                                                href="../../cgi-bin/hgPcr">In-Silico PCR</a></li>
+                                        <li><a id="tableBrowserMenuLink"
+                                                title="Query and retrieve from all Genome Browser data"
+                                                href="../../cgi-bin/hgTables">Table Browser</a></li>
+                                        <li><a id="liftOverMenuLink" title="Convert coordinates between two assemblies"
+                                                href="../../cgi-bin/hgLiftOver">LiftOver</a></li>
+                                        <li><a id="vaiMenuLink"
+                                                title="Annotate variants using a variety of data sources"
+                                                href="../../cgi-bin/hgVai">Variant Annotation Integrator</a></li>
+                                        <li><a id="diMenuLink" title="Intersect the data from several tracks"
+                                                href="../../cgi-bin/hgIntegrator">Data Integrator</a></li>
+                                        <li><a title="Explore gene/protein interactions and pathways"
+                                                id="interactionMenuLink" href="../../cgi-bin/hgGeneGraph">Gene
+                                                Interactions</a></li>
+                                        <li class="last"><a
+                                                title="See our other tools and external tools for working with Genome Browser data"
+                                                href="../../util.html">Other Tools</a></li>
+                                    </ul>
+                                </li>
+                                <li class="menuparent" id="mirrors"><span>Mirrors</span>
+                                    <ul style="display: none; visibility: hidden;">
+                                        <li class="first"><a
+                                                title="A Genome Browser mirror hosted closer to your location may improve speed"
+                                                href="../../mirror.html">Euro/Asia Mirrors</a></li>
+                                        <li><a href="../../goldenPath/help/mirror.html">Mirroring Instructions</a></li>
+                                        <!-- OPTIONAL_MIRROR_MENU -->
+                                    </ul>
+
+                                </li>
+                                <li class="menuparent" id="downloads"><span>Downloads</span>
+                                    <ul style="display: none; visibility: hidden;">
+                                        <li class="first"><a title="Download underlying Genome Browser data files"
+                                                href="https://hgdownload.soe.ucsc.edu/downloads.html">Genome Data</a>
+                                        </li>
+                                        <li><a href="https://hgdownload.soe.ucsc.edu/downloads.html#source_downloads">Source
+                                                Code</a></li>
+                                        <li><a title="Purchase a commerical license for certain Genome Browser software"
+                                                href="https://genome-store.ucsc.edu">Genome Browser Store</a></li>
+                                        <li><a title="Download utilities for working with Genome Browser data"
+                                                href="https://hgdownload.soe.ucsc.edu/downloads.html#utilities_downloads">Utilities</a>
+                                        </li>
+                                        <li class="last"><a href="../../goldenPath/help/ftp.html">FTP</a></li>
+                                        <li class="last"><a href="../../goldenPath/help/mysql.html">MySQL Access</a>
+                                        </li>
+                                        <li class="last"><a href="../../goldenPath/help/cloud.html">Cloud Access</a>
+                                        </li>
+                                        <li class="last"><a href="../../goldenPath/help/api.html">REST API</a></li>
+                                    </ul>
+                                </li>
+                                <li class="menuparent" id="myData"><span>My Data</span>
+                                    <ul style="display: none; visibility: hidden;">
+                                        <li><a id="customTracksMenuLink" title="Manage your custom tracks"
+                                                href="../../cgi-bin/hgCustom">Custom Tracks</a></li>
+                                        <li><a id="sessionsMenuLink"
+                                                title="Create, manage, and share snapshots of Genome Browser configurations"
+                                                href="../../cgi-bin/hgSession?hgS_doMainPage=1">My Sessions</a></li>
+                                        <li><a id="trackHubsMenuLink"
+                                                title="Connect and manage your own track hubs or browse public hubs"
+                                                href="../../cgi-bin/hgHubConnect">Track Hubs</a></li>
+                                        <li><a id="customCompositeMenuLink"
+                                                title="Build your own collection of tracks on the fly"
+                                                href="../../cgi-bin/hgCollection">Track Collection Builder</a></li>
+                                        <li class="last"><a id="publicSessionsMenuLink"
+                                                title="See how others are using the Genome Browser"
+                                                href="../../cgi-bin/hgPublicSessions">Public Sessions</a></li>
+                                    </ul>
+                                </li>
+
+                                <!-- OPTIONAL_VIEW_MENU -->
+
+                                <!-- OPTIONAL_PROJECT_MENU_START -->
+                                <li class="menuparent" id="projects"><span>Projects</span>
+                                    <ul style="display: none; visibility: hidden;">
+                                        <li class="first"><a href="../../gtex.html">Genotype Tissue Expression
+                                                (GTEx)</a></li>
+                                        <li><a href="../../ENCODE/index.html">Encyclopedia of DNA Elements (ENCODE)</a>
+                                        </li>
+                                        <li><a href="../../singlecell.html">UCSC Cell Browser</a></li>
+                                        <li class="last"><a href="../../covid19.html">UCSC COVID-19 Research</a></li>
+                                    </ul>
+                                </li>
+                                <!-- OPTIONAL_PROJECT_MENU_END -->
+
+                                <li class="menuparent" id="help"><span>Help</span>
+                                    <ul style="display: none; visibility: hidden;">
+                                        <!-- CONTEXT_SPECIFIC_HELP -->
+                                        <li><a title="See frequently asked questions and search our help documentation"
+                                                href="../../FAQ/">FAQs &amp; Search</a></li>
+                                        <li><a title="Help documentation covering all aspects of the Genome Browser"
+                                                href="../../goldenPath/help/hgTracksHelp.html">Browser Documentation</a>
+                                        </li>
+                                        <li><a title="How-to videos for various Genome Browser tasks and other materials"
+                                                href="../../training/index.html">Training</a></li>
+                                        <li class="last"><a title="Ask us a question" href="../../contacts.html">Contact
+                                                Us</a></li>
+                                    </ul>
+                                </li>
+
+                                <li class="menuparent last" id="aboutUs"><span>About Us</span>
+                                    <ul style="display: none; visibility: hidden;">
+                                        <li class="first odd"><a href="../../goldenPath/newsarch.html">News</a></li>
+                                        <li class="even"><a href="../../cite.html">Cite Us</a></li>
+                                        <li class="odd"><a href="../../goldenPath/releaseLog.html">Release Log</a></li>
+                                        <li class="even"><a href="../../staff.html">Staff</a></li>
+                                        <li class="odd"><a href="../../conditions.html">Conditions of Use</a></li>
+                                        <li class="even"><a href="../../goldenPath/history.html">Our History</a></li>
+                                        <li class="odd"><a href="../../license/">Licenses</a></li>
+                                        <li class="even last"><a href="../../contacts.html">Contact Us</a></li>
+                                    </ul>
+                                </li>
+
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="downcorner"></div>
+
+            </div>
+        </div><!-- end main-menu -->
+    </div><!-- end main-menu-whole -->
+    <script type="text/javascript" nonce="awTfhYG1Jfykx5byT0m528VawRu7">
+        $("#tools1 ul li a").each(function (a) {
+            if (this.href && this.href.indexOf("hgTracks") !== -1) {
+                var obj = this;
+                obj.onclick = function (e) {
+                    var pix = calculateHgTracksWidth();
+                    e.currentTarget.href += "&pix=" + pix;
+                }
+            }
+        });
+    </script>
+
+
+    <!-- Grid layout from bootstrap.css -->
+    <div class="container-fluid">
+        <!-- Wrapper for GB content -->
+        <div class="gbsPage">
+
+
+
+            <h1>Chain Format</h1>
+            <p>
+                The chain format describes a pairwise alignment that allow gaps in both sequences simultaneously.
+                Each set of chain alignments starts with a header line, contains one or more alignment data lines,
+                and terminates with a blank line. The format is deliberately quite dense.</p>
+            <p>
+                <strong><em>Example:</em></strong>
+            </p>
+            <pre><code>    chain 4900 chrY 58368225 + 25985403 25985638 chr5 151006098 - 43257292 43257528 1
+ 9       1       0
+ 10      0       5
+ 61      4       0
+ 16      0       4
+ 42      3       0
+ 16      0       8
+ 14      1       0
+ 3       7       0
+ 48
+
+ chain 4900 chrY 58368225 + 25985406 25985566 chr5 151006098 - 43549808 43549970 2
+ 16      0       2
+ 60      4       0
+ 10      0       4
+ 70</code></pre>
+            <p>
+                <strong>Header Lines</strong>
+            </p>
+            <p>
+            </p>
+            <pre><code>    <strong>chain</strong> <em>score</em> <em>tName</em> <em>tSize</em> <em>tStrand</em> <em>tStart</em> <em>tEnd</em> <em>qName</em> <em>qSize</em> <em>qStrand</em> <em>qStart</em> <em>qEnd</em> <em>id</em> </code></pre>
+            <p>
+                The initial header line starts with the keyword <strong><code>chain</code></strong>, followed by
+                11 required attribute values, and ends with a blank line. The attributes include:
+            </p>
+            <ul>
+                <li>
+                    <strong><code>score</code></strong> -- chain score
+                </li>
+                <li>
+                    <strong><code>tName</code></strong> -- chromosome (reference/target sequence)
+                </li>
+                <li>
+                    <strong><code>tSize</code></strong> -- chromosome size (reference/target sequence)
+                </li>
+                <li>
+                    <strong><code>tStrand</code></strong> -- strand (reference/target sequence)
+                </li>
+                <li>
+                    <strong><code>tStart</code></strong> -- alignment start position (reference/target sequence)
+                </li>
+                <li>
+                    <strong><code>tEnd</code></strong> -- alignment end position (reference/target sequence)
+                </li>
+                <li>
+                    <strong><code>qName</code></strong> -- chromosome (query sequence)
+                </li>
+                <li>
+                    <strong><code>qSize</code></strong> -- chromosome size (query sequence)
+                </li>
+                <li>
+                    <strong><code>qStrand</code></strong> -- strand (query sequence)
+                </li>
+                <li>
+                    <strong><code>qStart</code></strong> -- alignment start position (query sequence)
+                </li>
+                <li>
+                    <strong><code>qEnd</code></strong> -- alignment end position (query sequence)
+                </li>
+                <li>
+                    <strong><code>id</code></strong> -- chain ID
+                </li>
+            </ul>
+            <p>
+                The alignment start and end positions are represented as zero-based half-open intervals. For
+                example, the first 100 bases of a sequence would be represented with start position = 0 and end
+                position = 100, and the next 100 bases would be represented as start position = 100 and end
+                position = 200. When the strand value is "-", position coordinates are listed in terms of
+                the reverse-complemented sequence.</p>
+            <p>
+                <strong>Alignment Data Lines</strong>
+            </p>
+            <p>
+                Alignment data lines contain three required attribute values:</p>
+            <p>
+            </p>
+            <pre>    <em>size</em> <em>dt</em> <em>dq</em></pre>
+            <ul>
+                <li>
+                    <strong><code>size</code></strong> -- the size of the ungapped alignment
+                </li>
+                <li>
+                    <strong><code>dt</code></strong> -- the difference between the end of this block and the beginning
+                    of
+                    the next block (reference/target sequence)
+                </li>
+                <li>
+                    <strong><code>dq</code></strong> -- the difference between the end of this block and the beginning
+                    of
+                    the next block (query sequence)
+                </li>
+            </ul>
+            <p>
+                NOTE: The last line of the alignment section contains only one number: the ungapped alignment size
+                of the last block.</p>
+
+            <a name="rearrangement"></a>
+            <h3>"Snake" rearrangement display</h3>
+            <p>
+                Rearrangement display, sometimes called snakes display, is an alternative way to view pairwise
+                alignments.
+                It is available for PSL and chain format tracks.</p>
+            <p>
+                Rearrangement display is a representation of the path that the sequence follows in the "other" sequence.
+                You start in the upper left and move to the right, following the lines if you come to the end of a
+                block. If a block
+                is red, which means it is a match on the negative strand, then you reverse your course and start going
+                from right to left.
+                The gray lines mean there are no bases in the other sequence between the blocks. Orange lines means
+                there are some
+                bases in there that are not aligning.</p>
+            <p>The display type can be enabled on the track configuration page of eligible tracks. Below are two
+                examples for clarity.</p>
+            <p>
+            </p>
+            <div class="text-left">
+                <img src="../../images/rearrangementExample1.png" alt="Rearrangement display example 1" width="55%">
+            </div><br>
+            This example shows a tandem duplication on CDH1 which duplicates 3 exons.<p></p>
+            <p>
+            </p>
+            <div class="text-left">
+                <img src="../../images/rearrangementExample2.png" alt="Rearrangement display example 2" width="55%">
+            </div><br>
+            This example shows an inversion, which can be identified by the red colored sequence.<p></p>
+
+            <!-- gbPageEnd.html - Include file for GB static pages -->
+
+            <!-- End container and page -->
+        </div>
+    </div>
+
+    <!-- Add footer -->
+
+
+    <div class="gbClearBoth"></div>
+    <div id="footer" class="gbRow gbFooterContainer">
+        <div class="gbFooterColumn">
+            <a href="http://www.ucsc.edu">UCSC Home</a>
+            <br>
+            <a href="http://www.soe.ucsc.edu">BSOE Home</a>
+            <br>
+            <a href="https://ucscgenomics.soe.ucsc.edu/">Genomics Institute Home</a>
+            <br>
+            <a href="../../license/">Licenses</a>
+        </div>
+
+        <div class="gbFooterColumn">
+            <a href="../../training/">Training</a>
+            <br>
+            <a href="../../FAQ/index.html">FAQs &amp; Search</a>
+            <br>
+            <a href="../../cite.html">Cite Us</a>
+            <br>
+            <a href="../../goldenPath/pubs.html">Publications</a>
+        </div>
+
+        <div class="gbFooterColumn">
+            <a href="https://genome-store.ucsc.edu/">Store</a>
+            <br>
+            <a href="../../contacts.html">Contact</a>
+            <br>
+            <a href="../../cgi-bin/hgUserSuggestion">Suggestions</a>
+            <br>
+            <a href="https://ucscgenomics.soe.ucsc.edu/careers/">Jobs</a>
+        </div>
+
+        <div class="gbFooterColumn">
+            <div class="gbFooterIcons">
+                <a href="http://www.facebook.com/ucscGenomeBrowser">
+                    <i class="fa fa-facebook-square fa-2x"></i></a>
+                &nbsp;&nbsp;
+                <a href="https://www.twitter.com/GenomeBrowser">
+                    <i class="fa fa-twitter-square fa-2x"></i></a>
+                &nbsp;&nbsp;
+                <a href="http://genome.ucsc.edu/blog/">
+                    <i class="fa fa-wordpress fa-2x"></i></a>
+                <br>
+                <a
+                    href="https://secure.ucsc.edu/s/1069/bp18/interior.aspx?sid=1069&amp;gid=1001&amp;pgid=780&amp;cid=1749&amp;dids=645">
+                    <div class="gbAllCapsButton gbDonateButton" id="donateButton">
+                        Donate
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="gbFooterCopyright">
+            © 2000-2024 The Regents of the University of California. All Rights Reserved.
+            <br>
+            <a href="../../conditions.html">Conditions of Use</a>
+        </div>
+        <script src="../../js/analytics.js"></script>
+    </div> <!-- footer -->
+
+
+
+
+    <script src="https://www.googletagmanager.com/gtag/js?id=G-P5EV0BL192"></script>
+    <script>window.dataLayer = window.dataLayer || []; function gtag() { dataLayer.push(arguments); } gtag("js", new Date()); gtag("config", "G-P5EV0BL192");</script>
+</body>
+
+</html>

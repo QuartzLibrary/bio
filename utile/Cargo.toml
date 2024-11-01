@@ -1,0 +1,24 @@
+[package]
+name = "utile"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+directories = "5"
+flate2 = "1"
+futures = "0.3"
+hyperx = { version = "1.4", git = "https://github.com/QuartzLibrary/hyperx", ref = "b4bf9e31a8a8676bb0ce229fec36a140e0d096f7", branch = "bump" }
+log = "0.4"
+reqwest = { version = "0.12", features = ["blocking", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+suppaftp = { version = "6", features = ["async"] }
+tempfile = "3.12"
+thiserror = "2"
+tokio = { version = "1.39", features = ["fs"] }
+tokio-util = { version = "0.7", features = ["io", "compat"] }
+url = { version = "2", features = ["serde"] }
+
+[patch.crates-io]
+# hyperx = { path = "../hyperx" }
