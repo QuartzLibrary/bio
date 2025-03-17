@@ -3,6 +3,7 @@
 #![feature(io_error_more)]
 
 pub mod cache;
+pub mod collections;
 pub mod drop;
 pub mod io;
 pub mod jsonl;
