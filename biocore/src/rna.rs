@@ -4,7 +4,8 @@ use crate::sequence::Sequence;
 
 pub type RnaSequence = Sequence<RnaBase>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
 #[repr(u8)]
 pub enum RnaBase {
     A = b'A',

@@ -19,7 +19,7 @@ pub async fn get_reference_genome(
 
 async fn download_and_cache() -> Result<CacheEntry, std::io::Error> {
     let url: Url = REF_URL.parse().unwrap();
-    let file_name = url.path_segments().unwrap().last().unwrap();
+    let file_name = url.path_segments().unwrap().next_back().unwrap();
 
     let fs_entry = Cache::global("1000genomes").entry(file_name);
 
@@ -32,7 +32,7 @@ async fn download_and_cache() -> Result<CacheEntry, std::io::Error> {
 }
 async fn download_and_cache_index() -> Result<CacheEntry, std::io::Error> {
     let url: Url = REF_INDEX_URL.parse().unwrap();
-    let file_name = url.path_segments().unwrap().last().unwrap();
+    let file_name = url.path_segments().unwrap().next_back().unwrap();
 
     let fs_entry = Cache::global("1000genomes").entry(file_name);
 

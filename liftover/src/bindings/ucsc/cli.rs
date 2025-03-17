@@ -95,10 +95,9 @@ pub async fn liftover(
     let result = command.output().unwrap();
 
     if !result.status.success() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("liftOver command failed:\n{result:?}"),
-        ));
+        return Err(std::io::Error::other(format!(
+            "liftOver command failed:\n{result:?}"
+        )));
     }
 
     let success_results = super::parse_success_file(&std::fs::read_to_string(output.path())?)?;
