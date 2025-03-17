@@ -13,9 +13,9 @@
     // Rust Analyzer
     // Keep in sync with rust-toolchain.toml
     "rust-analyzer.server.extraEnv": {
-        "RUSTUP_TOOLCHAIN": "nightly-2024-12-14",
+        "RUSTUP_TOOLCHAIN": "nightly-2025-03-16",
     },
-    // "rust-analyzer.updates.channel": "nightly-2024-12-14",
+    // "rust-analyzer.updates.channel": "nightly-2025-03-16",
     "rust-analyzer.cargo.extraArgs": [
         "--target-dir",
         "target\\ra",
