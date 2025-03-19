@@ -221,7 +221,19 @@ impl fmt::Display for UrlEntry {
 }
 impl UrlEntry {
     pub fn new(url: impl IntoUrl) -> reqwest::Result<Self> {
-        Ok(Self(url.into_url()?))
+        let mut url = url.into_url()?;
+
+        // Convert s3:// URLs to https URLs for AWS S3
+        if url.scheme() == "s3"
+            && let Some(bucket) = url.host_str()
+        {
+            let path = url.path();
+            let new = Url::parse(&format!("https://{bucket}.s3.amazonaws.com{path}")).unwrap();
+            log::info!("Converted {url} to {new}.");
+            url = new;
+        }
+
+        Ok(Self(url))
     }
 
     pub fn exists(&self) -> reqwest::Result<bool> {
