@@ -2,9 +2,10 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::{collections::BTreeMap, ops::Range};
 
 use biocore::location::{GenomePosition, GenomeRange, SequenceOrientation};
+use utile::resource::{RawResource, RawResourceExt};
 
 use liftover::{
-    sources::{EnsemblHG, UcscHG},
+    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
     Chain, Liftover,
 };
 
@@ -15,16 +16,16 @@ use liftover::{
 fn cache_testpoints() -> anyhow::Result<()> {
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &UcscHG::key(from, to);
-        let entry = UcscHG::global_cache(from, to);
-        cache::store(&Liftover::read_file(entry).unwrap(), "ucsc", key);
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
+        cache::store(&Liftover::load(entry).unwrap(), "ucsc", &resource.key());
     }
 
     for (from, to) in EnsemblHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &EnsemblHG::key(from, to);
-        let entry = EnsemblHG::global_cache(from, to);
-        cache::store(&Liftover::read_file(entry).unwrap(), "ensembl", key);
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
+        cache::store(&Liftover::load(entry).unwrap(), "ensembl", &resource.key());
     }
 
     Ok(())
@@ -34,16 +35,16 @@ fn cache_testpoints() -> anyhow::Result<()> {
 fn check_testpoints() -> anyhow::Result<()> {
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &UcscHG::key(from, to);
-        let entry = UcscHG::global_cache(from, to);
-        cache::assert(&Liftover::read_file(entry).unwrap(), "ucsc", key);
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
+        cache::assert(&Liftover::load(entry).unwrap(), "ucsc", &resource.key());
     }
 
     for (from, to) in EnsemblHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &EnsemblHG::key(from, to);
-        let entry = EnsemblHG::global_cache(from, to);
-        cache::assert(&Liftover::read_file(entry).unwrap(), "ensembl", key);
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
+        cache::assert(&Liftover::load(entry).unwrap(), "ensembl", &resource.key());
     }
 
     Ok(())

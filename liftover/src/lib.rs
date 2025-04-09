@@ -1,5 +1,6 @@
 #![feature(strict_overflow_ops)]
 #![feature(iterator_try_collect)]
+#![feature(impl_trait_in_assoc_type)]
 
 mod parse;
 

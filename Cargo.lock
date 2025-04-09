@@ -1156,6 +1156,7 @@ dependencies = [
  "anyhow",
  "biocore",
  "flate2",
+ "log",
  "ordered-float",
  "rand 0.8.5",
  "regex",

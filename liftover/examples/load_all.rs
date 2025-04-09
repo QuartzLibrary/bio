@@ -1,7 +1,8 @@
 use liftover::{
-    sources::{EnsemblHG, UcscHG},
+    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
     Liftover,
 };
+use utile::resource::RawResourceExt;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -9,7 +10,10 @@ async fn main() -> anyhow::Result<()> {
         println!("{from} {to}");
 
         // We use the global cache to avoid re-distributing the file in the repo.
-        let liftover = Liftover::load_human_ucsc(from, to).await.unwrap();
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
+
+        let liftover = Liftover::load(entry).unwrap();
 
         drop(liftover);
     }
@@ -18,7 +22,10 @@ async fn main() -> anyhow::Result<()> {
         println!("{from} {to}");
 
         // We use the global cache to avoid re-distributing the file in the repo.
-        let liftover = Liftover::load_human_ensembl(from, to).await.unwrap();
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
+
+        let liftover = Liftover::load(entry).unwrap();
 
         drop(liftover);
     }

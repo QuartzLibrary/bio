@@ -4,41 +4,42 @@ use biocore::location::{GenomePosition, GenomeRange};
 
 use liftover::{
     bindings::{self, ucsc::UcscLiftoverSettings},
-    sources::{EnsemblHG, UcscHG},
+    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
     Liftover,
 };
+use utile::resource::{RawResource, RawResourceExt};
 
 #[ignore]
 #[tokio::test]
 async fn cache_testpoints_ucsc() -> anyhow::Result<()> {
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &UcscHG::key(from, to);
-        let entry = &UcscHG::global_cache(from, to);
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load_async(entry.clone()).await.unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
-        let snps_ucsc = run_snps(entry, &snps).await;
-        let ranges_ucsc = run_ranges(entry, &ranges).await;
+        let snps_ucsc = run_snps(entry.cache().unwrap(), &snps).await;
+        let ranges_ucsc = run_ranges(entry.cache().unwrap(), &ranges).await;
 
-        cache::store(snps_ucsc, ranges_ucsc, "ucsc", key);
+        cache::store(snps_ucsc, ranges_ucsc, "ucsc", &resource.key());
     }
 
     for (from, to) in EnsemblHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &EnsemblHG::key(from, to);
-        let entry = &EnsemblHG::global_cache(from, to);
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load_async(entry.clone()).await.unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
-        let snps_ucsc = run_snps(entry, &snps).await;
-        let ranges_ucsc = run_ranges(entry, &ranges).await;
+        let snps_ucsc = run_snps(entry.cache().unwrap(), &snps).await;
+        let ranges_ucsc = run_ranges(entry.cache().unwrap(), &ranges).await;
 
-        cache::store(snps_ucsc, ranges_ucsc, "ensembl", key);
+        cache::store(snps_ucsc, ranges_ucsc, "ensembl", &resource.key());
     }
 
     Ok(())
@@ -48,32 +49,32 @@ async fn cache_testpoints_ucsc() -> anyhow::Result<()> {
 async fn check_testpoints_ucsc() -> anyhow::Result<()> {
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &UcscHG::key(from, to);
-        let entry = &UcscHG::global_cache(from, to);
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load_async(entry.clone()).await.unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
-        let snps_ucsc = run_snps(entry, &snps).await;
-        let ranges_ucsc = run_ranges(entry, &ranges).await;
+        let snps_ucsc = run_snps(entry.cache().unwrap(), &snps).await;
+        let ranges_ucsc = run_ranges(entry.cache().unwrap(), &ranges).await;
 
-        cache::assert(snps_ucsc, ranges_ucsc, "ucsc", key);
+        cache::assert(snps_ucsc, ranges_ucsc, "ucsc", &resource.key());
     }
 
     for (from, to) in EnsemblHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &EnsemblHG::key(from, to);
-        let entry = &EnsemblHG::global_cache(from, to);
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load_async(entry.clone()).await.unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
-        let snps_ucsc = run_snps(entry, &snps).await;
-        let ranges_ucsc = run_ranges(entry, &ranges).await;
+        let snps_ucsc = run_snps(entry.cache().unwrap(), &snps).await;
+        let ranges_ucsc = run_ranges(entry.cache().unwrap(), &ranges).await;
 
-        cache::assert(snps_ucsc, ranges_ucsc, "ensembl", key);
+        cache::assert(snps_ucsc, ranges_ucsc, "ensembl", &resource.key());
     }
 
     Ok(())
@@ -87,17 +88,17 @@ async fn check_testpoints_ucsc_web() -> anyhow::Result<()> {
         }
 
         println!("{from} {to}");
-        let key = &UcscHG::key(from, to);
-        let entry = &UcscHG::global_cache(from, to);
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load_async(entry.clone()).await.unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
         let snps_ucsc = run_snps_web(from, to, &snps).await;
         let ranges_ucsc = run_ranges_web(from, to, &ranges).await;
 
-        cache::assert(snps_ucsc, ranges_ucsc, "ucsc", key);
+        cache::assert(snps_ucsc, ranges_ucsc, "ucsc", &resource.key());
     }
 
     Ok(())

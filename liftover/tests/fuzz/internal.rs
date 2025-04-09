@@ -1,19 +1,20 @@
 use biocore::location::{GenomePosition, GenomeRange};
 
 use liftover::{
-    sources::{EnsemblHG, UcscHG},
+    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
     Liftover, LiftoverIndexed,
 };
+use utile::resource::{RawResource, RawResourceExt};
 
 #[ignore]
 #[test]
 fn cache_testpoints_internal() -> anyhow::Result<()> {
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &UcscHG::key(from, to);
-        let entry = UcscHG::global_cache(from, to);
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load(entry).unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
@@ -22,15 +23,15 @@ fn cache_testpoints_internal() -> anyhow::Result<()> {
         let snps_internal = run_snps(liftover, snps);
         let ranges_internal = run_ranges(liftover, ranges);
 
-        cache::store(snps_internal, ranges_internal, "ucsc", key);
+        cache::store(snps_internal, ranges_internal, "ucsc", &resource.key());
     }
 
     for (from, to) in EnsemblHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &EnsemblHG::key(from, to);
-        let entry = EnsemblHG::global_cache(from, to);
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load(entry).unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
@@ -39,7 +40,7 @@ fn cache_testpoints_internal() -> anyhow::Result<()> {
         let snps_internal = run_snps(liftover, snps);
         let ranges_internal = run_ranges(liftover, ranges);
 
-        cache::store(snps_internal, ranges_internal, "ensembl", key);
+        cache::store(snps_internal, ranges_internal, "ensembl", &resource.key());
     }
 
     Ok(())
@@ -48,10 +49,10 @@ fn cache_testpoints_internal() -> anyhow::Result<()> {
 fn check_testpoints_internal() -> anyhow::Result<()> {
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &UcscHG::key(from, to);
-        let entry = UcscHG::global_cache(from, to);
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load(entry).unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
@@ -60,15 +61,15 @@ fn check_testpoints_internal() -> anyhow::Result<()> {
         let snps_internal = run_snps(liftover, snps);
         let ranges_internal = run_ranges(liftover, ranges);
 
-        cache::assert(snps_internal, ranges_internal, "ucsc", key);
+        cache::assert(snps_internal, ranges_internal, "ucsc", &resource.key());
     }
 
     for (from, to) in EnsemblHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &EnsemblHG::key(from, to);
-        let entry = EnsemblHG::global_cache(from, to);
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load(entry).unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
@@ -77,7 +78,7 @@ fn check_testpoints_internal() -> anyhow::Result<()> {
         let snps_internal = run_snps(liftover, snps);
         let ranges_internal = run_ranges(liftover, ranges);
 
-        cache::assert(snps_internal, ranges_internal, "ensembl", key);
+        cache::assert(snps_internal, ranges_internal, "ensembl", &resource.key());
     }
 
     Ok(())
@@ -86,32 +87,32 @@ fn check_testpoints_internal() -> anyhow::Result<()> {
 fn check_testpoints_slow() -> anyhow::Result<()> {
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &UcscHG::key(from, to);
-        let entry = UcscHG::global_cache(from, to);
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load(entry).unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
         let snps_internal = run_snps_slow(liftover, snps);
         let ranges_internal = run_ranges_slow(liftover, ranges);
 
-        cache::assert(snps_internal, ranges_internal, "ucsc", key);
+        cache::assert(snps_internal, ranges_internal, "ucsc", &resource.key());
     }
 
     for (from, to) in EnsemblHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &EnsemblHG::key(from, to);
-        let entry = EnsemblHG::global_cache(from, to);
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load(entry).unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
         let snps_internal = run_snps_slow(liftover, snps);
         let ranges_internal = run_ranges_slow(liftover, ranges);
 
-        cache::assert(snps_internal, ranges_internal, "ensembl", key);
+        cache::assert(snps_internal, ranges_internal, "ensembl", &resource.key());
     }
 
     Ok(())

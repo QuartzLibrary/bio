@@ -7,11 +7,31 @@ use std::{
 
 use flate2::read::MultiGzDecoder;
 
+use utile::{
+    io::read_ext::AsyncReadInto,
+    resource::{RawResource, RawResourceExt},
+};
+
 use super::{
     AlignmentBlock, Chain, ChainHeader, ChainRange, GenomeRange, Liftover, SequenceOrientation,
 };
 
 impl Liftover {
+    pub fn load(resource: impl RawResource) -> anyhow::Result<Self> {
+        Ok(Self::read(resource.decompressed().buffered().read()?)?)
+    }
+    pub async fn load_async(resource: impl RawResource) -> anyhow::Result<Self> {
+        Ok(Self::read(
+            &*resource
+                .decompressed()
+                .buffered()
+                .read_async()
+                .await?
+                .read_into_vec()
+                .await?,
+        )?)
+    }
+
     pub fn read(mut reader: impl BufRead) -> Result<Self, std::io::Error> {
         let mut chains = vec![];
         let mut buf = vec![];

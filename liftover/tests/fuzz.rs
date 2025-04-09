@@ -11,10 +11,13 @@ mod ucsc;
 use std::path::PathBuf;
 
 use biocore::location::GenomeRange;
-use utile::cache::Cache;
+use utile::{
+    cache::Cache,
+    resource::{RawResource, RawResourceExt},
+};
 
 use liftover::{
-    sources::{EnsemblHG, UcscHG},
+    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
     Liftover,
 };
 
@@ -42,7 +45,10 @@ async fn cache_chain_files() -> anyhow::Result<()> {
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");
 
-        let liftover = Liftover::load_human_ucsc(from, to).await.unwrap();
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
+
+        let liftover = Liftover::load(entry).unwrap();
 
         drop(liftover);
     }
@@ -50,7 +56,10 @@ async fn cache_chain_files() -> anyhow::Result<()> {
     for (from, to) in EnsemblHG::valid_pairs() {
         println!("{from} {to}");
 
-        let liftover = Liftover::load_human_ensembl(from, to).await.unwrap();
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
+
+        let liftover = Liftover::load(entry).unwrap();
 
         drop(liftover);
     }
@@ -88,10 +97,10 @@ async fn check_against_ucsc() -> anyhow::Result<()> {
 
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &UcscHG::key(from, to);
-        let entry = UcscHG::global_cache(from, to);
+        let resource = UcscResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load(entry).unwrap();
 
         let (snps, ranges) = testpoints::get(liftover);
 
@@ -103,7 +112,7 @@ async fn check_against_ucsc() -> anyhow::Result<()> {
         // let snps_ucsc = ucsc::run_snps(entry, &snps).await;
         // let ranges_ucsc = ucsc::run_ranges(entry, &ranges).await;
 
-        let (snps_ucsc, ranges_ucsc) = ucsc::cache::get("ucsc", key);
+        let (snps_ucsc, ranges_ucsc) = ucsc::cache::get("ucsc", &resource.key());
 
         assert!(snps_internal == snps_ucsc);
 
@@ -116,10 +125,10 @@ async fn check_against_ucsc() -> anyhow::Result<()> {
 
     for (from, to) in EnsemblHG::valid_pairs() {
         println!("{from} {to}");
-        let key = &EnsemblHG::key(from, to);
-        let entry = EnsemblHG::global_cache(from, to);
+        let resource = EnsemblResource::new_human_liftover(from, to);
+        let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::read_file(entry).unwrap();
+        let liftover = &Liftover::load(entry).unwrap();
 
         let (snps, ranges) = testpoints::get(liftover);
 
@@ -131,7 +140,7 @@ async fn check_against_ucsc() -> anyhow::Result<()> {
         // let snps_ucsc = ucsc::run_snps(entry, &snps).await;
         // let ranges_ucsc = ucsc::run_ranges(entry, &ranges).await;
 
-        let (snps_ucsc, ranges_ucsc) = ucsc::cache::get("ensembl", key);
+        let (snps_ucsc, ranges_ucsc) = ucsc::cache::get("ensembl", &resource.key());
 
         assert!(snps_internal == snps_ucsc);
 

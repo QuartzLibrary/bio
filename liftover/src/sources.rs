@@ -1,8 +1,11 @@
 use url::Url;
-use utile::cache::{Cache, CacheEntry, UrlEntry};
 
-use super::Liftover;
+use utile::resource::{Compression, RawResource, UrlResource};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnsemblResource {
+    pub key: String,
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnsemblHG {
     #[doc(alias = "hg19")]
@@ -17,25 +20,63 @@ pub enum EnsemblHG {
     #[doc(alias = "Hg18")]
     NCBI36,
 }
-impl EnsemblHG {
-    pub fn url(from: Self, to: Self) -> Url {
-        ensembl_url(from.name(), to.name())
+impl EnsemblResource {
+    pub fn new(key: String) -> Self {
+        Self { key }
     }
-    pub fn key(from: Self, to: Self) -> String {
-        ensembl_key(from.name(), to.name())
+    pub fn new_human_liftover(from: EnsemblHG, to: EnsemblHG) -> Self {
+        Self::new_human_liftover_raw(from.name(), to.name())
     }
-    pub fn global_cache(from: Self, to: Self) -> CacheEntry {
-        Cache::global("ensembl").entry(Self::key(from, to))
+    pub fn new_human_liftover_raw(from: &str, to: &str) -> Self {
+        Self::new(format!(
+            "assembly_mapping/homo_sapiens/{from}_to_{to}.chain.gz"
+        ))
+    }
+
+    pub fn url(&self) -> Url {
+        let key = &self.key;
+        Url::parse(&format!("https://ftp.ensembl.org/pub/{key}")).unwrap()
+    }
+
+    fn url_resource(&self) -> UrlResource {
+        UrlResource::new(self.url()).unwrap()
     }
 }
-pub fn ensembl_url(from: &str, to: &str) -> Url {
-    let key = ensembl_key(from, to);
-    Url::parse(&format!("https://ftp.ensembl.org/pub/{key}")).unwrap()
-}
-pub fn ensembl_key(from: &str, to: &str) -> String {
-    format!("assembly_mapping/homo_sapiens/{from}_to_{to}.chain.gz")
+impl RawResource for EnsemblResource {
+    const NAMESPACE: &'static str = "ensembl";
+    fn key(&self) -> String {
+        self.key.clone()
+    }
+
+    fn compression(&self) -> Option<Compression> {
+        if self.key.ends_with(".gz") || self.key.ends_with(".bgz") {
+            Some(Compression::MultiGzip)
+        } else {
+            None
+        }
+    }
+
+    type Reader = <UrlResource as RawResource>::Reader;
+    fn size(&self) -> std::io::Result<u64> {
+        self.url_resource().size()
+    }
+    fn read(&self) -> std::io::Result<Self::Reader> {
+        self.url_resource().read()
+    }
+
+    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    async fn size_async(&self) -> std::io::Result<u64> {
+        self.url_resource().size_async().await
+    }
+    async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
+        self.url_resource().read_async().await
+    }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UcscResource {
+    pub key: String,
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UcscHG {
     Hg4,
@@ -68,91 +109,56 @@ pub enum UcscHG {
     #[doc(alias = "T2T-CHM13v2.0")]
     Hs1,
 }
-impl UcscHG {
-    pub fn url(from: Self, to: Self) -> Url {
-        ucsc_url(from.name(), to.name_in_to_position())
+impl UcscResource {
+    pub fn new(key: String) -> Self {
+        Self { key }
     }
-    pub fn key(from: Self, to: Self) -> String {
-        ucsc_key(from.name(), to.name_in_to_position())
+    pub fn new_human_liftover(from: UcscHG, to: UcscHG) -> Self {
+        Self::new_human_liftover_raw(from.name(), to.name_in_to_position())
     }
-    pub fn global_cache(from: Self, to: Self) -> CacheEntry {
-        Cache::global("ucsc").entry(Self::key(from, to))
-    }
-}
-pub fn ucsc_url(from: &str, to: &str) -> Url {
-    let key = ucsc_key(from, to);
-    Url::parse(&format!("https://hgdownload2.cse.ucsc.edu/{key}")).unwrap()
-}
-pub fn ucsc_key(from: &str, to: &str) -> String {
-    format!("goldenPath/{from}/liftOver/{from}To{to}.over.chain.gz")
-}
-
-impl Liftover {
-    pub async fn load_human_ensembl(from: EnsemblHG, to: EnsemblHG) -> anyhow::Result<Self> {
-        Self::load_ensembl(from.name(), to.name()).await
-    }
-    pub async fn load_ensembl(from: &str, to: &str) -> anyhow::Result<Self> {
-        Ok(Self::read_gz_compressed(
-            Self::cache_entry_ensembl(from, to).await?.get()?,
-        )?)
+    pub fn new_human_liftover_raw(from: &str, to: &str) -> Self {
+        Self::new(format!(
+            "goldenPath/{from}/liftOver/{from}To{to}.over.chain.gz"
+        ))
     }
 
-    pub async fn cache_human_entry_ensembl(
-        from: EnsemblHG,
-        to: EnsemblHG,
-    ) -> anyhow::Result<CacheEntry> {
-        Self::cache_entry_ensembl(from.name(), to.name()).await
+    pub fn url(&self) -> Url {
+        let key = &self.key;
+        Url::parse(&format!("https://hgdownload2.cse.ucsc.edu/{key}")).unwrap()
     }
-    pub async fn cache_entry_ensembl(from: &str, to: &str) -> anyhow::Result<CacheEntry> {
-        if from == to {
-            // TODO: return an identity and issue a warning instead.
-            Err(anyhow::anyhow!(
-                "Trying to create a liftover file for the same genome."
-            ))?;
+
+    fn url_resource(&self) -> UrlResource {
+        UrlResource::new(self.url()).unwrap()
+    }
+}
+impl RawResource for UcscResource {
+    const NAMESPACE: &'static str = "ucsc";
+    fn key(&self) -> String {
+        self.key.clone()
+    }
+
+    fn compression(&self) -> Option<Compression> {
+        if self.key.ends_with(".gz") || self.key.ends_with(".bgz") {
+            Some(Compression::MultiGzip)
+        } else {
+            None
         }
-
-        let fs_entry = Cache::global("ensembl").entry(ensembl_key(from, to));
-
-        UrlEntry::new(ensembl_url(from, to))?
-            .get_and_cache_async("[Data][Ensembl][liftover]", fs_entry.clone())
-            .await?;
-
-        Ok(fs_entry)
-    }
-}
-
-impl Liftover {
-    /// License: note that some UCSC liftover files do are not freely usable for commercial purposes.
-    pub async fn load_human_ucsc(from: UcscHG, to: UcscHG) -> anyhow::Result<Self> {
-        Self::load_ucsc(from.name(), to.name_in_to_position()).await
-    }
-    /// License: note that some UCSC liftover files do are not freely usable for commercial purposes.
-    pub async fn load_ucsc(from: &str, to: &str) -> anyhow::Result<Self> {
-        Ok(Self::read_gz_compressed(
-            Self::cache_entry_ucsc(from, to).await?.get()?,
-        )?)
     }
 
-    /// License: note that some UCSC liftover files do are not freely usable for commercial purposes.
-    pub async fn cache_human_entry_ucsc(from: UcscHG, to: UcscHG) -> anyhow::Result<CacheEntry> {
-        Self::cache_entry_ucsc(from.name(), to.name()).await
+    type Reader = <UrlResource as RawResource>::Reader;
+    fn size(&self) -> std::io::Result<u64> {
+        self.url_resource().size()
     }
-    /// License: note that some UCSC liftover files do are not freely usable for commercial purposes.
-    pub async fn cache_entry_ucsc(from: &str, to: &str) -> anyhow::Result<CacheEntry> {
-        if from == to {
-            // TODO: return an identity and issue a warning instead.
-            Err(anyhow::anyhow!(
-                "Trying to create a liftover file for the same genome."
-            ))?;
-        }
+    fn read(&self) -> std::io::Result<Self::Reader> {
+        self.url_resource().read()
+    }
 
-        let fs_entry = Cache::global("ucsc").entry(ucsc_key(from, to));
-
-        UrlEntry::new(ucsc_url(from, to))?
-            .get_and_cache_async("[Data][UCSC][liftover]", fs_entry.clone())
-            .await?;
-
-        Ok(fs_entry)
+    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    async fn size_async(&self) -> std::io::Result<u64> {
+        self.url_resource().size_async().await
+    }
+    async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
+        self.url_resource().read_async().await
     }
 }
 
@@ -489,5 +495,31 @@ mod boilerplate {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             f.write_str(self.name())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use crate::Liftover;
+
+    use super::*;
+
+    #[test]
+    fn test_ensembl_resource() {
+        let resource = EnsemblResource::new_human_liftover(EnsemblHG::GRCh37, EnsemblHG::GRCh38);
+        let liftover = Liftover::load(resource).unwrap();
+        let from = liftover
+            .chains
+            .iter()
+            .map(|c| &c.header.q.range.name)
+            .collect::<BTreeSet<_>>();
+        let to = liftover
+            .chains
+            .iter()
+            .map(|c| &c.header.t.range.name)
+            .collect::<BTreeSet<_>>();
+        println!("\n{from:?}\n\n{to:?}");
     }
 }
