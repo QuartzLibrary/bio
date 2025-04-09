@@ -1,10 +1,4 @@
 [workspace]
-members = [
-    "biocore",
-    "genomes1000",
-    "gwas_catalog",
-    "ids",
-    "liftover",
-    "pgs_catalog",
-]
+members = ["[!.]*"]
+exclude = ["target"]
 resolver = "2"
