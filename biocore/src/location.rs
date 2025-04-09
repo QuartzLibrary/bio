@@ -100,7 +100,7 @@ impl GenomeRange {
 
         Some(Self {
             name: b.name,
-            at: self.at.clone().intersect(b.at),
+            at: self.at.clone().intersection(b.at),
             orientation: self.orientation,
         })
     }

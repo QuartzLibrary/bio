@@ -135,7 +135,7 @@ impl Chain {
         let mut intersections = vec![];
 
         for b in self.blocks() {
-            let intersected = (t_start..(t_start + b.size)).intersect(intersected.at.clone());
+            let intersected = (t_start..(t_start + b.size)).intersection(intersected.at.clone());
 
             if !intersected.is_empty() {
                 let shift = intersected.start - t_start;
@@ -332,7 +332,7 @@ impl LiftoverIndexed {
         let mut intersections = vec![];
 
         for r in ranges {
-            let intersected = r.range.clone().intersect(at.clone());
+            let intersected = r.range.clone().intersection(at.clone());
             if !intersected.is_empty() {
                 let shift = intersected.start - r.range.start;
                 let mut new = GenomeRange {

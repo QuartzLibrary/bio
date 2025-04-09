@@ -3,6 +3,7 @@
 #![feature(io_error_more)]
 #![feature(let_chains)]
 #![feature(impl_trait_in_assoc_type)]
+#![feature(step_trait)]
 
 pub mod cache;
 pub mod collections;
