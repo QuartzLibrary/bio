@@ -8,6 +8,7 @@ pub mod collections;
 pub mod drop;
 pub mod fs;
 pub mod io;
+pub mod iter;
 pub mod jsonl;
 pub mod range;
 pub mod serde_ext;
