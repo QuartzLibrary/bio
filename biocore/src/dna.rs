@@ -3,11 +3,15 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::sequence::{AsciiChar, Sequence};
+use crate::sequence::{AsciiChar, Sequence, SequenceSlice};
 
 pub type DnaSequence = Sequence<DnaBase>;
 pub type AmbiguousDnaSequence = Sequence<AmbiguousDnaBase>;
 pub type IupacDnaSequence = Sequence<IupacDnaBase>;
+
+pub type DnaSequenceSlice = SequenceSlice<DnaBase>;
+pub type AmbiguousDnaSequenceSlice = SequenceSlice<AmbiguousDnaBase>;
+pub type IupacDnaSequenceSlice = SequenceSlice<IupacDnaBase>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Serialize, Deserialize)]
