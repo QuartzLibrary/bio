@@ -1,0 +1,24 @@
+[package]
+name = "pan_ukbb"
+version = "0.1.0"
+edition = "2024"
+description = "Library for working with Pan-UK Biobank data"
+license = "MIT OR Apache-2.0"
+keywords = ["bioinformatics", "genetics", "ukbiobank"]
+categories = ["science"]
+
+[dependencies]
+biocore = { path = "../biocore" }
+ids = { path = "../ids" }
+utile = { path = "../utile" }
+
+csv = "1"
+flate2 = "1"
+ordered-float = { version = "5", features = ["serde"] }
+rust_decimal = "1"
+serde = { version = "1", features = ["derive"] }
+url = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-test = "0.4"
