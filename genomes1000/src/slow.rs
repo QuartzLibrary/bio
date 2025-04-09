@@ -1,15 +1,14 @@
-use flate2::read::MultiGzDecoder;
-use std::{
-    collections::HashMap,
-    io::{BufReader, Read},
-};
+use std::{collections::HashMap, io::Read};
+use utile::resource::{RawResource, RawResourceExt};
 
-use super::{download_and_cache_latest_contig, parse, AltGenotype, B38Contig};
+use crate::resource::Genomes1000Resource;
+
+use super::{parse, AltGenotype, GRCh38Contig};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SerdeRecord {
     #[serde(rename = "CHROM")]
-    pub contig: B38Contig,
+    pub contig: GRCh38Contig,
     #[serde(rename = "POS")]
     pub position: u64,
     #[serde(rename = "ID")]
@@ -34,11 +33,17 @@ pub struct SerdeRecord {
 impl SerdeRecord {
     #[allow(dead_code)]
     async fn load_contig_(
-        contig: B38Contig,
+        contig: GRCh38Contig,
     ) -> Result<impl Iterator<Item = Result<SerdeRecord, csv::Error>>, std::io::Error> {
-        let fs_entry = download_and_cache_latest_contig(contig.download_url()).await?;
+        let mut reader = Genomes1000Resource::high_coverage_genotypes_contig_vcf(contig)
+            .log_progress()
+            .with_global_fs_cache()
+            .ensure_cached_async()
+            .await?
+            .decompressed()
+            .buffered()
+            .read()?;
 
-        let mut reader = BufReader::new(MultiGzDecoder::new(fs_entry.get()?));
         parse::comments::skip(&mut reader)?;
 
         {

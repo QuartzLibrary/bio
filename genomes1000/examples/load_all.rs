@@ -1,4 +1,5 @@
-use genomes1000::B38Contig;
+use genomes1000::{load_grch38_reference_genome, GRCh38Contig};
+use noodles::fasta::Reader;
 
 #[tokio::main]
 async fn main() {
@@ -10,10 +11,16 @@ async fn main() {
 
     log::info!("Starting");
 
-    let tasks = B38Contig::iter()
+    let reference_genome = load_grch38_reference_genome().await.unwrap();
+
+    for record in Reader::new(reference_genome.into_inner()).records() {
+        let _record = record.unwrap();
+    }
+
+    let tasks = GRCh38Contig::CHROMOSOMES
         .into_iter()
         .map(|c| async move {
-            genomes1000::load_contig(c.clone())
+            genomes1000::load_contig(c)
                 .await
                 .unwrap()
                 .enumerate()

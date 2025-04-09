@@ -1,13 +1,15 @@
 use std::{
     io::{self, BufRead},
-    rc::Rc,
     str,
+    sync::Arc,
 };
 
 use biocore::dna::DnaBase;
 use utile::io::FromUtf8Bytes;
 
-use super::{B38Contig, Record};
+use crate::GRCh38Contig;
+
+use super::Record;
 
 pub(super) fn parse<S>(
     reader: impl BufRead,
@@ -24,7 +26,7 @@ pub(super) fn parse<S>(
     })
 }
 
-pub(super) fn read_header(reader: &mut impl BufRead) -> Result<Vec<Rc<str>>, io::Error> {
+pub(super) fn read_header(reader: &mut impl BufRead) -> Result<Vec<Arc<str>>, io::Error> {
     const EXPECTED_SAMPLE_COUNT: usize = 2500;
     const REFERENCE: [u8; 46] = *b"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t";
     let mut buf = [0; REFERENCE.len()];
@@ -43,7 +45,7 @@ pub(super) fn read_header(reader: &mut impl BufRead) -> Result<Vec<Rc<str>>, io:
         log::warn!("[Data][1000 Genomes] File header is not valid UTF-8.");
         io::ErrorKind::InvalidData
     })?;
-    sample_names.extend(line.split('\t').map(Rc::from));
+    sample_names.extend(line.split('\t').map(Arc::from));
     Ok(sample_names)
 }
 
@@ -51,7 +53,7 @@ pub(super) fn read_header(reader: &mut impl BufRead) -> Result<Vec<Rc<str>>, io:
 struct Lines<S, B> {
     buf: Vec<u8>,
     inner: B,
-    sample_names: Vec<Rc<str>>,
+    sample_names: Vec<Arc<str>>,
     read_sample: fn(&[u8], &[u8]) -> io::Result<S>,
 }
 impl<S, B> Iterator for Lines<S, B>
@@ -76,7 +78,7 @@ where
 
 pub(super) fn read_record<S>(
     buf: &mut Vec<u8>,
-    sample_names: &[Rc<str>],
+    sample_names: &[Arc<str>],
     reader: &mut impl BufRead,
     read_sample: fn(&[u8], &[u8]) -> Result<S, io::Error>,
 ) -> Result<Option<Record<S>>, io::Error> {
@@ -87,14 +89,14 @@ pub(super) fn read_record<S>(
         Ok(String::from_utf8(buf.to_vec()).unwrap())
     }
 
-    let contig: B38Contig = {
+    let contig: GRCh38Contig = {
         buf.clear();
         reader.read_until(b'\t', buf)?;
         if buf.is_empty() {
             return Ok(None);
         }
         let buf = &buf[..buf.len() - 1];
-        B38Contig::from_bytes(buf).unwrap()
+        GRCh38Contig::from_bytes(buf).unwrap()
     };
     let position: u64 = {
         buf.clear();

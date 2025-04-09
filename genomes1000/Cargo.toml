@@ -13,7 +13,8 @@ jiff = { version = "0.1", features = ["serde"] }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
-noodles = { version = "0.84", features = ["core", "fasta"] }
+noodles = { version = "0.95", features = ["core", "fasta", "vcf"] }
+phf = { version = "0.11", features = ["macros"] }
 
 [dev-dependencies]
 pgs_catalog = { path = "../pgs_catalog" }

@@ -1,4 +1,5 @@
 #![feature(never_type)]
+#![feature(ascii_char)]
 
 mod contig;
 mod genotype;
@@ -6,20 +7,16 @@ mod info;
 mod parse;
 mod slow;
 
-use std::io::BufReader;
-
-use flate2::read::MultiGzDecoder;
-use url::Url;
+use biocore::dna::DnaBase;
+use resource::Genomes1000Resource;
 use utile::{
-    cache::{Cache, CacheEntry, UrlEntry},
     io::FromUtf8Bytes,
+    resource::{RawResource, RawResourceExt},
 };
 
-use biocore::dna::DnaBase;
+pub mod resource;
 
-pub mod reference_genome;
-
-pub use contig::B38Contig;
+pub use contig::GRCh38Contig;
 pub use genotype::AltGenotype;
 pub use info::RecordInfo;
 
@@ -35,7 +32,7 @@ pub struct VcfFile<S> {
 
 #[derive(Debug, Clone)]
 pub struct Record<S> {
-    pub contig: B38Contig,
+    pub contig: GRCh38Contig,
     /// 1-based! 0 and n+1 means telomere (where n is length of contig).
     pub position: u64,
     pub id: String,
@@ -57,7 +54,7 @@ pub enum Genotype {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HaploidGenotype {
-    value: u8,
+    pub value: u8,
 }
 
 /// Diploid/biallelic genotype/variant
@@ -114,129 +111,100 @@ pub struct ExtendedSample<GT> {
 pub async fn load_all(
 ) -> Result<impl Iterator<Item = Result<Record<Genotype>, std::io::Error>>, std::io::Error> {
     let mut chromosomes = vec![];
-    for i in 1..=22 {
-        chromosomes.push(load_chr(i).await?);
+    for contig in GRCh38Contig::CHROMOSOMES {
+        chromosomes.push(load_contig(contig).await?);
     }
-    let x = load_x().await?;
-    let y = load_y().await?;
-    let others = load_others().await?;
 
-    Ok(chromosomes
-        .into_iter()
-        .flat_map(|i| i.map(|r| Ok(r?.map(Genotype::Diploid))))
-        .chain(x)
-        .chain(y.map(|r| Ok(r?.map(Genotype::from))))
-        .chain(others.map(|r| Ok(r?.map(Genotype::from)))))
+    Ok(chromosomes.into_iter().flatten())
 }
 
 pub async fn load_contig(
-    c: B38Contig,
-) -> Result<Box<dyn Iterator<Item = Result<Record<Genotype>, std::io::Error>>>, std::io::Error> {
-    Ok(match c {
-        B38Contig::Chr1 => Box::new(load_chr(1).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr2 => Box::new(load_chr(2).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr3 => Box::new(load_chr(3).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr4 => Box::new(load_chr(4).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr5 => Box::new(load_chr(5).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr6 => Box::new(load_chr(6).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr7 => Box::new(load_chr(7).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr8 => Box::new(load_chr(8).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr9 => Box::new(load_chr(9).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr10 => Box::new(load_chr(10).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr11 => Box::new(load_chr(11).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr12 => Box::new(load_chr(12).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr13 => Box::new(load_chr(13).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr14 => Box::new(load_chr(14).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr15 => Box::new(load_chr(15).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr16 => Box::new(load_chr(16).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr17 => Box::new(load_chr(17).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr18 => Box::new(load_chr(18).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr19 => Box::new(load_chr(19).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr20 => Box::new(load_chr(20).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr21 => Box::new(load_chr(21).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::Chr22 => Box::new(load_chr(22).await?.map(|r| Ok(r?.map(Genotype::from)))),
-        B38Contig::MT | B38Contig::Other(_) => {
-            Box::new(load_others().await?.map(|r| Ok(r?.map(Genotype::from))))
-        }
-        B38Contig::X => Box::new(load_x().await?),
-        B38Contig::Y => Box::new(load_y().await?.map(|r| Ok(r?.map(Genotype::from)))),
-    })
-}
-
-pub async fn load_chr(
-    number: usize,
-) -> Result<impl Iterator<Item = Result<Record<DiploidGenotype>, std::io::Error>>, std::io::Error> {
-    assert!((1..=22).contains(&number));
-    let contig: B38Contig = format!("chr{number}").parse().unwrap();
-    load_url(contig.download_url(), |_, buf| {
-        DiploidGenotype::from_bytes(buf)
-    })
-    .await
-}
-pub async fn load_x(
+    c: GRCh38Contig,
 ) -> Result<impl Iterator<Item = Result<Record<Genotype>, std::io::Error>>, std::io::Error> {
-    load_url(B38Contig::X.download_url(), |_, buf| {
-        Genotype::from_bytes(buf)
-    })
-    .await
-}
-pub async fn load_y() -> Result<
-    impl Iterator<Item = Result<Record<ExtendedSample<HaploidGenotype>>, std::io::Error>>,
-    std::io::Error,
-> {
-    load_url(B38Contig::Y.download_url(), |format, buf| {
-        ExtendedSample::from_bytes(format, buf)
-    })
-    .await
-}
-pub async fn load_others() -> Result<
-    impl Iterator<Item = Result<Record<ExtendedSample<Genotype>>, std::io::Error>>,
-    std::io::Error,
-> {
-    let url = contig::OTHER_DOWNLOAD_URL;
-    load_url(url.parse().unwrap(), |format, buf| {
-        ExtendedSample::from_bytes(format, buf)
-    })
-    .await
-}
+    let resource = Genomes1000Resource::high_coverage_genotypes_contig_vcf(c)
+        .log_progress()
+        .with_global_fs_cache()
+        .ensure_cached_async()
+        .await?
+        .decompressed()
+        .buffered();
 
-impl<S> Record<S> {
-    fn map<O>(self, f: impl FnMut(S) -> O) -> Record<O> {
-        Record {
-            contig: self.contig,
-            position: self.position,
-            id: self.id,
-            reference_allele: self.reference_allele,
-            alternate_alleles: self.alternate_alleles,
-            quality: self.quality,
-            filter: self.filter,
-            info: self.info,
-            format: self.format,
-            samples: self.samples.into_iter().map(f).collect(),
-        }
-    }
-}
-
-async fn load_url<S>(
-    url: Url,
-    read_sample: fn(&[u8], &[u8]) -> Result<S, std::io::Error>,
-) -> Result<impl Iterator<Item = Result<Record<S>, std::io::Error>>, std::io::Error> {
-    let fs_entry = download_and_cache_latest_contig(url).await?;
-
-    let reader = BufReader::new(MultiGzDecoder::new(fs_entry.get()?));
-
-    parse::parse(reader, read_sample)
+    parse::parse(
+        resource.read()?,
+        match c {
+            GRCh38Contig::CHR1
+            | GRCh38Contig::CHR2
+            | GRCh38Contig::CHR3
+            | GRCh38Contig::CHR4
+            | GRCh38Contig::CHR5
+            | GRCh38Contig::CHR6
+            | GRCh38Contig::CHR7
+            | GRCh38Contig::CHR8
+            | GRCh38Contig::CHR9
+            | GRCh38Contig::CHR10
+            | GRCh38Contig::CHR11
+            | GRCh38Contig::CHR12
+            | GRCh38Contig::CHR13
+            | GRCh38Contig::CHR14
+            | GRCh38Contig::CHR15
+            | GRCh38Contig::CHR16
+            | GRCh38Contig::CHR17
+            | GRCh38Contig::CHR18
+            | GRCh38Contig::CHR19
+            | GRCh38Contig::CHR20
+            | GRCh38Contig::CHR21
+            | GRCh38Contig::CHR22 => |_, buf| DiploidGenotype::from_bytes(buf).map(Genotype::from),
+            GRCh38Contig::X => |_, buf| Genotype::from_bytes(buf),
+            GRCh38Contig::Y => |format, buf| {
+                ExtendedSample::<HaploidGenotype>::from_bytes(format, buf).map(Genotype::from)
+            },
+            _ => |format, buf| {
+                ExtendedSample::<Genotype>::from_bytes(format, buf).map(Genotype::from)
+            },
+        },
+    )
 }
 
-async fn download_and_cache_latest_contig(url: Url) -> Result<CacheEntry, std::io::Error> {
-    let fs_entry = Cache::global("1000genomes").entry(url.path().trim_start_matches('/'));
-
-    UrlEntry::new(url)
-        .unwrap()
-        .get_and_cache_async("[Data][1000 Genomes]", fs_entry.clone())
+pub async fn load_grch38_reference_genome(
+) -> std::io::Result<noodles::fasta::IndexedReader<std::io::BufReader<std::fs::File>>> {
+    let resource = Genomes1000Resource::grch38_reference_genome()
+        .log_progress()
+        .with_global_fs_cache()
+        .ensure_cached_async()
+        .await?;
+    let index_resource = Genomes1000Resource::grch38_reference_genome_index()
+        .log_progress()
+        .with_global_fs_cache()
+        .ensure_cached_async()
         .await?;
 
-    Ok(fs_entry)
+    Ok(noodles::fasta::IndexedReader::new(
+        resource.buffered().read()?,
+        noodles::fasta::fai::Reader::new(index_resource.decompressed().buffered().read()?)
+            .read_index()?,
+    ))
+}
+
+pub async fn load_grch37_reference_genome(
+) -> std::io::Result<noodles::fasta::IndexedReader<std::io::BufReader<std::fs::File>>> {
+    let resource = Genomes1000Resource::old_grch37_reference_genome()
+        .log_progress()
+        .with_global_fs_cache()
+        .decompressed() // Decompress *before* caching, so we have a file to index into.
+        .with_global_fs_cache()
+        .ensure_cached_async()
+        .await?;
+    let index_resource = Genomes1000Resource::old_grch37_reference_genome_index()
+        .log_progress()
+        .with_global_fs_cache()
+        .ensure_cached_async()
+        .await?;
+
+    Ok(noodles::fasta::IndexedReader::new(
+        resource.buffered().read()?,
+        noodles::fasta::fai::Reader::new(index_resource.decompressed().buffered().read()?)
+            .read_index()?,
+    ))
 }
 
 mod boilerplate {
