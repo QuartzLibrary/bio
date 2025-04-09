@@ -904,7 +904,7 @@ mod boilerplate {
             S: serde::Serializer,
         {
             match *v {
-                Some(true) => "TRUE".serialize(serializer),
+                Some(true) => "True".serialize(serializer),
                 Some(false) => "False".serialize(serializer),
                 None => serializer.serialize_none(),
             }
