@@ -6,6 +6,7 @@
 pub mod cache;
 pub mod collections;
 pub mod drop;
+pub mod fs;
 pub mod io;
 pub mod jsonl;
 pub mod range;
