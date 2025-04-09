@@ -2,6 +2,7 @@
 #![feature(iterator_try_collect)]
 #![feature(io_error_more)]
 #![feature(let_chains)]
+#![feature(impl_trait_in_assoc_type)]
 
 pub mod cache;
 pub mod collections;
@@ -11,5 +12,6 @@ pub mod io;
 pub mod iter;
 pub mod jsonl;
 pub mod range;
+pub mod resource;
 pub mod serde_ext;
 pub mod wsl;
