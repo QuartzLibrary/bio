@@ -3,6 +3,50 @@ use std::{fmt, io::BufRead, str::FromStr};
 use hyperx::header::{ContentDisposition, DispositionParam, DispositionType, Header};
 use reqwest::header::{HeaderMap, CONTENT_DISPOSITION, CONTENT_LENGTH};
 
+pub mod read_ext {
+    use std::{
+        io::{Error, Read},
+        pin::pin,
+    };
+
+    use tokio::io::{AsyncRead, AsyncReadExt};
+
+    pub trait ReadInto: Read {
+        fn read_into_vec(&mut self) -> Result<Vec<u8>, Error>;
+        fn read_into_string(&mut self) -> Result<String, Error>;
+    }
+    impl<R: Read> ReadInto for R {
+        fn read_into_vec(&mut self) -> Result<Vec<u8>, Error> {
+            let mut buf = Vec::new();
+            self.read_to_end(&mut buf)?;
+            Ok(buf)
+        }
+        fn read_into_string(&mut self) -> Result<String, Error> {
+            let mut buf = String::new();
+            self.read_to_string(&mut buf)?;
+            Ok(buf)
+        }
+    }
+
+    #[allow(async_fn_in_trait)] // TODO
+    pub trait AsyncReadInto: AsyncRead {
+        async fn read_into_vec(self) -> Result<Vec<u8>, Error>;
+        async fn read_into_string(self) -> Result<String, Error>;
+    }
+    impl<R: AsyncRead> AsyncReadInto for R {
+        async fn read_into_vec(self) -> Result<Vec<u8>, Error> {
+            let mut buf = Vec::new();
+            pin!(self).read_to_end(&mut buf).await?;
+            Ok(buf)
+        }
+        async fn read_into_string(self) -> Result<String, Error> {
+            let mut buf = String::new();
+            pin!(self).read_to_string(&mut buf).await?;
+            Ok(buf)
+        }
+    }
+}
+
 pub mod read {
     use std::{io::BufRead, str::FromStr};
 
