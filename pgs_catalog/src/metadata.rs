@@ -3,12 +3,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use flate2::read::MultiGzDecoder;
-use ids::pgs::PgsId;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tar::Archive;
-use url::Url;
-use utile::cache::{Cache, CacheEntry, UrlEntry};
+
+use ids::pgs::PgsId;
+use utile::resource::{RawResource, RawResourceExt};
+
+use crate::PgsCatalogResource;
 
 pub struct Metadata {
     pub cohorts: Vec<Cohort>,
@@ -25,26 +26,6 @@ impl Metadata {
     }
     pub async fn load(id: PgsId) -> Result<Self, std::io::Error> {
         load_all_metadata(Some(id)).await
-    }
-
-    const ALL_URL: &str =
-        "https://ftp.ebi.ac.uk/pub/databases/spot/pgs/metadata/pgs_all_metadata.tar.gz";
-    const ALL_PATH: &str = "metadata/pgs_all_metadata.tar.gz";
-    fn url(id: Option<PgsId>) -> Url {
-        match id {
-            Some(id) => format!("https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/{id}/Metadata/{id}_metadata.tar.gz"),
-            None => Self::ALL_URL.to_owned(),
-        }
-        .parse()
-        .unwrap()
-    }
-    fn path(id: Option<PgsId>) -> PathBuf {
-        match id {
-            Some(id) => format!("scores/{id}/Metadata/{id}_metadata.tar.gz"),
-            None => Self::ALL_PATH.to_owned(),
-        }
-        .parse()
-        .unwrap()
     }
 }
 
@@ -371,9 +352,16 @@ async fn load_all_metadata(id: Option<PgsId>) -> Result<Metadata, std::io::Error
     let mut efo_traits: Option<Vec<EfoTrait>> = None;
     let mut publications: Option<Vec<Publication>> = None;
 
-    let fs_entry = download_and_cache_metadata(id).await?;
+    let resource = PgsCatalogResource::Metadata { id }
+        .log_progress()
+        .with_global_fs_cache()
+        .ensure_cached_async()
+        .await?
+        .decompressed();
 
-    for entry in Archive::new(MultiGzDecoder::new(fs_entry.get()?)).entries()? {
+    let mut archive = Archive::new(resource.read()?);
+
+    for entry in archive.entries()? {
         let entry = entry?;
         let path = &*entry.path()?;
         if path == cohorts_path {
@@ -420,9 +408,16 @@ async fn load_metadata_file<T: DeserializeOwned>(
 ) -> Result<Vec<T>, std::io::Error> {
     let file_name = file_name.as_ref();
 
-    let fs_entry = download_and_cache_metadata(id).await?;
+    let resource = PgsCatalogResource::Metadata { id }
+        .log_progress()
+        .with_global_fs_cache()
+        .ensure_cached_async()
+        .await?
+        .decompressed();
 
-    for entry in Archive::new(MultiGzDecoder::new(fs_entry.get()?)).entries()? {
+    let mut archive = Archive::new(resource.read()?);
+
+    for entry in archive.entries()? {
         let entry = entry?;
         if &*entry.path()? == file_name {
             return Ok(read_file(entry)?);
@@ -433,24 +428,6 @@ async fn load_metadata_file<T: DeserializeOwned>(
         std::io::ErrorKind::NotFound,
         missing(file_name),
     ))?
-}
-async fn download_and_cache_metadata(id: Option<PgsId>) -> Result<CacheEntry, std::io::Error> {
-    let url: Url = Metadata::url(id);
-    let path: PathBuf = Metadata::path(id);
-
-    let target = target(id);
-
-    let fs_entry = Cache::global("pgs_catalog").entry(path);
-
-    UrlEntry::new(url)
-        .unwrap()
-        .get_and_cache_async(
-            &format!("[Data][PGS Catalog][Metadata][{target}]"),
-            fs_entry.clone(),
-        )
-        .await?;
-
-    Ok(fs_entry)
 }
 fn read_file<T: DeserializeOwned>(file: impl Read) -> Result<Vec<T>, csv::Error> {
     csv::ReaderBuilder::new()
@@ -475,12 +452,5 @@ fn prefix(id: Option<PgsId>) -> String {
     match id {
         Some(id) => id.to_string(),
         None => "pgs_all".to_owned(),
-    }
-}
-
-fn target(id: Option<PgsId>) -> String {
-    match id {
-        Some(id) => id.to_string(),
-        None => "all".to_owned(),
     }
 }

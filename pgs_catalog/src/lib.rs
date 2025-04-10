@@ -1,19 +1,78 @@
 #![feature(iterator_try_collect)]
 
-use std::{
-    io::{BufReader, Read},
-    path::PathBuf,
-};
+use std::io::Read;
 
-use biocore::dna::DnaSequence;
-use flate2::read::MultiGzDecoder;
 use ordered_float::NotNan;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
-use utile::cache::{Cache, CacheEntry, UrlEntry};
+
+use biocore::dna::DnaSequence;
+use utile::resource::{RawResource, RawResourceExt, UrlResource};
 
 pub mod metadata;
 pub use ids::{pgs::PgsId, rs::RsId};
+
+const URL_BASE: &str = "https://ftp.ebi.ac.uk/pub/databases/spot/pgs";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PgsCatalogResource {
+    Study { id: PgsId },
+    HarmonizedStudy { id: PgsId, build: GenomeBuild },
+    Metadata { id: Option<PgsId> },
+}
+impl PgsCatalogResource {
+    pub fn key(&self) -> String {
+        match self {
+            PgsCatalogResource::Study { id } => format!("scores/{id}/ScoringFiles/{id}.txt.gz"),
+            PgsCatalogResource::HarmonizedStudy { id, build } => {
+                format!("scores/{id}/ScoringFiles/Harmonized/{id}_hmPOS_{build}.txt.gz")
+            }
+            PgsCatalogResource::Metadata { id } => match id {
+                Some(id) => format!("scores/{id}/Metadata/{id}_metadata.tar.gz"),
+                None => "metadata/pgs_all_metadata.tar.gz".to_owned(),
+            },
+        }
+    }
+    pub fn url(&self) -> Url {
+        let key = self.key();
+        format!("{URL_BASE}/{key}").parse().unwrap()
+    }
+    fn url_resource(&self) -> UrlResource {
+        UrlResource::new(self.url()).unwrap()
+    }
+}
+impl RawResource for PgsCatalogResource {
+    const NAMESPACE: &'static str = "pan_ukbb";
+
+    fn key(&self) -> String {
+        self.key()
+    }
+
+    fn compression(&self) -> Option<utile::resource::Compression> {
+        let key = self.key();
+        if key.ends_with(".gz") || key.ends_with(".bgz") {
+            Some(utile::resource::Compression::MultiGzip)
+        } else {
+            None
+        }
+    }
+
+    type Reader = <UrlResource as RawResource>::Reader;
+    fn size(&self) -> std::io::Result<u64> {
+        self.url_resource().size()
+    }
+    fn read(&self) -> std::io::Result<Self::Reader> {
+        self.url_resource().read()
+    }
+
+    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    async fn size_async(&self) -> std::io::Result<u64> {
+        self.url_resource().size_async().await
+    }
+    async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
+        self.url_resource().read_async().await
+    }
+}
 
 /// See [docs::HEADER_DOCS] and [docs::EXAMPLE_HEADER] and [docs::HARMONIZATION_EXTENSION].
 /// Harmonization happens to a [GenomeBuild].
@@ -411,21 +470,17 @@ impl Study {
     pub async fn load(
         id: PgsId,
     ) -> Result<impl Iterator<Item = Result<StudyAssociation, csv::Error>>, std::io::Error> {
-        let fs_entry = download_and_cache_study(id).await?;
-        let mut file = BufReader::new(MultiGzDecoder::new(fs_entry.get()?));
+        let resource = PgsCatalogResource::Study { id }
+            .log_progress()
+            .with_global_fs_cache()
+            .ensure_cached_async()
+            .await?
+            .decompressed()
+            .buffered();
+
+        let mut file = resource.read()?;
         let _header = comments::read(&mut file)?;
         Ok(read_file(file))
-    }
-
-    fn url(id: PgsId) -> Url {
-        format!("https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/{id}/ScoringFiles/{id}.txt.gz")
-            .parse()
-            .unwrap()
-    }
-    fn path(id: PgsId) -> PathBuf {
-        format!("scores/{id}/ScoringFiles/{id}.txt.gz")
-            .parse()
-            .unwrap()
     }
 }
 
@@ -435,56 +490,18 @@ impl HarmonizedStudy {
         build: GenomeBuild,
     ) -> Result<impl Iterator<Item = Result<HarmonizedStudyAssociation, csv::Error>>, std::io::Error>
     {
-        let fs_entry = download_and_cache_harmonized_study(id, build).await?;
-        let mut file = BufReader::new(MultiGzDecoder::new(fs_entry.get()?));
+        let resource = PgsCatalogResource::HarmonizedStudy { id, build }
+            .log_progress()
+            .with_global_fs_cache()
+            .ensure_cached_async()
+            .await?
+            .decompressed()
+            .buffered();
+
+        let mut file = resource.read()?;
         let _header = comments::read(&mut file)?;
         Ok(read_file(file))
     }
-
-    fn url(id: PgsId, build: GenomeBuild) -> Url {
-        format!("https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/{id}/ScoringFiles/Harmonized/{id}_hmPOS_{build}.txt.gz")
-            .parse()
-            .unwrap()
-    }
-    fn path(id: PgsId, build: GenomeBuild) -> PathBuf {
-        format!("scores/{id}/ScoringFiles/Harmonized/{id}_hmPOS_{build}.txt.gz")
-            .parse()
-            .unwrap()
-    }
-}
-
-async fn download_and_cache_study(id: PgsId) -> Result<CacheEntry, std::io::Error> {
-    let url: Url = Study::url(id);
-    let path: PathBuf = Study::path(id);
-
-    let fs_entry = Cache::global("pgs_catalog").entry(path);
-
-    UrlEntry::new(url)
-        .unwrap()
-        .get_and_cache_async(&format!("[Data][PGS Catalog][{id}]"), fs_entry.clone())
-        .await?;
-
-    Ok(fs_entry)
-}
-
-async fn download_and_cache_harmonized_study(
-    id: PgsId,
-    build: GenomeBuild,
-) -> Result<CacheEntry, std::io::Error> {
-    let url: Url = HarmonizedStudy::url(id, build);
-    let path: PathBuf = HarmonizedStudy::path(id, build);
-
-    let fs_entry = Cache::global("pgs_catalog").entry(path);
-
-    UrlEntry::new(url)
-        .unwrap()
-        .get_and_cache_async(
-            &format!("[Data][PGS Catalog][{id}][Harmonized {build}]"),
-            fs_entry.clone(),
-        )
-        .await?;
-
-    Ok(fs_entry)
 }
 
 fn read_file<T: DeserializeOwned>(file: impl Read) -> impl Iterator<Item = Result<T, csv::Error>> {
