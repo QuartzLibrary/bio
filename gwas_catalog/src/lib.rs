@@ -3,9 +3,72 @@ use ids::pubmed::PubmedId;
 use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 use url::Url;
-use utile::cache::{Cache, CacheEntry, UrlEntry};
 
 use biocore::location::{GenomePosition, SequenceOrientation};
+use utile::{
+    io::reqwest_error,
+    resource::{RawResource, RawResourceExt, UrlResource},
+};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GwasCatalogResource {
+    url: &'static str,
+    key: String,
+    size: u64,
+}
+impl GwasCatalogResource {
+    pub async fn get_latest_associations() -> std::io::Result<Self> {
+        get_latest_key(Self::ASSOCIATIONS_URL).await
+    }
+    pub async fn get_latest_studies() -> std::io::Result<Self> {
+        get_latest_key(Self::STUDIES_URL).await
+    }
+    pub async fn get_latest_ancestries() -> std::io::Result<Self> {
+        get_latest_key(Self::ANCESTRY_URL).await
+    }
+
+    const ASSOCIATIONS_URL: &str = "https://www.ebi.ac.uk/gwas/api/search/downloads/alternative";
+    const STUDIES_URL: &str = "https://www.ebi.ac.uk/gwas/api/search/downloads/studies/v1.0.3.1";
+    const ANCESTRY_URL: &str =
+        "https://www.ebi.ac.uk/gwas/api/search/downloads/ancestries/v1.0.3.1";
+    pub fn associations_url(&self) -> Url {
+        Self::ASSOCIATIONS_URL.parse().unwrap()
+    }
+    pub fn studies_url(&self) -> Url {
+        Self::STUDIES_URL.parse().unwrap()
+    }
+    pub fn ancestry_url(&self) -> Url {
+        Self::ANCESTRY_URL.parse().unwrap()
+    }
+}
+impl RawResource for GwasCatalogResource {
+    const NAMESPACE: &'static str = "gwas_catalog";
+
+    fn key(&self) -> String {
+        self.key.clone()
+    }
+
+    fn compression(&self) -> Option<utile::resource::Compression> {
+        None
+    }
+
+    type Reader = <UrlResource as RawResource>::Reader;
+    fn size(&self) -> std::io::Result<u64> {
+        Ok(self.size)
+    }
+
+    fn read(&self) -> std::io::Result<Self::Reader> {
+        UrlResource::new(self.url).unwrap().read()
+    }
+
+    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    async fn size_async(&self) -> std::io::Result<u64> {
+        Ok(self.size)
+    }
+    async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
+        UrlResource::new(self.url).unwrap().read_async().await
+    }
+}
 
 /// *Available in associations download files
 /// +Available in studies download files
@@ -136,17 +199,18 @@ pub struct GwasCatalogAssociation {
 impl GwasCatalogAssociation {
     pub async fn get_latest(
     ) -> Result<impl Iterator<Item = Result<Self, csv::Error>>, std::io::Error> {
-        const URL: &str = "https://www.ebi.ac.uk/gwas/api/search/downloads/alternative";
-
-        let reader = download_and_cache_latest(URL.parse().unwrap())
+        let resource = GwasCatalogResource::get_latest_associations()
             .await?
-            .get()?;
-        let reader = std::io::BufReader::new(reader);
+            .log_progress()
+            .with_global_fs_cache()
+            .ensure_cached_async()
+            .await?
+            .buffered();
 
         Ok(csv::ReaderBuilder::new()
             .delimiter(b'\t')
             .has_headers(true)
-            .from_reader(reader)
+            .from_reader(resource.read()?)
             .into_deserialize())
     }
     pub fn locations_raw(&self) -> Vec<Location> {
@@ -310,17 +374,18 @@ pub struct GwasCatalogStudy {
 impl GwasCatalogStudy {
     pub async fn get_latest(
     ) -> Result<impl Iterator<Item = Result<Self, csv::Error>>, std::io::Error> {
-        const URL: &str = "https://www.ebi.ac.uk/gwas/api/search/downloads/studies/v1.0.3.1";
-
-        let reader = download_and_cache_latest(URL.parse().unwrap())
+        let resource = GwasCatalogResource::get_latest_studies()
             .await?
-            .get()?;
-        let reader = std::io::BufReader::new(reader);
+            .log_progress()
+            .with_global_fs_cache()
+            .ensure_cached_async()
+            .await?
+            .buffered();
 
         Ok(csv::ReaderBuilder::new()
             .delimiter(b'\t')
             .has_headers(true)
-            .from_reader(reader)
+            .from_reader(resource.read()?)
             .into_deserialize())
     }
 }
@@ -386,17 +451,18 @@ pub struct GwasCatalogAncestry {
 impl GwasCatalogAncestry {
     pub async fn get_latest(
     ) -> Result<impl Iterator<Item = Result<Self, csv::Error>>, std::io::Error> {
-        const URL: &str = "https://www.ebi.ac.uk/gwas/api/search/downloads/ancestries/v1.0.3.1";
-
-        let reader = download_and_cache_latest(URL.parse().unwrap())
+        let resource = GwasCatalogResource::get_latest_ancestries()
             .await?
-            .get()?;
-        let reader = std::io::BufReader::new(reader);
+            .log_progress()
+            .with_global_fs_cache()
+            .ensure_cached_async()
+            .await?
+            .buffered();
 
         Ok(csv::ReaderBuilder::new()
             .delimiter(b'\t')
             .has_headers(true)
-            .from_reader(reader)
+            .from_reader(resource.read()?)
             .into_deserialize())
     }
 }
@@ -555,26 +621,19 @@ fn parse_human_contig(v: &str) -> Result<HumanContig, std::io::Error> {
     }
 }
 
-async fn download_and_cache_latest(url: Url) -> Result<CacheEntry, std::io::Error> {
-    const PREFIX: &str = "[Data][GWAS Catalog]";
-    let Ok(head) = reqwest::Client::new().head(url.clone()).send().await else {
-        log::info!("{PREFIX} Could not retrieve latest file name.");
-
-        //   let others =  Cache.list_all().await?;
-        todo!();
-    };
+async fn get_latest_key(url: &'static str) -> std::io::Result<GwasCatalogResource> {
+    let head = reqwest::Client::new()
+        .head(url)
+        .send()
+        .await
+        .map_err(reqwest_error)?;
 
     let file_name = utile::io::get_filename_from_headers(head.headers()).unwrap();
     let file_size = utile::io::get_filesize_from_headers(head.headers()).unwrap();
 
-    log::info!("{PREFIX} Latest file: \"{file_name}\" (size: {file_size}B)");
-
-    let fs_entry = Cache::global("gwas_catalog").entry(&file_name);
-
-    UrlEntry::new(url)
-        .unwrap()
-        .get_and_cache_async("{PREFIX}", fs_entry.clone())
-        .await?;
-
-    Ok(fs_entry)
+    Ok(GwasCatalogResource {
+        url,
+        key: file_name,
+        size: file_size,
+    })
 }
