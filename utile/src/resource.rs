@@ -3,14 +3,13 @@
 use std::{
     fmt::{self, Debug},
     io::Read,
-    path::{Path, PathBuf},
+    path::PathBuf,
     pin::{pin, Pin},
     sync::LazyLock,
     task::{Context, Poll},
 };
 
 use bytes::Bytes;
-use directories::ProjectDirs;
 use futures::{stream, Stream, TryStreamExt};
 use indicatif::ProgressStyle;
 use pin_project::pin_project;
@@ -20,7 +19,10 @@ use serde_json::StreamDeserializer;
 use tokio::io::AsyncReadExt;
 use url::Url;
 
-use crate::io::{get_filesize_from_headers, read_ext::AsyncReadInto, reqwest_error};
+use crate::{
+    cache::{FsCache, FsCacheEntry},
+    io::{get_filesize_from_headers, read_ext::AsyncReadInto, reqwest_error},
+};
 
 type JsonStreamDeserializer<R, T> =
     StreamDeserializer<'static, serde_json::de::IoRead<std::io::BufReader<R>>, T>;
@@ -55,10 +57,10 @@ pub trait RawResourceExt: RawResource + Sized {
     }
 
     fn with_fs_cache(self, cache: &FsCache) -> FsCacheResource<Self> {
-        cache.entry(self)
+        FsCacheResource::new(cache, self)
     }
     fn with_global_fs_cache(self) -> FsCacheResource<Self> {
-        FsCache::global().entry(self)
+        FsCacheResource::new(&FsCache::global(), self)
     }
 
     fn log_progress(self) -> ProgressResource<Self> {
@@ -107,30 +109,41 @@ pub trait RawResourceExt: RawResource + Sized {
 }
 impl<T: RawResource> RawResourceExt for T {}
 
-pub struct FsCache {
-    path: PathBuf,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct BufferedResource<R> {
+    resource: R,
 }
-impl FsCache {
-    pub fn global() -> Self {
-        static PROJECT_DIRS: LazyLock<ProjectDirs> = LazyLock::new(|| {
-            let cache = directories::ProjectDirs::from("", "bio_data", "bio_data").unwrap();
-            log::info!("Using global cache at {}", cache.cache_dir().display());
-            cache
-        });
-
-        Self::new(PROJECT_DIRS.cache_dir())
-    }
-    pub fn new(path: impl AsRef<Path>) -> Self {
-        assert!(path.as_ref().is_absolute());
-        Self {
-            path: path.as_ref().to_path_buf(),
-        }
-    }
-
-    pub fn entry<R: RawResource>(&self, resource: R) -> FsCacheResource<R> {
-        FsCacheResource::new(self, resource)
+impl<R: RawResource> BufferedResource<R> {
+    pub fn new(resource: R) -> Self {
+        Self { resource }
     }
 }
+impl<R: RawResource> RawResource for BufferedResource<R> {
+    const NAMESPACE: &'static str = R::NAMESPACE;
+    fn key(&self) -> String {
+        R::key(&self.resource)
+    }
+    fn compression(&self) -> Option<Compression> {
+        self.resource.compression()
+    }
+
+    type Reader = std::io::BufReader<R::Reader>;
+    fn size(&self) -> std::io::Result<u64> {
+        self.resource.size()
+    }
+    fn read(&self) -> std::io::Result<Self::Reader> {
+        Ok(std::io::BufReader::new(self.resource.read()?))
+    }
+
+    type AsyncReader = tokio::io::BufReader<R::AsyncReader>;
+    async fn size_async(&self) -> std::io::Result<u64> {
+        self.resource.size_async().await
+    }
+    async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
+        Ok(tokio::io::BufReader::new(self.resource.read_async().await?))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FsCacheResource<R> {
     entry: FsCacheEntry,
@@ -147,7 +160,7 @@ impl<R> FsCacheResource<R> {
         R: RawResource,
     {
         Self {
-            entry: FsCacheEntry::new(cache, cache.path.join(R::NAMESPACE).join(resource.key())),
+            entry: FsCacheEntry::new(cache, PathBuf::from(R::NAMESPACE).join(resource.key())),
             resource,
         }
     }
@@ -210,7 +223,7 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
     fn read(&self) -> std::io::Result<Self::Reader> {
         if self.exists()? {
             log::info!("Cache hit at {self}");
-            return self.entry.read_file();
+            return self.entry.read();
         }
 
         log::info!("Downloading {self} from {self}");
@@ -220,7 +233,7 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
 
         log::info!("Downloaded {self}");
 
-        self.entry.read_file()
+        self.entry.read()
     }
 
     type AsyncReader = tokio::fs::File;
@@ -234,13 +247,13 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
     async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
         if self.exists_async().await? {
             log::info!("Cache hit at {self}");
-            return self.entry.read_file_async().await;
+            return self.entry.read_async().await;
         }
 
         log::info!("Downloading {self} from {self}");
 
         self.entry
-            .set_file_async(
+            .write_file_async(
                 ResourceRef::new(&self.resource)
                     .buffered()
                     .read_async()
@@ -250,84 +263,7 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
 
         log::info!("Downloaded {self}");
 
-        self.entry.read_file_async().await
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FsCacheEntry {
-    path: PathBuf,
-}
-impl AsRef<Path> for FsCacheEntry {
-    fn as_ref(&self) -> &Path {
-        &self.path
-    }
-}
-impl fmt::Display for FsCacheEntry {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.path.display())
-    }
-}
-impl FsCacheEntry {
-    pub fn new(cache: &FsCache, key: impl AsRef<Path>) -> Self {
-        assert!(cache.path.is_absolute());
-        let path = cache.path.join(key.as_ref());
-        assert!(path.is_absolute());
-        Self { path }
-    }
-
-    pub fn size(&self) -> std::io::Result<u64> {
-        std::fs::metadata(self).map(|m| m.len())
-    }
-    pub async fn size_async(&self) -> std::io::Result<u64> {
-        tokio::fs::metadata(self).await.map(|m| m.len())
-    }
-
-    pub fn exists(&self) -> std::io::Result<bool> {
-        match std::fs::File::open(self) {
-            Ok(_) => Ok(true),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(e),
-        }
-    }
-    pub async fn exists_async(&self) -> std::io::Result<bool> {
-        match tokio::fs::File::open(&self).await {
-            Ok(_) => Ok(true),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(e),
-        }
-    }
-
-    pub fn read_file(&self) -> std::io::Result<std::fs::File> {
-        std::fs::File::open(self)
-    }
-    pub fn write_file(&self, mut data: impl std::io::BufRead) -> std::io::Result<()> {
-        std::fs::create_dir_all(self.path.parent().unwrap())?;
-
-        let mut tmp_file = tempfile::Builder::new().tempfile()?;
-        std::io::copy(&mut data, &mut tmp_file)?;
-
-        rename_or_copy(tmp_file, self)?;
-
-        Ok(())
-    }
-
-    pub async fn read_file_async(&self) -> std::io::Result<tokio::fs::File> {
-        tokio::fs::File::open(&self).await
-    }
-    pub async fn set_file_async(&self, data: impl tokio::io::AsyncBufRead) -> std::io::Result<()> {
-        tokio::fs::create_dir_all(self.path.parent().unwrap()).await?;
-
-        let tmp_file = tempfile::Builder::new().tempfile()?;
-        tokio::io::copy(
-            &mut pin!(data),
-            &mut tokio::fs::File::create(tmp_file.path()).await?,
-        )
-        .await?;
-
-        rename_or_copy_async(tmp_file, &self).await?;
-
-        Ok(())
+        self.entry.read_async().await
     }
 }
 
@@ -401,41 +337,6 @@ impl<R: RawResource> RawResource for DecompressedResource<R> {
             )),
             Some(Compression::MultiGzip) => todo!(),
         }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BufferedResource<R> {
-    resource: R,
-}
-impl<R: RawResource> BufferedResource<R> {
-    pub fn new(resource: R) -> Self {
-        Self { resource }
-    }
-}
-impl<R: RawResource> RawResource for BufferedResource<R> {
-    const NAMESPACE: &'static str = R::NAMESPACE;
-    fn key(&self) -> String {
-        R::key(&self.resource)
-    }
-    fn compression(&self) -> Option<Compression> {
-        self.resource.compression()
-    }
-
-    type Reader = std::io::BufReader<R::Reader>;
-    fn size(&self) -> std::io::Result<u64> {
-        self.resource.size()
-    }
-    fn read(&self) -> std::io::Result<Self::Reader> {
-        Ok(std::io::BufReader::new(self.resource.read()?))
-    }
-
-    type AsyncReader = tokio::io::BufReader<R::AsyncReader>;
-    async fn size_async(&self) -> std::io::Result<u64> {
-        self.resource.size_async().await
-    }
-    async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
-        Ok(tokio::io::BufReader::new(self.resource.read_async().await?))
     }
 }
 
@@ -678,30 +579,6 @@ impl<R: RawResource> RawResource for ProgressResource<R> {
         }
         .with_style(style)
         .wrap_async_read(Box::pin(reader)))
-    }
-}
-
-fn rename_or_copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> std::io::Result<()> {
-    match std::fs::rename(from.as_ref(), to.as_ref()) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
-            std::fs::copy(from.as_ref(), to.as_ref())?;
-            std::fs::remove_file(from.as_ref())?;
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }
-}
-
-async fn rename_or_copy_async(from: impl AsRef<Path>, to: impl AsRef<Path>) -> std::io::Result<()> {
-    match tokio::fs::rename(from.as_ref(), to.as_ref()).await {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
-            tokio::fs::copy(from.as_ref(), to.as_ref()).await?;
-            tokio::fs::remove_file(from.as_ref()).await?;
-            Ok(())
-        }
-        Err(e) => Err(e),
     }
 }
 

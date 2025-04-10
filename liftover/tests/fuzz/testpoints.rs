@@ -231,29 +231,41 @@ fn generate_range_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomeRan
 pub mod cache {
     use std::path::PathBuf;
 
-    use utile::cache::CacheEntry;
-
     use liftover::Liftover;
+    use utile::{cache::FsCacheEntry, resource::RawResourceExt};
 
     pub fn store(liftover: &Liftover, prefix: &str, key: &str) {
         let (snps, ranges) = super::get(liftover);
 
-        snp_testpoints(prefix, key).set_json_lines(snps).unwrap();
+        snp_testpoints(prefix, key).write_json_lines(snps).unwrap();
         range_testpoints(prefix, key)
-            .set_json_lines(ranges)
+            .write_json_lines(ranges)
             .unwrap();
     }
     pub fn assert(liftover: &Liftover, prefix: &str, key: &str) {
         let (snps, ranges) = super::get(liftover);
 
-        assert!(snps == snp_testpoints(prefix, key).get_as_json_lines().unwrap());
-        assert!(ranges == range_testpoints(prefix, key).get_as_json_lines().unwrap());
+        assert!(
+            snps == snp_testpoints(prefix, key)
+                .read_json_lines()
+                .unwrap()
+                .try_collect::<Vec<_>>()
+                .unwrap()
+        );
+        assert!(
+            ranges
+                == range_testpoints(prefix, key)
+                    .read_json_lines()
+                    .unwrap()
+                    .try_collect::<Vec<_>>()
+                    .unwrap()
+        );
     }
 
-    fn snp_testpoints(prefix: &str, key: &str) -> CacheEntry {
+    fn snp_testpoints(prefix: &str, key: &str) -> FsCacheEntry {
         super::super::cache(prefix).entry(PathBuf::from(key).join("snp_testpoints.jsonl"))
     }
-    fn range_testpoints(prefix: &str, key: &str) -> CacheEntry {
+    fn range_testpoints(prefix: &str, key: &str) -> FsCacheEntry {
         super::super::cache(prefix).entry(PathBuf::from(key).join("range_testpoints.jsonl"))
     }
 }

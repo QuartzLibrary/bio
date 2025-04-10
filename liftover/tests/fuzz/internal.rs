@@ -145,7 +145,7 @@ pub mod cache {
     use std::path::PathBuf;
 
     use biocore::location::{GenomePosition, GenomeRange};
-    use utile::cache::CacheEntry;
+    use utile::{cache::FsCacheEntry, resource::RawResourceExt};
 
     pub fn store(
         snps_internal: Vec<Vec<GenomePosition>>,
@@ -154,10 +154,10 @@ pub mod cache {
         key: &str,
     ) {
         snp_testpoints_internal_target(prefix, key)
-            .set_json_lines(snps_internal)
+            .write_json_lines(snps_internal)
             .unwrap();
         range_testpoints_internal_target(prefix, key)
-            .set_json_lines(ranges_internal)
+            .write_json_lines(ranges_internal)
             .unwrap();
     }
     pub fn assert(
@@ -169,21 +169,25 @@ pub mod cache {
         assert!(
             snps_internal
                 == snp_testpoints_internal_target(prefix, key)
-                    .get_as_json_lines::<Vec<GenomePosition>>()
+                    .read_json_lines::<Vec<GenomePosition>>()
+                    .unwrap()
+                    .try_collect::<Vec<_>>()
                     .unwrap()
         );
         assert!(
             ranges_internal
                 == range_testpoints_internal_target(prefix, key)
-                    .get_as_json_lines::<Vec<GenomeRange>>()
+                    .read_json_lines::<Vec<GenomeRange>>()
+                    .unwrap()
+                    .try_collect::<Vec<_>>()
                     .unwrap()
         );
     }
 
-    fn snp_testpoints_internal_target(prefix: &str, key: &str) -> CacheEntry {
+    fn snp_testpoints_internal_target(prefix: &str, key: &str) -> FsCacheEntry {
         super::super::cache(prefix).entry(PathBuf::from(key).join("snp_testpoints_internal.jsonl"))
     }
-    fn range_testpoints_internal_target(prefix: &str, key: &str) -> CacheEntry {
+    fn range_testpoints_internal_target(prefix: &str, key: &str) -> FsCacheEntry {
         super::super::cache(prefix)
             .entry(PathBuf::from(key).join("range_testpoints_internal.jsonl"))
     }

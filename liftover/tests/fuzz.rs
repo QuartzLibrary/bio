@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use biocore::location::GenomeRange;
 use utile::{
-    cache::Cache,
+    cache::FsCache,
     resource::{RawResource, RawResourceExt},
 };
 
@@ -26,11 +26,12 @@ fn liftover_command() -> PathBuf {
     const LOCAL_LIFTOVER_CMD: &str = "tests/liftOver";
     PathBuf::from(CARGO_MANIFEST_DIR).join(LOCAL_LIFTOVER_CMD)
 }
-fn cache(prefix: &str) -> Cache {
+fn cache(prefix: &str) -> FsCache {
     const LOCAL_DATA_DIR: &str = "tests/data";
-    Cache::new(
-        PathBuf::from(CARGO_MANIFEST_DIR).join(LOCAL_DATA_DIR),
-        prefix,
+    FsCache::new(
+        PathBuf::from(CARGO_MANIFEST_DIR)
+            .join(LOCAL_DATA_DIR)
+            .join(prefix),
     )
 }
 
