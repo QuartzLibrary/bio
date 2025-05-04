@@ -9,11 +9,11 @@ utile = { path = "../utile" }
 
 csv = "1"
 flate2 = "1"
-jiff = { version = "0.1", features = ["serde"] }
+jiff = { version = "0.2", features = ["serde"] }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
-noodles = { version = "0.95", features = ["core", "fasta", "vcf"] }
+noodles = { version = "0.97", features = ["core", "fasta", "vcf"] }
 phf = { version = "0.11", features = ["macros"] }
 
 [dev-dependencies]

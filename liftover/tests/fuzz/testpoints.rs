@@ -66,8 +66,8 @@ fn generate_ranges(liftover: &Liftover, rng: &mut impl Rng) -> Vec<GenomeRange> 
             [0..1, 0..size, size - 1..size]
                 .into_iter()
                 .chain((0..100).map(|_| {
-                    let from = rng.gen_range(0..size);
-                    let to = from + rng.gen_range(1..1000);
+                    let from = rng.random_range(0..size);
+                    let to = from + rng.random_range(1..1000);
                     let to = Ord::min(size, to);
                     from..to
                 }))
@@ -94,7 +94,7 @@ fn generate_snps(liftover: &Liftover, rng: &mut impl Rng) -> Vec<GenomePosition>
         .flat_map(|(name, size)| {
             [0, size - 1]
                 .into_iter()
-                .chain((0..100).map(|_| rng.gen_range(0..size)))
+                .chain((0..100).map(|_| rng.random_range(0..size)))
                 .map(|at| GenomePosition {
                     name: name.clone(),
                     at,
@@ -132,8 +132,8 @@ fn generate_snp_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomePosit
 
     for b in chain.blocks() {
         let weird = b.dt < 0;
-        let peculiar = (b.size == 0 || b.dt == 0 || b.dq == 0) && rng.gen_bool(1. / 100.);
-        if weird || peculiar || rng.gen_bool(1. / 1000.) {
+        let peculiar = (b.size == 0 || b.dt == 0 || b.dq == 0) && rng.random_bool(1. / 100.);
+        if weird || peculiar || rng.random_bool(1. / 1000.) {
             let new = [
                 t_start,
                 t_start + 1,
@@ -172,8 +172,8 @@ fn generate_range_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomeRan
 
     for b in chain.blocks() {
         let weird = b.dt < 0;
-        let peculiar = (b.size == 0 || b.dt == 0 || b.dq == 0) && rng.gen_bool(1. / 100.);
-        if weird || peculiar || rng.gen_bool(1. / 1000.) {
+        let peculiar = (b.size == 0 || b.dt == 0 || b.dq == 0) && rng.random_bool(1. / 100.);
+        if weird || peculiar || rng.random_bool(1. / 1000.) {
             let new = [
                 // t_start..t_start,
                 t_start..t_start + 1,

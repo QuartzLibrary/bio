@@ -7,11 +7,11 @@ edition = "2021"
 anyhow = "1"
 async-compression = { version = "0.4", default-features = false, features = ["tokio", "gzip"] }
 bytes = "1"
-directories = "5"
+directories = "6"
 either = "1"
 flate2 = "1"
 futures = "0.3"
-hyperx = { version = "1", git = "https://github.com/QuartzLibrary/hyperx", ref = "b4bf9e31a8a8676bb0ce229fec36a140e0d096f7", branch = "bump" }
+hyperx = { version = "1", git = "https://github.com/QuartzLibrary/hyperx", rev = "b4bf9e31a8a8676bb0ce229fec36a140e0d096f7" } # branch = "bump"
 indicatif = { version = "0.17", features = ["tokio"] }
 log = "0.4"
 pin-project = "1"

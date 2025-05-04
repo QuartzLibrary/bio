@@ -11,7 +11,7 @@ utile = { path = "../utile" }
 csv = "1"
 flate2 = "1"
 log = "0.4"
-ordered-float = { version = "4", features = ["serde"] }
+ordered-float = { version = "5", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 tar = "0.4"
 url = { version = "2", features = ["serde"] }

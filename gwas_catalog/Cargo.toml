@@ -15,7 +15,7 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 # tar = "0.4"
 url = { version = "2", features = ["serde"] }
-jiff = { version = "0.1", features = ["serde"] }
+jiff = { version = "0.2", features = ["serde"] }
 either = { version = "1", features = ["serde"] }
 reqwest = "0.12"
 
