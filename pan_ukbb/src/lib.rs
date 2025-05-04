@@ -449,7 +449,7 @@ pub struct SummaryStats {
     // High quality meta-analysis fields
     /// Alternate allele frequency from meta-analysis across populations for which this phenotype passes all QC filters.
     /// pub NOTE: This field only appears in files for quantitative phenotypes.
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub af_meta_hq: Option<NotNan<f64>>,
     /// Estimated effect size of alternate allele from meta-analysis across populations for which this phenotype passes all QC filters.
     #[serde(with = "s::opt")]
@@ -467,7 +467,7 @@ pub struct SummaryStats {
     // Meta-analysis fields
     /// Alternate allele frequency from meta-analysis across populations for which this phenotype was GWASed.
     /// pub NOTE: This field only appears in files for quantitative phenotypes.
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub af_meta: Option<NotNan<f64>>,
     /// Estimated effect size of alternate allele from meta-analysis across populations for which this phenotype was GWASed.
     #[serde(with = "s::opt")]
@@ -481,7 +481,6 @@ pub struct SummaryStats {
     /// -log10 p-value from heterogeneity test of meta-analysis.
     #[serde(with = "s::opt")]
     pub neglog10_pval_heterogeneity: Option<NotNan<f64>>,
-
     // Population-specific fields
     #[serde(with = "s::opt")]
     pub af_AFR: Option<NotNan<f64>>,
@@ -565,7 +564,13 @@ mod s {
     pub mod opt {
         use std::{fmt, marker::PhantomData};
 
-        use serde::{Deserialize, Serialize, de::DeserializeOwned};
+        use serde::{
+            Deserialize, Serialize,
+            de::{
+                DeserializeOwned,
+                value::{F32Deserializer, F64Deserializer, U64Deserializer},
+            },
+        };
 
         use utile::serde_ext::StringDeserializer;
 
@@ -618,8 +623,55 @@ mod s {
                 {
                     self.visit_str(&v)
                 }
+                fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    <T as Deserialize>::deserialize(U64Deserializer::new(v)).map(Some)
+                }
+                fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    <T as Deserialize>::deserialize(F32Deserializer::new(v)).map(Some)
+                }
+                fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    <T as Deserialize>::deserialize(F64Deserializer::new(v)).map(Some)
+                }
+                fn visit_unit<E>(self) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    Ok(None)
+                }
+                fn visit_none<E>(self) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    Ok(None)
+                }
+                fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+                where
+                    D: serde::Deserializer<'de>,
+                {
+                    deserializer.deserialize_any(Visitor(PhantomData))
+                }
+                fn __private_visit_untagged_option<D>(
+                    self,
+                    deserializer: D,
+                ) -> Result<Self::Value, ()>
+                where
+                    D: serde::Deserializer<'de>,
+                {
+                    deserializer
+                        .deserialize_any(Visitor(PhantomData))
+                        .map_err(drop)
+                }
             }
-            deserializer.deserialize_str(Visitor(PhantomData))
+            deserializer.deserialize_option(Visitor(PhantomData))
         }
     }
     pub mod comma {
