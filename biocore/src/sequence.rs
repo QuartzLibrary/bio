@@ -1,7 +1,7 @@
 use std::{
     borrow::Borrow,
     fmt,
-    ops::{Deref, DerefMut, Index, IndexMut, Range},
+    ops::{Deref, DerefMut, Index, IndexMut, Range, RangeBounds},
 };
 
 use ref_cast::RefCast;
@@ -63,9 +63,62 @@ impl<T: fmt::Display> fmt::Display for Sequence<T> {
         Ok(())
     }
 }
+impl<T> IntoIterator for Sequence<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.bases.into_iter()
+    }
+}
+impl<'a, T> IntoIterator for &'a Sequence<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.bases.iter()
+    }
+}
+impl<T> FromIterator<T> for Sequence<T> {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+    {
+        Self::new(iter.into_iter().collect())
+    }
+}
+impl<C: AsciiChar> TryFrom<noodles::fasta::record::Sequence> for Sequence<C> {
+    type Error = C::DecodeError;
+    fn try_from(sequence: noodles::fasta::record::Sequence) -> Result<Self, Self::Error> {
+        // TODO: avoid re-allocating
+        C::decode(sequence.as_ref().to_vec())
+    }
+}
 impl<T> Sequence<T> {
     pub fn new(bases: Vec<T>) -> Self {
         Self { bases }
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, T> {
+        self.bases.iter()
+    }
+
+    pub fn reverse_complement(self, f: impl Fn(T) -> T) -> Self {
+        self.into_iter().rev().map(f).collect()
+    }
+
+    pub fn spliced<R, I>(mut self, range: R, replace_with: I) -> Self
+    where
+        R: RangeBounds<usize>,
+        I: IntoIterator<Item = T>,
+    {
+        self.bases.splice(range, replace_with);
+        self
+    }
+    pub fn splice<R, I>(&mut self, range: R, replace_with: I)
+    where
+        R: RangeBounds<usize>,
+        I: IntoIterator<Item = T>,
+    {
+        self.bases.splice(range, replace_with).for_each(drop);
     }
 }
 
@@ -113,12 +166,28 @@ impl<T: Clone> ToOwned for SequenceSlice<T> {
         Sequence::new(self.bases.to_vec())
     }
 }
+impl<T: fmt::Display> fmt::Display for SequenceSlice<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for b in self {
+            fmt::Display::fmt(b, f)?;
+        }
+
+        Ok(())
+    }
+}
+impl<'a, T> IntoIterator for &'a SequenceSlice<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.bases.iter()
+    }
+}
 
 pub trait AsciiChar: Sized {
     // TODO: return &str instead
     fn encode(bases: &[Self]) -> String;
 
-    type DecodeError;
+    type DecodeError: Into<std::io::Error>;
     fn decode(bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>;
 }
 
