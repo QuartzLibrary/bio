@@ -17,7 +17,7 @@ async fn cache_testpoints_ucsc() -> anyhow::Result<()> {
         let resource = UcscResource::new_human_liftover(from, to);
         let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::load_async(entry.clone()).await.unwrap();
+        let liftover = &Liftover::load(entry.clone()).unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
@@ -32,7 +32,7 @@ async fn cache_testpoints_ucsc() -> anyhow::Result<()> {
         let resource = EnsemblResource::new_human_liftover(from, to);
         let entry = resource.clone().with_global_fs_cache();
 
-        let liftover = &Liftover::load_async(entry.clone()).await.unwrap();
+        let liftover = &Liftover::load(entry.clone()).unwrap();
 
         let (snps, ranges) = super::testpoints::get(liftover);
 
