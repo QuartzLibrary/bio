@@ -16,8 +16,11 @@ use tokio::io::AsyncReadExt;
 use crate::{cache::FsCache, io::read_ext::AsyncReadInto};
 
 pub use self::{
-    buffered::BufferedResource, cached::FsCacheResource, compression::DecompressedResource,
-    progress::ProgressResource, uri::UrlResource,
+    buffered::BufferedResource,
+    cached::FsCacheResource,
+    compression::{CompressedResource, DecompressedResource},
+    progress::ProgressResource,
+    uri::UrlResource,
 };
 
 type JsonStreamDeserializer<R, T> =
@@ -58,6 +61,13 @@ pub trait RawResourceExt: RawResource + Sized {
     }
     fn decompressed_with(self, compression: Compression) -> DecompressedResource<Self> {
         DecompressedResource::new_with(self, compression)
+    }
+
+    fn compressed(self) -> CompressedResource<Self> {
+        CompressedResource::new(self, Compression::Gzip)
+    }
+    fn compressed_with(self, compression: Compression) -> CompressedResource<Self> {
+        CompressedResource::new(self, compression)
     }
 
     fn read_vec(&self) -> std::io::Result<Vec<u8>> {
@@ -102,12 +112,35 @@ pub enum Compression {
     // TODO: nested
 }
 impl Compression {
+    pub fn infer_strict(filename: &str) -> Option<Self> {
+        if filename.ends_with(".gz") {
+            Some(Self::Gzip)
+        } else if filename.ends_with(".bgz") {
+            Some(Self::MultiGzip)
+        } else {
+            None
+        }
+    }
     pub fn infer(filename: &str) -> Option<Self> {
         if filename.ends_with(".gz") || filename.ends_with(".bgz") {
             // We default to multi-gzip because it doesn't fail silently.
             Some(Self::MultiGzip)
         } else {
             None
+        }
+    }
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Gzip => "gz",
+            Self::MultiGzip => "bgz",
+        }
+    }
+    pub fn trim_extension(self, filename: &str) -> &str {
+        match self {
+            Compression::Gzip => filename.strip_suffix(".gz").unwrap_or(filename),
+            Compression::MultiGzip => filename
+                .strip_suffix(".bgz")
+                .unwrap_or_else(|| filename.strip_suffix(".gz").unwrap_or(filename)),
         }
     }
 }
