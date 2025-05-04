@@ -68,7 +68,8 @@ impl RawResource for PanUKBBS3Resource {
 }
 
 /// https://pan.ukbb.broadinstitute.org/docs/per-phenotype-files
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub struct PhenotypeManifestEntry {
@@ -272,7 +273,8 @@ pub struct PhenotypeManifestEntry {
     pub md5_hex_tabix: String,
     pub size_in_bytes_tabix: usize,
 }
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Serialize)]
 pub enum TraitType {
     #[serde(rename = "biomarkers")]
     Biomarkers,
@@ -287,7 +289,8 @@ pub enum TraitType {
     #[serde(rename = "prescriptions")]
     Prescriptions,
 }
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Serialize)]
 pub enum PhenoSex {
     #[serde(rename = "both_sexes")]
     Both,
@@ -296,7 +299,8 @@ pub enum PhenoSex {
     #[serde(rename = "males")]
     Male,
 }
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Serialize)]
 pub enum Modifier {
     #[serde(rename = "02")]
     Modifier02,
@@ -343,7 +347,8 @@ pub enum Modifier {
     #[serde(rename = "random_strat")]
     RandomStrat,
 }
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Population {
     Afr,
@@ -353,7 +358,8 @@ pub enum Population {
     Eur,
     Mid,
 }
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Serialize)]
 pub enum PhenotypeQc {
     #[serde(rename = "PASS")]
     Pass,
@@ -490,6 +496,7 @@ pub struct SummaryStats {
     /// -log10 p-value from heterogeneity test of meta-analysis.
     #[serde(with = "s::opt")]
     pub neglog10_pval_heterogeneity: Option<NotNan<f64>>,
+
     // Population-specific fields
     #[serde(with = "s::opt")]
     pub af_AFR: Option<NotNan<f64>>,
