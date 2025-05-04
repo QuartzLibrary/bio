@@ -51,15 +51,26 @@ impl<R> FsCacheResource<R> {
     where
         R: RawResource,
     {
-        self.read()?;
+        if !self.exists()? {
+            self.read()?;
+        }
         Ok(self.entry.clone())
     }
     pub async fn cache_async(&self) -> std::io::Result<FsCacheEntry>
     where
         R: RawResource,
     {
-        self.read_async().await?;
+        if !self.exists_async().await? {
+            self.read_async().await?;
+        }
         Ok(self.entry.clone())
+    }
+
+    pub fn invalidate(&self) -> std::io::Result<()> {
+        self.entry.invalidate()
+    }
+    pub async fn invalidate_async(&self) -> std::io::Result<()> {
+        self.entry.invalidate_async().await
     }
 }
 impl<R: RawResource> RawResource for FsCacheResource<R> {
@@ -86,12 +97,12 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
             return self.entry.read();
         }
 
-        log::info!("Downloading {self} from {self}");
+        log::info!("Cache miss at {self} from {self}");
 
         self.entry
             .write_file(ResourceRef::new(&self.resource).buffered().read()?)?;
 
-        log::info!("Downloaded {self}");
+        log::info!("Retrieved {self}");
 
         self.entry.read()
     }
@@ -110,7 +121,7 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
             return self.entry.read_async().await;
         }
 
-        log::info!("Downloading {self} from {self}");
+        log::info!("Cache miss at {self} from {self}");
 
         self.entry
             .write_file_async(
@@ -121,7 +132,7 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
             )
             .await?;
 
-        log::info!("Downloaded {self}");
+        log::info!("Retrieved {self}");
 
         self.entry.read_async().await
     }
