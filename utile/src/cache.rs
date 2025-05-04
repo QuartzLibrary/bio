@@ -6,9 +6,6 @@ use std::{
 };
 
 use directories::ProjectDirs;
-use reqwest::IntoUrl;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use url::Url;
 
 use crate::{io::not_found_error, resource::RawResource};
 
@@ -162,96 +159,6 @@ impl RawResource for FsCacheEntry {
         tokio::fs::File::open(self)
             .await
             .map_err(|e| not_found_error(e, self))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FtpEntry(pub Url);
-impl fmt::Display for FtpEntry {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-impl FtpEntry {
-    pub fn new(url: impl IntoUrl) -> reqwest::Result<Self> {
-        Ok(Self(url.into_url()?))
-    }
-
-    fn connect(&self) -> suppaftp::FtpResult<suppaftp::FtpStream> {
-        let Some(host) = self.0.host_str() else {
-            return Err(suppaftp::FtpError::ConnectionError(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Invalid FTP host",
-            )));
-        };
-        let port = self.0.port().unwrap_or(21);
-
-        let mut ftp = suppaftp::FtpStream::connect(format!("{host}:{port}"))?;
-        ftp.login("anonymous", "anonymous")?;
-
-        Ok(ftp)
-    }
-    async fn connect_async(&self) -> suppaftp::FtpResult<suppaftp::AsyncFtpStream> {
-        let Some(host) = self.0.host_str() else {
-            return Err(suppaftp::FtpError::ConnectionError(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Invalid FTP host",
-            )));
-        };
-        let port = self.0.port().unwrap_or(21);
-
-        let mut ftp = suppaftp::AsyncFtpStream::connect(format!("{host}:{port}")).await?;
-        ftp.login("anonymous", "anonymous").await?;
-
-        Ok(ftp)
-    }
-
-    pub fn exists(&self) -> suppaftp::FtpResult<bool> {
-        let mut ftp = self.connect()?;
-        let path = self.0.path();
-        Ok(ftp.size(path).is_ok())
-    }
-    pub async fn exists_async(&self) -> suppaftp::FtpResult<bool> {
-        let mut ftp = self.connect_async().await?;
-        let path = self.0.path();
-        Ok(ftp.size(path).await.is_ok())
-    }
-
-    pub fn get(&self) -> suppaftp::FtpResult<impl std::io::Read> {
-        let mut ftp = self.connect()?;
-
-        let path = self.0.path();
-        let reader = ftp.retr_as_stream(path)?;
-
-        Ok(reader)
-    }
-    pub async fn get_async(&self) -> suppaftp::FtpResult<impl tokio::io::AsyncRead> {
-        let mut ftp = self.connect_async().await?;
-        let path = self.0.path();
-        // TODO: we should clean-up the connection after the stream is done.
-        // Though it might be fine if we use a different connection for every file for now?
-        Ok(ftp.retr_as_stream(path).await?.compat(/* tokio compat */))
-    }
-    pub async fn get_retry_async(
-        &self,
-        retries: u64,
-    ) -> suppaftp::FtpResult<impl tokio::io::AsyncRead> {
-        for i in 0.. {
-            match self.get_async().await {
-                Ok(ok) => return Ok(ok),
-                Err(e) if i == retries => return Err(e),
-                Err(_) => {
-                    let delay = 1000 * (1 << i); // 1s, 2s, 4s, 8s, 16s, ...
-                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
-                }
-            }
-        }
-        unreachable!()
-    }
-
-    pub async fn list_all(&self) -> suppaftp::FtpResult<Vec<String>> {
-        let mut ftp = self.connect_async().await?;
-        ftp.list(Some(self.0.path())).await
     }
 }
 

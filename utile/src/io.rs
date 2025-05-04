@@ -188,16 +188,6 @@ pub fn reqwest_error(e: reqwest::Error) -> std::io::Error {
     };
     std::io::Error::new(kind, e)
 }
-pub fn ftp_error(e: suppaftp::FtpError) -> std::io::Error {
-    let kind = match &e {
-        suppaftp::FtpError::ConnectionError(error) => error.kind(),
-        // suppaftp::FtpError::SecureError(_) => std::io::ErrorKind::Other,
-        suppaftp::FtpError::UnexpectedResponse(_) => std::io::ErrorKind::InvalidData,
-        suppaftp::FtpError::BadResponse => std::io::ErrorKind::InvalidData,
-        suppaftp::FtpError::InvalidAddress(_) => std::io::ErrorKind::Other,
-    };
-    std::io::Error::new(kind, e)
-}
 pub fn not_found_error(e: std::io::Error, path: impl AsRef<Path>) -> std::io::Error {
     if e.kind() == std::io::ErrorKind::NotFound {
         std::io::Error::new(
