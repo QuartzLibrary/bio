@@ -1,7 +1,6 @@
 use std::{
     fmt, io,
     path::{Path, PathBuf},
-    pin::pin,
     sync::LazyLock,
 };
 
@@ -76,6 +75,7 @@ impl FsCacheEntry {
             Err(e) => Err(e),
         }
     }
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn exists_async(&self) -> std::io::Result<bool> {
         match tokio::fs::File::open(&self).await {
             Ok(_) => Ok(true),
@@ -94,6 +94,7 @@ impl FsCacheEntry {
 
         Ok(())
     }
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn write_file_async(
         &self,
         data: impl tokio::io::AsyncBufRead,
@@ -102,7 +103,7 @@ impl FsCacheEntry {
 
         let tmp_file = tempfile::Builder::new().tempfile()?;
         tokio::io::copy(
-            &mut pin!(data),
+            &mut std::pin::pin!(data),
             &mut tokio::fs::File::create(tmp_file.path()).await?,
         )
         .await?;
@@ -129,6 +130,7 @@ impl FsCacheEntry {
         std::fs::remove_file(self)
     }
     /// Unfortunately some sources aren't pure.
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn invalidate_async(&self) -> std::io::Result<()> {
         tokio::fs::remove_file(&self).await
     }
@@ -151,14 +153,27 @@ impl RawResource for FsCacheEntry {
         std::fs::File::open(self).map_err(|e| not_found_error(e, self))
     }
 
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     type AsyncReader = tokio::fs::File;
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     async fn size_async(&self) -> std::io::Result<u64> {
         tokio::fs::metadata(self).await.map(|m| m.len())
     }
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
         tokio::fs::File::open(self)
             .await
             .map_err(|e| not_found_error(e, self))
+    }
+    #[cfg(target_arch = "wasm32")]
+    type AsyncReader = std::io::Cursor<&'static [u8]>;
+    #[cfg(target_arch = "wasm32")]
+    async fn size_async(&self) -> std::io::Result<u64> {
+        panic!("FsCacheEntry is not supported on wasm32");
+    }
+    #[cfg(target_arch = "wasm32")]
+    async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
+        panic!("FsCacheEntry is not supported on wasm32");
     }
 }
 
@@ -175,6 +190,7 @@ fn rename_or_copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> std::io::Resu
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))] // TODO
 async fn rename_or_copy_async(from: impl AsRef<Path>, to: impl AsRef<Path>) -> std::io::Result<()> {
     match tokio::fs::rename(from.as_ref(), to.as_ref()).await {
         Ok(()) => Ok(()),

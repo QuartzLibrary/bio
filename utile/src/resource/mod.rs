@@ -13,15 +13,16 @@ use serde::de::DeserializeOwned;
 use serde_json::StreamDeserializer;
 use tokio::io::AsyncReadExt;
 
-use crate::{cache::FsCache, io::read_ext::AsyncReadInto};
+use crate::io::read_ext::AsyncReadInto;
 
 pub use self::{
     buffered::BufferedResource,
-    cached::FsCacheResource,
     compression::{CompressedResource, DecompressedResource},
     progress::ProgressResource,
     uri::UrlResource,
 };
+
+pub use self::cached::FsCacheResource;
 
 type JsonStreamDeserializer<R, T> =
     StreamDeserializer<'static, serde_json::de::IoRead<std::io::BufReader<R>>, T>;
@@ -45,11 +46,11 @@ pub trait RawResourceExt: RawResource + Sized {
         BufferedResource::new(self)
     }
 
-    fn with_fs_cache(self, cache: &FsCache) -> FsCacheResource<Self> {
+    fn with_fs_cache(self, cache: &crate::cache::FsCache) -> FsCacheResource<Self> {
         FsCacheResource::new(cache, self)
     }
     fn with_global_fs_cache(self) -> FsCacheResource<Self> {
-        FsCacheResource::new(&FsCache::global(), self)
+        FsCacheResource::new(&crate::cache::FsCache::global(), self)
     }
 
     fn log_progress(self) -> ProgressResource<Self> {

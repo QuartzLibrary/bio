@@ -177,13 +177,18 @@ pub fn invalid_data(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> s
 pub fn reqwest_error(e: reqwest::Error) -> std::io::Error {
     let kind = if e.is_timeout() {
         std::io::ErrorKind::TimedOut
-    } else if e.is_connect() {
-        std::io::ErrorKind::ConnectionRefused
     } else if e.is_request() {
         std::io::ErrorKind::InvalidInput
     } else if e.is_body() || e.is_decode() {
         std::io::ErrorKind::InvalidData
     } else {
+        #[cfg(not(target_arch = "wasm32"))]
+        if e.is_connect() {
+            std::io::ErrorKind::ConnectionRefused
+        } else {
+            std::io::ErrorKind::Other
+        }
+        #[cfg(target_arch = "wasm32")]
         std::io::ErrorKind::Other
     };
     std::io::Error::new(kind, e)

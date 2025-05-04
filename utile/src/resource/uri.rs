@@ -44,12 +44,18 @@ impl UrlResource {
         Ok(Self(url))
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn exists(&self) -> reqwest::Result<bool> {
         let response = reqwest::blocking::Client::new()
             .head(self.0.clone())
             .send()?;
         Ok(response.status() == reqwest::StatusCode::OK)
     }
+    #[cfg(target_arch = "wasm32")]
+    pub fn exists(&self) -> reqwest::Result<bool> {
+        panic!("UrlResource::exists is not supported on wasm32, use the non-blocking version.");
+    }
+
     pub async fn exists_async(&self) -> reqwest::Result<bool> {
         let response = reqwest::Client::new().head(self.0.clone()).send().await?;
         Ok(response.status() == reqwest::StatusCode::OK)
@@ -65,7 +71,7 @@ impl UrlResource {
                 Err(e) if i == retries => return Err(e),
                 Err(_) => {
                     let delay = 1000 * (1 << i); // 1s, 2s, 4s, 8s, 16s, ...
-                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                    crate::time::sleep(std::time::Duration::from_millis(delay)).await;
                 }
             }
         }
@@ -82,7 +88,9 @@ impl RawResource for UrlResource {
         None
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     type Reader = reqwest::blocking::Response;
+    #[cfg(not(target_arch = "wasm32"))]
     fn size(&self) -> std::io::Result<u64> {
         let response = reqwest::blocking::Client::new()
             .head(self.0.clone())
@@ -98,7 +106,9 @@ impl RawResource for UrlResource {
             )),
         }
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn read(&self) -> std::io::Result<Self::Reader> {
+        log::info!("Downloading {self}");
         static CLIENT: LazyLock<reqwest::blocking::Client> =
             LazyLock::new(reqwest::blocking::Client::new);
         let response = CLIENT
@@ -120,6 +130,16 @@ impl RawResource for UrlResource {
         }
 
         Ok(response)
+    }
+    #[cfg(target_arch = "wasm32")]
+    type Reader = std::io::Cursor<&'static [u8]>;
+    #[cfg(target_arch = "wasm32")]
+    fn size(&self) -> std::io::Result<u64> {
+        panic!("UrlResource::size is not supported on wasm32, use the non-blocking version.");
+    }
+    #[cfg(target_arch = "wasm32")]
+    fn read(&self) -> std::io::Result<Self::Reader> {
+        panic!("UrlResource::read is not supported on wasm32, use the non-blocking version.");
     }
 
     type AsyncReader =
@@ -163,6 +183,7 @@ impl RawResource for UrlResource {
 }
 
 // TODO: integrate into main resource.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod ftp {
     use std::fmt;
 

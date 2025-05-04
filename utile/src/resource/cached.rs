@@ -28,8 +28,13 @@ impl<R> FsCacheResource<R> {
     pub fn exists(&self) -> std::io::Result<bool> {
         self.entry.exists()
     }
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn exists_async(&self) -> std::io::Result<bool> {
         self.entry.exists_async().await
+    }
+    #[cfg(target_arch = "wasm32")] // TODO
+    pub async fn exists_async(&self) -> std::io::Result<bool> {
+        panic!("FsCacheResource is not supported on wasm32");
     }
 
     pub fn ensure_cached(self) -> std::io::Result<Self>
@@ -39,12 +44,20 @@ impl<R> FsCacheResource<R> {
         self.cache()?;
         Ok(self)
     }
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn ensure_cached_async(self) -> std::io::Result<Self>
     where
         R: RawResource,
     {
         self.cache_async().await?;
         Ok(self)
+    }
+    #[cfg(target_arch = "wasm32")] // TODO
+    pub async fn ensure_cached_async(self) -> std::io::Result<Self>
+    where
+        R: RawResource,
+    {
+        panic!("FsCacheResource is not supported on wasm32");
     }
 
     pub fn cache(&self) -> std::io::Result<FsCacheEntry>
@@ -56,6 +69,7 @@ impl<R> FsCacheResource<R> {
         }
         Ok(self.entry.clone())
     }
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn cache_async(&self) -> std::io::Result<FsCacheEntry>
     where
         R: RawResource,
@@ -65,12 +79,24 @@ impl<R> FsCacheResource<R> {
         }
         Ok(self.entry.clone())
     }
+    #[cfg(target_arch = "wasm32")] // TODO
+    pub async fn cache_async(&self) -> std::io::Result<FsCacheEntry>
+    where
+        R: RawResource,
+    {
+        panic!("FsCacheResource is not supported on wasm32");
+    }
 
     pub fn invalidate(&self) -> std::io::Result<()> {
         self.entry.invalidate()
     }
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn invalidate_async(&self) -> std::io::Result<()> {
         self.entry.invalidate_async().await
+    }
+    #[cfg(target_arch = "wasm32")] // TODO
+    pub async fn invalidate_async(&self) -> std::io::Result<()> {
+        panic!("FsCacheResource is not supported on wasm32");
     }
 }
 impl<R: RawResource> RawResource for FsCacheResource<R> {
@@ -107,7 +133,9 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
         self.entry.read()
     }
 
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     type AsyncReader = tokio::fs::File;
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     async fn size_async(&self) -> std::io::Result<u64> {
         if let Ok(size) = self.entry.size_async().await {
             Ok(size)
@@ -115,6 +143,7 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
             self.resource.size_async().await
         }
     }
+    #[cfg(not(target_arch = "wasm32"))] // TODO
     async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
         if self.exists_async().await? {
             log::info!("Cache hit at {self}");
@@ -135,5 +164,15 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
         log::info!("Retrieved {self}");
 
         self.entry.read_async().await
+    }
+    #[cfg(target_arch = "wasm32")] // TODO
+    type AsyncReader = std::io::Cursor<&'static [u8]>;
+    #[cfg(target_arch = "wasm32")] // TODO
+    async fn size_async(&self) -> std::io::Result<u64> {
+        panic!("FsCacheResource is not supported on wasm32");
+    }
+    #[cfg(target_arch = "wasm32")] // TODO
+    async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
+        panic!("FsCacheResource is not supported on wasm32");
     }
 }

@@ -16,4 +16,5 @@ pub mod plot;
 pub mod range;
 pub mod resource;
 pub mod serde_ext;
+pub mod time;
 pub mod wsl;
