@@ -934,6 +934,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "hail"
+version = "0.1.0"
+dependencies = [
+ "biocore",
+ "either",
+ "env_logger",
+ "futures",
+ "log",
+ "noodles",
+ "pgs_catalog",
+ "phf",
+ "serde",
+ "tokio",
+ "url",
+ "utile",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
