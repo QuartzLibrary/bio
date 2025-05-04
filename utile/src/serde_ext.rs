@@ -4,7 +4,6 @@ use serde::{
     de::{EnumAccess, SeqAccess, Unexpected, VariantAccess},
     Deserializer,
 };
-
 /// A simple deserializer that parses a string into the correct value
 /// requested by the deserialized type.
 pub struct StringDeserializer<'de, E>(&'de str, PhantomData<E>);

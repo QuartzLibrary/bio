@@ -40,6 +40,20 @@ impl Genomes1000Resource {
         Self::new(format!("{REFERENCE_GENOME}.fai"))
     }
 
+    pub fn into_bcf(self) -> Self {
+        if let Some(name) = self.key.strip_suffix(".vcf.gz") {
+            Self::new(format!("{name}.bcf"))
+        } else if let Some(name) = self.key.strip_suffix(".vcf.gz.tbi") {
+            Self::new(format!("{name}.bcf.csi"))
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn high_coverage_pedigree() -> Self {
+        Self::new("vol1/ftp/data_collections/1000G_2504_high_coverage/20130606_g1k_3202_samples_ped_population.txt".to_owned())
+    }
+
     pub fn high_coverage_genotypes_contig_vcf(contig: GRCh38Contig) -> Self {
         match contig {
             GRCh38Contig::CHR1 => Self::high_coverage_genotypes_chr_vcf(1),

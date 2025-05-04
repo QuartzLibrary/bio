@@ -76,6 +76,12 @@ pub trait RawResourceExt: RawResource + Sized {
         reader.read_to_end(&mut data)?;
         Ok(data)
     }
+    fn read_string(&self) -> std::io::Result<String> {
+        let mut reader = ResourceRef::new(self).read()?;
+        let mut data = String::new();
+        reader.read_to_string(&mut data)?;
+        Ok(data)
+    }
     fn read_json<T: DeserializeOwned>(&self) -> std::io::Result<T> {
         serde_json::from_reader(ResourceRef::new(self).buffered().read()?)
             .map_err(std::io::Error::from)
@@ -91,6 +97,12 @@ pub trait RawResourceExt: RawResource + Sized {
         let mut reader = ResourceRef::new(self).read_async().await?;
         let mut data = Vec::new();
         pin!(reader).read_to_end(&mut data).await?;
+        Ok(data)
+    }
+    async fn read_string_async(&self) -> std::io::Result<String> {
+        let mut reader = ResourceRef::new(self).read_async().await?;
+        let mut data = String::new();
+        pin!(reader).read_to_string(&mut data).await?;
         Ok(data)
     }
     async fn read_json_async<T: DeserializeOwned>(&self) -> std::io::Result<T> {

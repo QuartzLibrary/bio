@@ -1,6 +1,6 @@
 #![feature(iterator_try_collect)]
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, io, mem};
 
 use biocore::{
     dna::DnaSequence,
@@ -374,7 +374,7 @@ pub enum PhenotypeQc {
 }
 
 impl PhenotypeManifestEntry {
-    pub async fn load_all() -> Result<Vec<Self>, csv::Error> {
+    pub async fn load_all() -> csv::Result<Vec<Self>> {
         let resource = PanUKBBS3Resource::phenotype_manifest()
             .log_progress()
             .with_global_fs_cache()
@@ -392,18 +392,22 @@ impl PhenotypeManifestEntry {
     }
     pub fn passes_qc(&self) -> bool {
         // Kind of arbitrary, just to shave the number.
-        self.pops_pass_qc.contains(&Population::Eur)
-            && self.n_cases_full_cohort_both_sexes > 100_000
+        self.pops_pass_qc.contains(&Population::Eur) && self.n_cases_full_cohort_both_sexes > 50_000
     }
 }
 
 impl PhenotypeManifestEntry {
-    pub async fn get_summary_stats(
-        &self,
-    ) -> Result<impl Iterator<Item = Result<SummaryStats, csv::Error>>, std::io::Error> {
+    pub fn get_summary_stats_resource(&self) -> io::Result<PanUKBBS3Resource> {
         let key = format!("sumstats_flat_files/{}", self.filename);
         assert!(self.aws_path.as_str().ends_with(&key));
-        let resource = PanUKBBS3Resource::new(key)
+        Ok(PanUKBBS3Resource::new(key))
+    }
+    pub async fn get_summary_stats(
+        &self,
+    ) -> io::Result<impl Iterator<Item = csv::Result<SummaryStats>> + use<>> {
+        let key = format!("sumstats_flat_files/{}", self.filename);
+        assert!(self.aws_path.as_str().ends_with(&key));
+        let resource = PanUKBBS3Resource::new(key.clone())
             .log_progress()
             .with_global_fs_cache()
             .ensure_cached_async()
@@ -418,7 +422,12 @@ impl PhenotypeManifestEntry {
             .into_deserialize())
     }
 
-    pub async fn get_summary_stats_tabix(&self) -> Result<Vec<u8>, std::io::Error> {
+    pub fn get_summary_stats_tabix_resource(&self) -> io::Result<PanUKBBS3Resource> {
+        let key = format!("sumstats_release/{}", self.filename_tabix);
+        assert!(self.aws_path_tabix.as_str().ends_with(&key));
+        Ok(PanUKBBS3Resource::new(key))
+    }
+    pub async fn get_summary_stats_tabix(&self) -> io::Result<Vec<u8>> {
         let key = format!("sumstats_release/{}", self.filename_tabix);
         assert!(self.aws_path_tabix.as_str().ends_with(&key));
         PanUKBBS3Resource::new(key)
@@ -557,6 +566,28 @@ impl SummaryStats {
             orientation: SequenceOrientation::Forward,
             at: self.pos - 1..(self.pos - 1 + u64::try_from(self.ref_allele.len()).unwrap()),
         }
+    }
+
+    pub fn flip_ref_alt(&mut self) {
+        mem::swap(&mut self.ref_allele, &mut self.alt);
+
+        self.af_meta = None;
+        self.af_meta_hq = None;
+        self.af_AFR = None;
+        self.af_AMR = None;
+        self.af_CSA = None;
+        self.af_EAS = None;
+        self.af_EUR = None;
+        self.af_MID = None;
+
+        self.beta_meta = self.beta_meta.map(|b| -b);
+        self.beta_meta_hq = self.beta_meta_hq.map(|b| -b);
+        self.beta_AFR = self.beta_AFR.map(|b| -b);
+        self.beta_AMR = self.beta_AMR.map(|b| -b);
+        self.beta_CSA = self.beta_CSA.map(|b| -b);
+        self.beta_EAS = self.beta_EAS.map(|b| -b);
+        self.beta_EUR = self.beta_EUR.map(|b| -b);
+        self.beta_MID = self.beta_MID.map(|b| -b);
     }
 }
 

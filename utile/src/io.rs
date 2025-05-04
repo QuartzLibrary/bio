@@ -188,6 +188,12 @@ pub fn reqwest_error(e: reqwest::Error) -> std::io::Error {
     };
     std::io::Error::new(kind, e)
 }
+pub fn utf8_error(type_: &'static str, e: std::str::Utf8Error) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("Expected {type_}, but found invalid UTF-8: {e:?}."),
+    )
+}
 pub fn not_found_error(e: std::io::Error, path: impl AsRef<Path>) -> std::io::Error {
     if e.kind() == std::io::ErrorKind::NotFound {
         std::io::Error::new(
@@ -278,10 +284,12 @@ from_bytes_ascii!(u16);
 from_bytes_ascii!(u32);
 from_bytes_ascii!(u64);
 from_bytes_ascii!(u128);
+from_bytes_ascii!(usize);
 from_bytes_ascii!(i8);
 from_bytes_ascii!(i16);
 from_bytes_ascii!(i32);
 from_bytes_ascii!(i64);
 from_bytes_ascii!(i128);
+from_bytes_ascii!(isize);
 from_bytes_ascii!(f32);
 from_bytes_ascii!(f64);

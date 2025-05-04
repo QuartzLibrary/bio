@@ -9,7 +9,7 @@ use crate::io::{get_filesize_from_headers, reqwest_error};
 
 use super::{Compression, RawResource};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UrlResource(Url);
 impl fmt::Display for UrlResource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -29,6 +29,17 @@ impl UrlResource {
             log::info!("Converted {url} to {new}.");
             url = new;
         }
+
+        // Seems like this doesn't work, requires login.
+        // if url.scheme() == "gs"
+        //     && let Some(bucket) = url.host_str()
+        // {
+        //     let path = url.path();
+        //     let new =
+        //         Url::parse(&format!("https://storage.cloud.google.com/{bucket}{path}")).unwrap();
+        //     log::info!("Converted {url} to {new}.");
+        //     url = new;
+        // }
 
         Ok(Self(url))
     }

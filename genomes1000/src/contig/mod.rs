@@ -9,6 +9,8 @@ use utile::io::FromUtf8Bytes;
 
 use biocore::genome::Contig;
 
+use crate::Sex;
+
 mod grch37_meta;
 mod grch38_meta;
 
@@ -51,16 +53,41 @@ impl GRCh38Contig {
         Self::new(&format!("chr{number}"))
     }
 
+    pub fn is_core(self) -> bool {
+        pub static META: phf::Set<&'static str> = phf::phf_set! {
+            "chr1",
+            "chr2",
+            "chr3",
+            "chr4",
+            "chr5",
+            "chr6",
+            "chr7",
+            "chr8",
+            "chr9",
+            "chr10",
+            "chr11",
+            "chr12",
+            "chr13",
+            "chr14",
+            "chr15",
+            "chr16",
+            "chr17",
+            "chr18",
+            "chr19",
+            "chr20",
+            "chr21",
+            "chr22",
+            "chrX",
+            "chrY",
+            "chrM",
+        };
+        META.contains(self.contig)
+    }
+
+    // Note that these are intentionally ordered as if they were strings,
+    // to maintain maximum compatibility with string representations.
     pub const CHROMOSOMES: [Self; 25] = [
         Self::CHR1,
-        Self::CHR2,
-        Self::CHR3,
-        Self::CHR4,
-        Self::CHR5,
-        Self::CHR6,
-        Self::CHR7,
-        Self::CHR8,
-        Self::CHR9,
         Self::CHR10,
         Self::CHR11,
         Self::CHR12,
@@ -71,9 +98,17 @@ impl GRCh38Contig {
         Self::CHR17,
         Self::CHR18,
         Self::CHR19,
+        Self::CHR2,
         Self::CHR20,
         Self::CHR21,
         Self::CHR22,
+        Self::CHR3,
+        Self::CHR4,
+        Self::CHR5,
+        Self::CHR6,
+        Self::CHR7,
+        Self::CHR8,
+        Self::CHR9,
         Self::MT,
         Self::X,
         Self::Y,
@@ -108,44 +143,24 @@ impl GRCh38Contig {
                 | Self::Y
         )
     }
-    pub fn scoring_ploidy(self) -> u8 {
-        match self.is_haploid() {
-            Some(true) => 1,
-            Some(false) => 2,
-            None => 1,
+    pub fn ploidy(self, sex: Sex) -> u8 {
+        match (self, sex) {
+            (Self::Y, Sex::Male) => 1,
+            (Self::Y, Sex::Female) => 0,
+
+            (Self::X, Sex::Male) => 1,
+            (Self::X, Sex::Female) => 2,
+
+            (Self::MT, _) => 1,
+
+            _ => 2,
         }
     }
-    pub fn is_diploid(self) -> Option<bool> {
-        Some(!self.is_haploid()?)
+    pub fn is_diploid(self, sex: Sex) -> bool {
+        self.ploidy(sex) == 2
     }
-    pub fn is_haploid(self) -> Option<bool> {
-        #[allow(clippy::wildcard_in_or_patterns)]
-        match self {
-            Self::CHR1
-            | Self::CHR2
-            | Self::CHR3
-            | Self::CHR4
-            | Self::CHR5
-            | Self::CHR6
-            | Self::CHR7
-            | Self::CHR8
-            | Self::CHR9
-            | Self::CHR10
-            | Self::CHR11
-            | Self::CHR12
-            | Self::CHR13
-            | Self::CHR14
-            | Self::CHR15
-            | Self::CHR16
-            | Self::CHR17
-            | Self::CHR18
-            | Self::CHR19
-            | Self::CHR20
-            | Self::CHR21
-            | Self::CHR22 => Some(false),
-            Self::Y => Some(true),
-            Self::MT | Self::X | _ => None,
-        }
+    pub fn is_haploid(self, sex: Sex) -> bool {
+        self.ploidy(sex) == 1
     }
 
     fn new_from_bytes(bytes: &[u8]) -> Option<Self> {
@@ -284,16 +299,10 @@ impl GRCh37Contig {
         Self::new(&format!("chr{number}"))
     }
 
+    // Note that these are intentionally ordered as if they were strings,
+    // to maintain maximum compatibility with string representations.
     pub const CHROMOSOMES: [Self; 25] = [
         Self::CHR1,
-        Self::CHR2,
-        Self::CHR3,
-        Self::CHR4,
-        Self::CHR5,
-        Self::CHR6,
-        Self::CHR7,
-        Self::CHR8,
-        Self::CHR9,
         Self::CHR10,
         Self::CHR11,
         Self::CHR12,
@@ -304,9 +313,17 @@ impl GRCh37Contig {
         Self::CHR17,
         Self::CHR18,
         Self::CHR19,
+        Self::CHR2,
         Self::CHR20,
         Self::CHR21,
         Self::CHR22,
+        Self::CHR3,
+        Self::CHR4,
+        Self::CHR5,
+        Self::CHR6,
+        Self::CHR7,
+        Self::CHR8,
+        Self::CHR9,
         Self::MT,
         Self::X,
         Self::Y,
@@ -436,5 +453,32 @@ impl<'de> Deserialize<'de> for GRCh37Contig {
             }
         }
         deserializer.deserialize_str(Visitor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_grch38_contig_chromosomes_sorted() {
+        let names: Vec<&str> = GRCh38Contig::CHROMOSOMES.iter().map(|c| c.name()).collect();
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(
+            names, sorted,
+            "GRCh38Contig::CHROMOSOMES must be lexicographically sorted"
+        );
+    }
+
+    #[test]
+    fn test_grch37_contig_chromosomes_sorted() {
+        let names: Vec<&str> = GRCh37Contig::CHROMOSOMES.iter().map(|c| c.name()).collect();
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(
+            names, sorted,
+            "GRCh37Contig::CHROMOSOMES must be lexicographically sorted"
+        );
     }
 }
