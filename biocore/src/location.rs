@@ -227,6 +227,38 @@ mod noodles {
         }
     }
 
+    impl TryFrom<GenomeRange> for Interval {
+        type Error = GenomeLocationConversionError;
+
+        fn try_from(value: GenomeRange) -> Result<Self, Self::Error> {
+            (&value).try_into()
+        }
+    }
+    impl TryFrom<&GenomeRange> for Interval {
+        type Error = GenomeLocationConversionError;
+
+        fn try_from(
+            GenomeRange {
+                name: _,
+                orientation: _,
+                at,
+            }: &GenomeRange,
+        ) -> Result<Self, Self::Error> {
+            if at.is_empty() {
+                return Err(GenomeLocationConversionError::EmptyRange);
+            }
+            if at.end < at.start {
+                return Err(GenomeLocationConversionError::InvalidRange);
+            }
+
+            let at = usize::try_from(at.start).unwrap()..usize::try_from(at.end).unwrap();
+
+            let start = Position::new(at.start + 1).unwrap();
+            let end = Position::new((at.end + 1) - 1).unwrap();
+            Ok(Interval::from(start..=end))
+        }
+    }
+
     // impl From<Region> for GenomeRange {
     //     fn from(value: Region) -> Self {
     //         let start = value
