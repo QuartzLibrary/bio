@@ -10,7 +10,7 @@ use reqwest::IntoUrl;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use url::Url;
 
-use crate::resource::RawResource;
+use crate::{io::not_found_error, resource::RawResource};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FsCache {
@@ -26,12 +26,26 @@ impl FsCache {
 
         Self::new(PROJECT_DIRS.cache_dir())
     }
+
     pub fn new(path: impl AsRef<Path>) -> Self {
         assert!(path.as_ref().is_absolute());
         Self {
             path: path.as_ref().to_path_buf(),
         }
     }
+    pub fn new_temp() -> (Self, tempfile::TempDir) {
+        let temp = tempfile::Builder::new()
+            .suffix("bio_data")
+            .tempdir()
+            .unwrap();
+        (
+            Self {
+                path: temp.path().to_path_buf(),
+            },
+            temp,
+        )
+    }
+
     pub fn entry(&self, key: impl AsRef<Path>) -> FsCacheEntry {
         FsCacheEntry::new(self, key)
     }
@@ -137,7 +151,7 @@ impl RawResource for FsCacheEntry {
         std::fs::metadata(self).map(|m| m.len())
     }
     fn read(&self) -> std::io::Result<Self::Reader> {
-        std::fs::File::open(self)
+        std::fs::File::open(self).map_err(|e| not_found_error(e, self))
     }
 
     type AsyncReader = tokio::fs::File;
@@ -145,7 +159,9 @@ impl RawResource for FsCacheEntry {
         tokio::fs::metadata(self).await.map(|m| m.len())
     }
     async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
-        tokio::fs::File::open(self).await
+        tokio::fs::File::open(self)
+            .await
+            .map_err(|e| not_found_error(e, self))
     }
 }
 

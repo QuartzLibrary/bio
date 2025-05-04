@@ -1,4 +1,4 @@
-use std::{fmt, io::BufRead, str::FromStr};
+use std::{fmt, io::BufRead, path::Path, str::FromStr};
 
 use hyperx::header::{ContentDisposition, DispositionParam, DispositionType, Header};
 use reqwest::header::{HeaderMap, CONTENT_DISPOSITION, CONTENT_LENGTH};
@@ -197,6 +197,16 @@ pub fn ftp_error(e: suppaftp::FtpError) -> std::io::Error {
         suppaftp::FtpError::InvalidAddress(_) => std::io::ErrorKind::Other,
     };
     std::io::Error::new(kind, e)
+}
+pub fn not_found_error(e: std::io::Error, path: impl AsRef<Path>) -> std::io::Error {
+    if e.kind() == std::io::ErrorKind::NotFound {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("No such file or directory: {}", path.as_ref().display()),
+        )
+    } else {
+        e
+    }
 }
 
 pub fn get_filename_from_headers(headers: &HeaderMap) -> Option<String> {
