@@ -26,6 +26,17 @@ pub enum DnaBase {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Serialize, Deserialize)]
 #[repr(u8)]
+pub enum MaybeDnaBase {
+    A = b'A',
+    C = b'C',
+    G = b'G',
+    T = b'T',
+    N = b'N',
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
+#[repr(u8)]
 pub enum AmbiguousDnaBase {
     A = b'A',
     C = b'C',
@@ -215,6 +226,143 @@ impl FromStr for DnaBase {
             "C" | "c" => Ok(Self::C),
             "G" | "g" => Ok(Self::G),
             "T" | "t" => Ok(Self::T),
+            _ if s.len() == 1 => Err(DnaDecodeError::InvalidBaseChar {
+                from: s.chars().next().unwrap(),
+            }),
+            _ => Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() }),
+        }
+    }
+}
+
+// MaybeDnaBase
+
+impl MaybeDnaBase {
+    pub fn from_char(c: char) -> Option<Self> {
+        Self::from_char_strict(c.to_ascii_uppercase())
+    }
+    pub fn from_byte(b: u8) -> Option<Self> {
+        Self::from_byte_strict(b.to_ascii_uppercase())
+    }
+
+    pub fn from_char_strict(c: char) -> Option<Self> {
+        match c {
+            'A' => Some(Self::A),
+            'C' => Some(Self::C),
+            'G' => Some(Self::G),
+            'T' => Some(Self::T),
+            'N' => Some(Self::N),
+            _ => None,
+        }
+    }
+    pub fn from_byte_strict(b: u8) -> Option<Self> {
+        match b {
+            b'A' => Some(Self::A),
+            b'C' => Some(Self::C),
+            b'G' => Some(Self::G),
+            b'T' => Some(Self::T),
+            b'N' => Some(Self::N),
+            _ => None,
+        }
+    }
+
+    pub fn to_char(&self) -> char {
+        match self {
+            Self::A => 'A',
+            Self::C => 'C',
+            Self::G => 'G',
+            Self::T => 'T',
+            Self::N => 'N',
+        }
+    }
+    pub fn to_byte(&self) -> u8 {
+        match self {
+            Self::A => b'A',
+            Self::C => b'C',
+            Self::G => b'G',
+            Self::T => b'T',
+            Self::N => b'N',
+        }
+    }
+
+    // Get the complementary nucleotide
+    pub fn complement(&self) -> Self {
+        match self {
+            Self::A => Self::T,
+            Self::T => Self::A,
+            Self::C => Self::G,
+            Self::G => Self::C,
+            Self::N => Self::N,
+        }
+    }
+
+    // Check if the nucleotide is a purine (A or G)
+    pub fn is_purine(&self) -> bool {
+        matches!(self, Self::A | Self::G)
+    }
+
+    // Check if the nucleotide is a pyrimidine (C or T)
+    pub fn is_pyrimidine(&self) -> bool {
+        matches!(self, Self::C | Self::T)
+    }
+
+    pub fn is_ambiguous(&self) -> bool {
+        !matches!(self, Self::A | Self::C | Self::G | Self::T)
+    }
+}
+impl AsciiChar for MaybeDnaBase {
+    fn encode(bases: &[Self]) -> String
+    where
+        Self: Sized,
+    {
+        bases.iter().map(Self::to_char).collect()
+    }
+
+    type DecodeError = DnaDecodeError;
+    fn decode(bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>
+    where
+        Self: Sized,
+    {
+        decode_maybe(bases)
+    }
+}
+fn decode_maybe(mut bases: Vec<u8>) -> Result<Sequence<MaybeDnaBase>, DnaDecodeError> {
+    for (at, b) in bases.iter_mut().enumerate() {
+        match *b {
+            b'A' | b'C' | b'G' | b'T' | b'N' | b'a' | b'c' | b'g' | b't' | b'n' => {}
+            byte => {
+                return Err(DnaDecodeError::InvalidSequence {
+                    at,
+                    byte,
+                    len: bases.len(),
+                })
+            }
+        };
+    }
+    bases.make_ascii_uppercase();
+    Ok(Sequence::new(
+        bases
+            .into_iter()
+            .map(MaybeDnaBase::from_byte_strict)
+            .map(Option::unwrap)
+            .collect(),
+    ))
+}
+
+impl std::fmt::Display for MaybeDnaBase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_char())
+    }
+}
+impl FromStr for MaybeDnaBase {
+    type Err = DnaDecodeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "A" | "a" => Ok(Self::A),
+            "C" | "c" => Ok(Self::C),
+            "G" | "g" => Ok(Self::G),
+            "T" | "t" => Ok(Self::T),
+            "N" | "n" => Ok(Self::N),
             _ if s.len() == 1 => Err(DnaDecodeError::InvalidBaseChar {
                 from: s.chars().next().unwrap(),
             }),
