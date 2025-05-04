@@ -57,36 +57,49 @@ impl Liftover {
     pub fn indexed(&self) -> LiftoverIndexed {
         LiftoverIndexed::from_liftover(self)
     }
+
     pub fn map(&self, loc: GenomePosition) -> Vec<GenomePosition> {
-        let mut matches: Vec<_> = self
-            .chains
-            .iter()
-            .flat_map(|c| c.map(loc.clone()))
-            .collect();
+        let mut matches: Vec<_> = self.map_raw(loc).map(|(r, _)| r).collect();
         matches.sort();
         matches.dedup();
         matches
     }
     pub fn map_range(&self, range: GenomeRange) -> Vec<GenomeRange> {
-        let mut matches: Vec<_> = self
-            .chains
-            .iter()
-            .flat_map(|c| c.map_range(range.clone()))
-            .collect();
+        let mut matches: Vec<_> = self.map_range_raw(range).map(|(r, _)| r).collect();
         matches.sort();
         matches.dedup();
         matches
     }
+
+    pub fn map_raw(
+        &self,
+        loc: GenomePosition,
+    ) -> impl Iterator<Item = (GenomePosition, bool)> + use<'_> {
+        self.chains.iter().flat_map(move |c| c.map_raw(loc.clone()))
+    }
+    pub fn map_range_raw(
+        &self,
+        range: GenomeRange,
+    ) -> impl Iterator<Item = (GenomeRange, bool)> + use<'_> {
+        self.chains
+            .iter()
+            .flat_map(move |c| c.map_range_raw(range.clone()))
+    }
+
     fn iter_ranges(&self) -> impl Iterator<Item = (ChainRange, ChainRange)> + use<'_> {
         self.chains.iter().flat_map(|c| c.iter_ranges())
     }
 }
 impl Chain {
-    pub fn map(&self, mut loc: GenomePosition) -> Vec<GenomePosition> {
+    pub fn map_raw(
+        &self,
+        mut loc: GenomePosition,
+    ) -> impl Iterator<Item = (GenomePosition, bool)> + use<'_> {
         let original_orientation = loc.orientation;
+        let flip_to_map = loc.orientation != self.header.t.range.orientation;
         loc.set_orientation(self.header.t.range.orientation, self.header.t.size);
         if !self.header.t.contains(&loc) {
-            return vec![];
+            return None.into_iter().flatten();
         }
         let at = loc.at;
         drop(loc);
@@ -94,71 +107,102 @@ impl Chain {
         let mut t_start = self.header.t.range.at.start;
         let mut q_start = self.header.q.range.at.start;
 
-        let mut matches = vec![];
+        let mapped = self
+            .blocks()
+            .filter_map(move |b| {
+                let mut r = None;
 
-        for b in self.blocks() {
-            if (t_start..(t_start + b.size)).contains(&at) {
-                let new = GenomePosition {
-                    name: self.header.q.range.name.clone(),
-                    at: q_start + (at - t_start),
-                    orientation: self.header.q.range.orientation,
+                if (t_start..(t_start + b.size)).contains(&at) {
+                    let new = GenomePosition {
+                        name: self.header.q.range.name.clone(),
+                        at: q_start + (at - t_start),
+                        orientation: self.header.q.range.orientation,
+                    };
+
+                    r = Some(new);
+                }
+
+                t_start += b.size;
+                q_start += b.size;
+
+                t_start = t_start.strict_add_signed(b.dt);
+                q_start += b.dq;
+
+                r
+            })
+            .map(move |mut r| {
+                let flipped = if flip_to_map {
+                    // If we flipped before, and do not need to flip again,
+                    // we are already on the original strand, but the original reference sequence
+                    // for this region is on the opposite strand, so should be fixed.
+                    r.orientation == original_orientation
+                } else {
+                    // If we ended up on the opposite strand, let's make a note that we are flipping back.
+                    r.orientation != original_orientation
                 };
+                r.set_orientation(original_orientation, self.header.q.size);
+                (r, flipped)
+            });
 
-                matches.push(new);
-            }
-
-            t_start += b.size;
-            q_start += b.size;
-
-            t_start = t_start.strict_add_signed(b.dt);
-            q_start += b.dq;
-        }
-
-        for r in &mut matches {
-            r.set_orientation(original_orientation, self.header.q.size);
-        }
-
-        matches
+        Some(mapped).into_iter().flatten()
     }
-    pub fn map_range(&self, range: GenomeRange) -> Vec<GenomeRange> {
+    pub fn map_range_raw(
+        &self,
+        range: GenomeRange,
+    ) -> impl Iterator<Item = (GenomeRange, bool)> + use<'_> {
         let intersected = match self.header.t.intersect(range.clone()) {
-            Some(intersected) if intersected.is_empty() => return vec![],
+            Some(intersected) if intersected.is_empty() => return None.into_iter().flatten(),
             Some(intersected) => intersected,
-            None => return vec![],
+            None => return None.into_iter().flatten(),
         };
         assert_eq!(intersected.name, range.name);
         let original_orientation = range.orientation;
+        let flip_to_map = range.orientation != self.header.t.range.orientation;
         drop(range);
 
         let mut t_start = self.header.t.range.at.start;
         let mut q_start = self.header.q.range.at.start;
 
-        let mut intersections = vec![];
+        let mapped = self
+            .blocks()
+            .filter_map(move |b| {
+                let mut r = None;
 
-        for b in self.blocks() {
-            let intersected = (t_start..(t_start + b.size)).intersection(intersected.at.clone());
+                let intersected =
+                    (t_start..(t_start + b.size)).intersection(intersected.at.clone());
 
-            if !intersected.is_empty() {
-                let shift = intersected.start - t_start;
-                intersections.push(GenomeRange {
-                    name: self.header.q.range.name.clone(),
-                    at: (q_start + shift)..(q_start + shift + intersected.range_len()),
-                    orientation: self.header.q.range.orientation,
-                });
-            }
+                if !intersected.is_empty() {
+                    let shift = intersected.start - t_start;
+                    r = Some(GenomeRange {
+                        name: self.header.q.range.name.clone(),
+                        at: (q_start + shift)..(q_start + shift + intersected.range_len()),
+                        orientation: self.header.q.range.orientation,
+                    });
+                }
 
-            t_start += b.size;
-            q_start += b.size;
+                t_start += b.size;
+                q_start += b.size;
 
-            t_start = t_start.strict_add_signed(b.dt);
-            q_start += b.dq;
-        }
+                t_start = t_start.strict_add_signed(b.dt);
+                q_start += b.dq;
 
-        for r in &mut intersections {
-            r.set_orientation(original_orientation, self.header.q.size);
-        }
+                r
+            })
+            .map(move |mut r| {
+                let flipped = if flip_to_map {
+                    // If we flipped before, and do not need to flip again,
+                    // we are already on the original strand, but the original reference sequence
+                    // for this region is on the opposite strand, so should be fixed.
+                    r.orientation == original_orientation
+                } else {
+                    // If we ended up on the opposite strand, let's make a note that we are flipping back.
+                    r.orientation != original_orientation
+                };
+                r.set_orientation(original_orientation, self.header.q.size);
+                (r, flipped)
+            });
 
-        intersections
+        Some(mapped).into_iter().flatten()
     }
     pub fn blocks(&self) -> impl Iterator<Item = AlignmentBlock> + use<'_> {
         self.blocks.iter().copied().chain([AlignmentBlock {
@@ -262,12 +306,34 @@ impl LiftoverIndexed {
 
         Self { chromosomes }
     }
-    pub fn map(&self, mut loc: GenomePosition) -> Vec<GenomePosition> {
+
+    pub fn map(&self, loc: GenomePosition) -> Vec<GenomePosition> {
+        let mut matches: Vec<_> = self.map_raw(loc).map(|(r, _)| r).collect();
+
+        matches.sort();
+        matches.dedup();
+
+        matches
+    }
+    pub fn map_range(&self, from: GenomeRange) -> Vec<GenomeRange> {
+        let mut intersections: Vec<_> = self.map_range_raw(from).map(|(r, _)| r).collect();
+
+        intersections.sort();
+        intersections.dedup();
+
+        intersections
+    }
+
+    pub fn map_raw(
+        &self,
+        mut loc: GenomePosition,
+    ) -> impl Iterator<Item = (GenomePosition, bool)> + use<'_> {
         let Some((ranges, size)) = self.chromosomes.get(&loc.name) else {
-            return vec![];
+            return None.into_iter().flatten();
         };
 
         let original_orientation = loc.orientation;
+        let flip_to_map = loc.orientation != SequenceOrientation::Forward;
         loc.set_orientation(SequenceOrientation::Forward, *size);
         let at = loc.at;
         drop(loc);
@@ -286,9 +352,7 @@ impl LiftoverIndexed {
             &ranges[..upper_bound] // Select the slice for which `e.range.start <= at` holds.
         };
 
-        let mut matches = vec![];
-
-        for r in ranges {
+        Some(ranges.iter().filter_map(move |r| {
             if r.range.contains(&at) {
                 let shift = at - r.range.start;
                 let mut new = GenomePosition {
@@ -296,22 +360,34 @@ impl LiftoverIndexed {
                     at: r.data.range.at.start + shift,
                     orientation: r.data.range.orientation,
                 };
+                let flipped = if flip_to_map {
+                    // If we flipped before, and do not need to flip again,
+                    // we are already on the original strand, but the original reference sequence
+                    // for this region is on the opposite strand, so should be fixed.
+                    new.orientation == original_orientation
+                } else {
+                    // If we ended up on the opposite strand, let's make a note that we are flipping back.
+                    new.orientation != original_orientation
+                };
                 new.set_orientation(original_orientation, r.data.size);
-                matches.push(new);
+                Some((new, flipped))
+            } else {
+                None
             }
-        }
-
-        matches.sort();
-        matches.dedup();
-
-        matches
+        }))
+        .into_iter()
+        .flatten()
     }
-    pub fn map_range(&self, mut from: GenomeRange) -> Vec<GenomeRange> {
+    pub fn map_range_raw(
+        &self,
+        mut from: GenomeRange,
+    ) -> impl Iterator<Item = (GenomeRange, bool)> + use<'_> {
         let Some((ranges, size)) = self.chromosomes.get(&from.name) else {
-            return vec![];
+            return None.into_iter().flatten();
         };
 
         let original_orientation = from.orientation;
+        let flip_to_map = from.orientation != SequenceOrientation::Forward;
         from.set_orientation(SequenceOrientation::Forward, *size);
         let at = from.at.clone();
         drop(from);
@@ -330,9 +406,7 @@ impl LiftoverIndexed {
             &ranges[..upper_bound] // Select the slice for which `e.range.start <= at.end` holds.
         };
 
-        let mut intersections = vec![];
-
-        for r in ranges {
+        Some(ranges.iter().filter_map(move |r| {
             let intersected = r.range.clone().intersection(at.clone());
             if !intersected.is_empty() {
                 let shift = intersected.start - r.range.start;
@@ -342,15 +416,23 @@ impl LiftoverIndexed {
                         ..(r.data.range.at.start + shift + intersected.range_len()),
                     orientation: r.data.range.orientation,
                 };
+                let flipped = if flip_to_map {
+                    // If we flipped before, and do not need to flip again,
+                    // we are already on the original strand, but the original reference sequence
+                    // for this region is on the opposite strand, so should be fixed.
+                    new.orientation == original_orientation
+                } else {
+                    // If we ended up on the opposite strand, let's make a note that we are flipping back.
+                    new.orientation != original_orientation
+                };
                 new.set_orientation(original_orientation, r.data.size);
-                intersections.push(new);
+                Some((new, flipped))
+            } else {
+                None
             }
-        }
-
-        intersections.sort();
-        intersections.dedup();
-
-        intersections
+        }))
+        .into_iter()
+        .flatten()
     }
 }
 
