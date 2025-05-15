@@ -95,10 +95,12 @@ pub struct PhenotypeManifestEntry {
     pub description: String,
     /// A longer description of the phenotype (for continuous and categorical variables,
     /// corresponds to the Notes page on the showcase).
-    pub description_more: String,
+    #[serde(with = "s::opt")]
+    pub description_more: Option<String>,
     /// For categorical variables, a description of the particular coding that was used
     /// (the Meaning column on the showcase page for that coding).
-    pub coding_description: String,
+    #[serde(with = "s::opt")]
+    pub coding_description: Option<String>,
     /// A categorization of the phenotype. For continuous, biomarkers, and categorical
     /// traits, this corresponds to the Category at the top of the showcase page.
     /// For ICD codes, this corresponds to the Chapter of the ICD code; for phecodes,
@@ -293,11 +295,11 @@ pub enum TraitType {
 #[derive(Deserialize, Serialize)]
 pub enum PhenoSex {
     #[serde(rename = "both_sexes")]
-    Both,
+    BothSexes,
     #[serde(rename = "females")]
-    Female,
+    Females,
     #[serde(rename = "males")]
-    Male,
+    Males,
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Deserialize, Serialize)]
@@ -358,6 +360,18 @@ pub enum Population {
     Eur,
     Mid,
 }
+impl Population {
+    pub fn all() -> [Self; 6] {
+        [
+            Self::Afr,
+            Self::Amr,
+            Self::Csa,
+            Self::Eas,
+            Self::Eur,
+            Self::Mid,
+        ]
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Deserialize, Serialize)]
 pub enum PhenotypeQc {
@@ -380,7 +394,7 @@ pub enum PhenotypeQc {
 }
 
 impl PhenotypeManifestEntry {
-    pub async fn load_all() -> csv::Result<Vec<Self>> {
+    pub async fn load_default() -> csv::Result<Vec<Self>> {
         let resource = PanUKBBS3Resource::phenotype_manifest()
             .log_progress()
             .with_global_fs_cache()
@@ -389,6 +403,10 @@ impl PhenotypeManifestEntry {
             .decompressed()
             .buffered();
 
+        Self::load(resource)
+    }
+
+    pub fn load(resource: impl RawResource) -> csv::Result<Vec<Self>> {
         csv::ReaderBuilder::new()
             .delimiter(b'\t')
             .has_headers(true)
@@ -396,9 +414,19 @@ impl PhenotypeManifestEntry {
             .into_deserialize()
             .try_collect()
     }
+    pub async fn load_async(resource: impl RawResource) -> csv::Result<Vec<Self>> {
+        csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(std::io::Cursor::new(resource.read_vec_async().await?))
+            .into_deserialize()
+            .try_collect()
+    }
+
     pub fn passes_qc(&self) -> bool {
         // Kind of arbitrary, just to shave the number.
-        self.pops_pass_qc.contains(&Population::Eur) && self.n_cases_full_cohort_both_sexes > 50_000
+        self.pops_pass_qc.contains(&Population::Eur)
+            && self.n_cases_full_cohort_both_sexes > 100_000
     }
 }
 
@@ -446,14 +474,15 @@ impl PhenotypeManifestEntry {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub struct SummaryStats {
     // Variant fields
     /// Chromosome of the variant.
     pub chr: String,
-    /// Position of the variant in GRCh37 coordinates.
+    /// Position of the variant (original is in GRCh37 coordinates).
     pub pos: u64,
     /// Reference allele on the forward strand.
     #[serde(rename = "ref")]
@@ -466,6 +495,13 @@ pub struct SummaryStats {
     /// pub NOTE: This field only appears in files for quantitative phenotypes.
     #[serde(with = "s::opt", default)]
     pub af_meta_hq: Option<NotNan<f64>>,
+    /// Alternate allele frequency in cases from meta-analysis across populations for which this phenotype passes all QC filters. NOTE: This field only appears in files for binary phenotypes.
+    #[serde(with = "s::opt", default)]
+    pub af_cases_meta_hq: Option<NotNan<f64>>,
+    /// Alternate allele frequency in controls from meta-analysis across populations for which this phenotype passes all QC filters. NOTE: This field only appears in files for binary phenotypes.
+    #[serde(with = "s::opt", default)]
+    pub af_controls_meta_hq: Option<NotNan<f64>>,
+    /// Estimated effect size of alternate allele from meta-analysis across populations for which this phenotype passes all QC filters.
     /// Estimated effect size of alternate allele from meta-analysis across populations for which this phenotype passes all QC filters.
     #[serde(with = "s::opt")]
     pub beta_meta_hq: Option<NotNan<f64>>,
@@ -484,6 +520,12 @@ pub struct SummaryStats {
     /// pub NOTE: This field only appears in files for quantitative phenotypes.
     #[serde(with = "s::opt", default)]
     pub af_meta: Option<NotNan<f64>>,
+    /// Alternate allele frequency in cases from meta-analysis across populations for which this phenotype was GWASed. NOTE: This field only appears in files for binary phenotypes.
+    #[serde(with = "s::opt", default)]
+    pub af_cases_meta: Option<NotNan<f64>>,
+    /// Alternate allele frequency in controls from meta-analysis across populations for which this phenotype was GWASed. NOTE: This field only appears in files for binary phenotypes.
+    #[serde(with = "s::opt", default)]
+    pub af_controls_meta: Option<NotNan<f64>>,
     /// Estimated effect size of alternate allele from meta-analysis across populations for which this phenotype was GWASed.
     #[serde(with = "s::opt")]
     pub beta_meta: Option<NotNan<f64>>,
@@ -498,65 +540,92 @@ pub struct SummaryStats {
     pub neglog10_pval_heterogeneity: Option<NotNan<f64>>,
 
     // Population-specific fields
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub af_AFR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub af_AMR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub af_CSA: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub af_EAS: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub af_EUR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub af_MID: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+
+    #[serde(with = "s::opt", default)]
+    pub af_cases_AFR: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_cases_AMR: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_cases_CSA: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_cases_EAS: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_cases_EUR: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_cases_MID: Option<NotNan<f64>>,
+
+    #[serde(with = "s::opt", default)]
+    pub af_controls_AFR: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_controls_AMR: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_controls_CSA: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_controls_EAS: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_controls_EUR: Option<NotNan<f64>>,
+    #[serde(with = "s::opt", default)]
+    pub af_controls_MID: Option<NotNan<f64>>,
+
+    #[serde(with = "s::opt", default)]
     pub beta_AFR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub beta_AMR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub beta_CSA: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub beta_EAS: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub beta_EUR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub beta_MID: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub se_AFR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub se_AMR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub se_CSA: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub se_EAS: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub se_EUR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub se_MID: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub neglog10_pval_AFR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub neglog10_pval_AMR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub neglog10_pval_CSA: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub neglog10_pval_EAS: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub neglog10_pval_EUR: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub neglog10_pval_MID: Option<NotNan<f64>>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub low_confidence_AFR: Option<bool>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub low_confidence_AMR: Option<bool>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub low_confidence_CSA: Option<bool>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub low_confidence_EAS: Option<bool>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub low_confidence_EUR: Option<bool>,
-    #[serde(with = "s::opt")]
+    #[serde(with = "s::opt", default)]
     pub low_confidence_MID: Option<bool>,
 }
 impl SummaryStats {
@@ -572,6 +641,119 @@ impl SummaryStats {
             name: self.chr.clone(),
             orientation: SequenceOrientation::Forward,
             at: self.pos - 1..(self.pos - 1 + u64::try_from(self.ref_allele.len()).unwrap()),
+        }
+    }
+
+    pub fn max_edit(&self, dosage: u8, ploidy: u8) -> Option<NotNan<f64>> {
+        Some(Ord::max(
+            self.edit_force_alt(dosage, ploidy)?,
+            self.edit_force_ref(dosage)?,
+        ))
+    }
+    pub fn min_edit(&self, dosage: u8, ploidy: u8) -> Option<NotNan<f64>> {
+        Some(Ord::min(
+            self.edit_force_alt(dosage, ploidy)?,
+            self.edit_force_ref(dosage)?,
+        ))
+    }
+
+    pub fn edit_force_alt(&self, dosage: u8, ploidy: u8) -> Option<NotNan<f64>> {
+        Some(NotNan::from(ploidy - dosage) * self.beta_meta?)
+    }
+    pub fn edit_force_ref(&self, dosage: u8) -> Option<NotNan<f64>> {
+        Some(-NotNan::from(dosage) * self.beta_meta?)
+    }
+
+    pub fn max_edit_hq(&self, dosage: u8, ploidy: u8) -> Option<NotNan<f64>> {
+        Ord::max(
+            self.edit_force_alt_hq(dosage, ploidy),
+            self.edit_force_ref_hq(dosage),
+        )
+    }
+    pub fn min_edit_hq(&self, dosage: u8, ploidy: u8) -> Option<NotNan<f64>> {
+        Ord::min(
+            self.edit_force_alt_hq(dosage, ploidy),
+            self.edit_force_ref_hq(dosage),
+        )
+    }
+
+    pub fn edit_force_alt_hq(&self, dosage: u8, ploidy: u8) -> Option<NotNan<f64>> {
+        Some(NotNan::from(ploidy - dosage) * self.beta_meta_hq?)
+    }
+    pub fn edit_force_ref_hq(&self, dosage: u8) -> Option<NotNan<f64>> {
+        Some(-NotNan::from(dosage) * self.beta_meta_hq?)
+    }
+
+    pub fn normalised(self, std_dev: NotNan<f64>, std_dev_hq: NotNan<f64>) -> Self {
+        fn normalise(x: Option<NotNan<f64>>, std_dev: NotNan<f64>) -> Option<NotNan<f64>> {
+            Some(x? / std_dev)
+        }
+        Self {
+            chr: self.chr.clone(),
+            pos: self.pos,
+            ref_allele: self.ref_allele.clone(),
+            alt: self.alt.clone(),
+
+            af_meta_hq: self.af_meta_hq,
+            af_cases_meta_hq: self.af_cases_meta_hq,
+            af_controls_meta_hq: self.af_controls_meta_hq,
+            beta_meta_hq: normalise(self.beta_meta_hq, std_dev_hq),
+            se_meta_hq: self.se_meta_hq,
+            neglog10_pval_meta_hq: self.neglog10_pval_meta_hq,
+            neglog10_pval_heterogeneity_hq: self.neglog10_pval_heterogeneity_hq,
+
+            af_meta: self.af_meta,
+            af_cases_meta: self.af_cases_meta,
+            af_controls_meta: self.af_controls_meta,
+            beta_meta: normalise(self.beta_meta, std_dev),
+            se_meta: self.se_meta,
+            neglog10_pval_meta: self.neglog10_pval_meta,
+            neglog10_pval_heterogeneity: self.neglog10_pval_heterogeneity,
+
+            af_AFR: self.af_AFR,
+            af_AMR: self.af_AMR,
+            af_CSA: self.af_CSA,
+            af_EAS: self.af_EAS,
+            af_EUR: self.af_EUR,
+            af_MID: self.af_MID,
+            af_cases_AFR: self.af_cases_AFR,
+            af_cases_AMR: self.af_cases_AMR,
+            af_cases_CSA: self.af_cases_CSA,
+            af_cases_EAS: self.af_cases_EAS,
+            af_cases_EUR: self.af_cases_EUR,
+            af_cases_MID: self.af_cases_MID,
+            af_controls_AFR: self.af_controls_AFR,
+            af_controls_AMR: self.af_controls_AMR,
+            af_controls_CSA: self.af_controls_CSA,
+            af_controls_EAS: self.af_controls_EAS,
+            af_controls_EUR: self.af_controls_EUR,
+            af_controls_MID: self.af_controls_MID,
+
+            // We drop the population-specific betas, as we don't have their mean/std_dev.
+            beta_AFR: None,
+            beta_AMR: None,
+            beta_CSA: None,
+            beta_EAS: None,
+            beta_EUR: None,
+            beta_MID: None,
+            se_AFR: self.se_AFR,
+            se_AMR: self.se_AMR,
+            se_CSA: self.se_CSA,
+            se_EAS: self.se_EAS,
+            se_EUR: self.se_EUR,
+            se_MID: self.se_MID,
+            neglog10_pval_AFR: self.neglog10_pval_AFR,
+            neglog10_pval_AMR: self.neglog10_pval_AMR,
+            neglog10_pval_CSA: self.neglog10_pval_CSA,
+            neglog10_pval_EAS: self.neglog10_pval_EAS,
+            neglog10_pval_EUR: self.neglog10_pval_EUR,
+            neglog10_pval_MID: self.neglog10_pval_MID,
+            low_confidence_AFR: self.low_confidence_AFR,
+            low_confidence_AMR: self.low_confidence_AMR,
+            low_confidence_CSA: self.low_confidence_CSA,
+            low_confidence_EAS: self.low_confidence_EAS,
+            low_confidence_EUR: self.low_confidence_EUR,
+            low_confidence_MID: self.low_confidence_MID,
         }
     }
 
@@ -606,7 +788,7 @@ mod s {
             Deserialize, Serialize,
             de::{
                 DeserializeOwned,
-                value::{F32Deserializer, F64Deserializer, U64Deserializer},
+                value::{BoolDeserializer, F32Deserializer, F64Deserializer, U64Deserializer},
             },
         };
 
@@ -660,6 +842,12 @@ mod s {
                     E: serde::de::Error,
                 {
                     self.visit_str(&v)
+                }
+                fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    <T as Deserialize>::deserialize(BoolDeserializer::new(v)).map(Some)
                 }
                 fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
                 where
@@ -715,16 +903,18 @@ mod s {
     pub mod comma {
         use std::{fmt, marker::PhantomData};
 
-        use serde::{Deserialize, Serialize, de::DeserializeOwned};
+        use serde::{Deserialize, de::DeserializeOwned};
 
         use utile::serde_ext::StringSequenceDeserializer;
 
-        pub fn serialize<S, T>(_v: &T, _serializer: S) -> Result<S::Ok, S::Error>
+        pub fn serialize<S, T>(v: &T, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
-            T: Serialize,
+            for<'a> &'a T: IntoIterator,
+            for<'a> <&'a T as IntoIterator>::Item: ToString,
         {
-            todo!()
+            let v = v.into_iter().map(|i| i.to_string()).collect::<Vec<_>>();
+            serializer.serialize_str(&v.join(","))
         }
 
         pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -740,7 +930,7 @@ mod s {
                 type Value = T;
                 fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                     let type_name = std::any::type_name::<T>();
-                    write!(formatter, "either 'NA', '', or a value of type {type_name}")
+                    write!(formatter, "a comma separated list (type: {type_name})")
                 }
                 fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
                 where
@@ -766,6 +956,45 @@ mod s {
     }
 }
 
+mod boilerplate {
+    use std::fmt;
+
+    use serde::Serialize;
+
+    use super::*;
+
+    impl fmt::Display for TraitType {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", serialize(self))
+        }
+    }
+    impl fmt::Display for PhenoSex {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", serialize(self))
+        }
+    }
+    impl fmt::Display for Modifier {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", serialize(self))
+        }
+    }
+    impl fmt::Display for Population {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", serialize(self))
+        }
+    }
+    impl fmt::Display for PhenotypeQc {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", serialize(self))
+        }
+    }
+
+    fn serialize<T: Serialize>(v: &T) -> String {
+        let s = serde_json::to_string(v).unwrap();
+        s.trim_matches('"').to_owned()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -774,7 +1003,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_latest_manifest() {
-        let result = PhenotypeManifestEntry::load_all().await.unwrap();
+        let result = PhenotypeManifestEntry::load_default().await.unwrap();
         assert!(!result.is_empty(), "Manifest should not be empty");
 
         println!("Number of phenotypes: {}", result.len());
@@ -800,8 +1029,16 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn roundtrip_manifest_json() {
+        let result = PhenotypeManifestEntry::load_default().await.unwrap();
+        let json = serde_json::to_string(&result).unwrap();
+        let result2: Vec<_> = serde_json::from_str(&json).unwrap();
+        assert_eq!(result, result2);
+    }
+
+    #[tokio::test]
     async fn test_get_summary_stats() {
-        let manifest = PhenotypeManifestEntry::load_all().await.unwrap();
+        let manifest = PhenotypeManifestEntry::load_default().await.unwrap();
         let entry = manifest.first().unwrap();
 
         // Only fetch the first few rows to avoid a large download during tests
