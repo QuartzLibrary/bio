@@ -7,30 +7,18 @@ use biocore::{
 };
 use utile::io::FromUtf8Bytes;
 
-// Alt genotypes actually seen in the data (besides 'Other'): {INS_ME_SVA, CN1, CN2, INS_ME_ALU, CN0, CN4, CN6, G, INS_MT, INS_ME_LINE1, CN3, INV, CN7, CN8, CN9, T, A, C, CN5}
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AltGenotype {
     Sequence(DnaSequence),
-    /// ##ALT=<ID=DEL,Description="Deletion">
     DEL,
-    /// ##ALT=<ID=DUP,Description="Duplication">
     DUP,
     INS,
-    /// ##ALT=<ID=INS:ME:ALU,Description="Insertion of ALU element">
-    INS_ME_ALU,
-    /// ##ALT=<ID=INS:ME:LINE1,Description="Insertion of LINE1 element">
-    INS_ME_LINE1,
-    /// ##ALT=<ID=INS:ME:SVA,Description="Insertion of SVA element">
-    INS_ME_SVA,
-    /// ##ALT=<ID=INS:MT,Description="Nuclear Mitochondrial Insertion">
-    INS_MT,
-    /// ##ALT=<ID=INV,Description="Inversion">
     INV,
-    /// ##ALT=<ID=CN0,Description="Copy number allele: 0 copies">
-    /// 0..=124
+    /// Copy Number
     CN(u8),
-    Other(String),
+    Other(&'static str),
+    Unknown(String),
 }
 impl fmt::Display for AltGenotype {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -39,10 +27,6 @@ impl fmt::Display for AltGenotype {
             Self::DEL => "<DEL>",
             Self::DUP => "<DUP>",
             Self::INS => "<INS>",
-            Self::INS_ME_ALU => "<INS:ME:ALU>",
-            Self::INS_ME_LINE1 => "<INS:ME:LINE1>",
-            Self::INS_ME_SVA => "<INS:ME:SVA>",
-            Self::INS_MT => "<INS:MT>",
             Self::INV => "<INV>",
             Self::CN(c) => {
                 f.write_str("<CN")?;
@@ -52,6 +36,7 @@ impl fmt::Display for AltGenotype {
                 return Ok(());
             }
             Self::Other(v) => v,
+            Self::Unknown(v) => v,
         };
         f.write_str(v)
     }
@@ -60,6 +45,10 @@ impl FromStr for AltGenotype {
     type Err = std::io::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        fn parse_cn(s: &str) -> Option<u8> {
+            s.strip_prefix("<CN")?.strip_suffix(">")?.parse().ok()
+        }
+
         Ok(match s {
             s if s
                 .bytes()
@@ -70,20 +59,14 @@ impl FromStr for AltGenotype {
             "<DEL>" => Self::DEL,
             "<DUP>" => Self::DUP,
             "<INS>" => Self::INS,
-            "<INS:ME:ALU>" => Self::INS_ME_ALU,
-            "<INS:ME:LINE1>" => Self::INS_ME_LINE1,
-            "<INS:ME:SVA>" => Self::INS_ME_SVA,
-            "<INS:MT>" => Self::INS_MT,
             "<INV>" => Self::INV,
             _ => {
-                fn parse_cn(s: &str) -> Option<u8> {
-                    s.strip_prefix("<CN")?.strip_suffix(">")?.parse().ok()
-                }
-
                 if let Some(c) = parse_cn(s) {
                     Self::CN(c)
+                } else if let Some(v) = KNOWN.get_key(s) {
+                    Self::Other(v)
                 } else {
-                    Self::Other(s.to_owned())
+                    Self::Unknown(s.to_owned())
                 }
             }
         })
@@ -93,6 +76,10 @@ impl FromUtf8Bytes for AltGenotype {
     type Err = std::io::Error;
 
     fn from_bytes(s: &[u8]) -> Result<Self, Self::Err> {
+        fn parse_cn(s: &[u8]) -> Option<u8> {
+            u8::from_bytes(s.strip_prefix(b"<CN")?.strip_suffix(b">")?).ok()
+        }
+
         Ok(match s {
             s if s
                 .iter()
@@ -103,20 +90,17 @@ impl FromUtf8Bytes for AltGenotype {
             b"<DEL>" => Self::DEL,
             b"<DUP>" => Self::DUP,
             b"<INS>" => Self::INS,
-            b"<INS:ME:ALU>" => Self::INS_ME_ALU,
-            b"<INS:ME:LINE1>" => Self::INS_ME_LINE1,
-            b"<INS:ME:SVA>" => Self::INS_ME_SVA,
-            b"<INS:MT>" => Self::INS_MT,
             b"<INV>" => Self::INV,
             _ => {
-                fn parse_cn(s: &[u8]) -> Option<u8> {
-                    u8::from_bytes(s.strip_prefix(b"<CN")?.strip_suffix(b">")?).ok()
-                }
-
                 if let Some(c) = parse_cn(s) {
                     Self::CN(c)
                 } else {
-                    Self::Other(String::from_utf8(s.to_vec()).map_err(utile::io::invalid_data)?)
+                    let s = str::from_utf8(s).map_err(utile::io::invalid_data)?;
+                    if let Some(v) = KNOWN.get_key(s) {
+                        Self::Other(v)
+                    } else {
+                        Self::Unknown(s.to_owned())
+                    }
                 }
             }
         })
@@ -125,33 +109,98 @@ impl FromUtf8Bytes for AltGenotype {
 impl AltGenotype {
     pub fn unpack(&self, reference: &SequenceSlice<DnaBase>) -> Option<DnaSequence> {
         Some(match self {
-            AltGenotype::Sequence(sequence) => sequence.clone(),
-            AltGenotype::DEL => DnaSequence::default(),
-            AltGenotype::DUP => DnaSequence::new(
+            Self::Sequence(sequence) => sequence.clone(),
+            Self::DEL => DnaSequence::default(),
+            Self::DUP => DnaSequence::new(
                 reference
                     .iter()
                     .cloned()
                     .chain(reference.iter().cloned())
                     .collect(),
             ),
-            AltGenotype::INS => return None, // Insertion of what?
-            AltGenotype::INS_ME_ALU
-            | AltGenotype::INS_ME_LINE1
-            | AltGenotype::INS_ME_SVA
-            | AltGenotype::INS_MT => return None, // TODO: what is the sequence?
-            AltGenotype::INV => {
+            Self::INS => return None, // Insertion of what?
+            Self::INV => {
                 let mut v = reference.to_vec();
                 v.reverse();
                 DnaSequence::new(v)
             }
-            AltGenotype::CN(n) => DnaSequence::new(reference.repeat((*n).into())),
-            AltGenotype::Other(v) => {
-                log::warn!("Unpacking unknown alt genotype: {v}");
+            Self::CN(n) => DnaSequence::new(reference.repeat((*n).into())),
+            Self::Other(v) if v.starts_with("<DEL:") => DnaSequence::default(),
+            Self::Other(_) => return None,
+            Self::Unknown(v) if v.starts_with("<DEL:") => DnaSequence::default(),
+            Self::Unknown(v) => {
+                if v != "*" {
+                    log::warn!("[1000 Genomes] Unpacking unknown alt genotype: {v}");
+                }
                 return None;
-            } // AltGenotype::Other(v) => todo!("{v}"),
+            }
         })
     }
 }
+
+pub static KNOWN: phf::Set<&'static str> = phf::phf_set! {
+    "*",
+    "<DEL:ME:LINE|L1|L1HS>",
+    "<DEL:ME:LINE|L1|L1MB8>",
+    "<DEL:ME:LINE|L1|L1P1>",
+    "<DEL:ME:LINE|L1|L1PA13>",
+    "<DEL:ME:LINE|L1|L1PA2>",
+    "<DEL:ME:LINE|L1|L1PA3>",
+    "<DEL:ME:LINE|L1|L1PA5>",
+    "<DEL:ME:LINE|L1|L1PA6>",
+    "<DEL:ME:LINE|L1|L1PA7>",
+    "<DEL:ME:LINE|L1|L1PA8>",
+    "<DEL:ME:LINE|L1|L1PB1>",
+    "<DEL:ME:Retroposon|SVA|SVA_C>",
+    "<DEL:ME:Retroposon|SVA|SVA_D>",
+    "<DEL:ME:Retroposon|SVA|SVA_E>",
+    "<DEL:ME:Retroposon|SVA|SVA_F>",
+    "<DEL:ME:SINE|Alu|Alu>",
+    "<DEL:ME:SINE|Alu|AluJb>",
+    "<DEL:ME:SINE|Alu|AluJr>",
+    "<DEL:ME:SINE|Alu|AluSc>",
+    "<DEL:ME:SINE|Alu|AluSc8>",
+    "<DEL:ME:SINE|Alu|AluSg>",
+    "<DEL:ME:SINE|Alu|AluSg4>",
+    "<DEL:ME:SINE|Alu|AluSp>",
+    "<DEL:ME:SINE|Alu|AluSq>",
+    "<DEL:ME:SINE|Alu|AluSq10>",
+    "<DEL:ME:SINE|Alu|AluSq2>",
+    "<DEL:ME:SINE|Alu|AluSq4>",
+    "<DEL:ME:SINE|Alu|AluSx>",
+    "<DEL:ME:SINE|Alu|AluSx1>",
+    "<DEL:ME:SINE|Alu|AluSx3>",
+    "<DEL:ME:SINE|Alu|AluSx4>",
+    "<DEL:ME:SINE|Alu|AluSz>",
+    "<DEL:ME:SINE|Alu|AluSz6>",
+    "<DEL:ME:SINE|Alu|AluY>",
+    "<DEL:ME:SINE|Alu|AluYa5>",
+    "<DEL:ME:SINE|Alu|AluYa8>",
+    "<DEL:ME:SINE|Alu|AluYb8>",
+    "<DEL:ME:SINE|Alu|AluYc3>",
+    "<DEL:ME:SINE|Alu|AluYd8>",
+    "<DEL:ME:SINE|Alu|AluYe5>",
+    "<DEL:ME:SINE|Alu|AluYf1>",
+    "<DEL:ME:SINE|Alu|AluYh3>",
+    "<DEL:ME:SINE|Alu|AluYh7>",
+    "<DEL:ME:SINE|Alu|AluYi6_4d>",
+    "<DEL:ME:SINE|Alu|AluYi6>",
+    "<DEL:ME:SINE|Alu|AluYj4>",
+    "<DEL:ME:SINE|Alu|AluYk11>",
+    "<DEL:ME:SINE|Alu|AluYk3>",
+    "<DEL:ME:SINE|Alu|AluYk4>",
+    "<DEL:ME:SINE|Alu|AluYm1>",
+    "<DEL:ME>",
+    "<DEL:xME:SINE|Alu|AluYb9>",
+    "<DEL>",
+    "<DUP>",
+    "<INS:ME:ALU>",
+    "<INS:ME:LINE1>",
+    "<INS:ME:SVA>",
+    "<INS:ME>",
+    "<INS>",
+    "<INV>",
+};
 
 #[cfg(test)]
 mod tests {
