@@ -48,7 +48,7 @@ impl<R: RawResource> RawResource for DecompressedResource<R> {
         ))
     }
     fn read(&self) -> std::io::Result<Self::Reader> {
-        match self.resource.compression() {
+        match self.compression.or(self.resource.compression()) {
             None => Ok(DecompressedReader::None(self.resource.read()?)),
             Some(Compression::Gzip) => {
                 Ok(DecompressedReader::Gzip(flate2::bufread::GzDecoder::new(
@@ -71,7 +71,7 @@ impl<R: RawResource> RawResource for DecompressedResource<R> {
         ))
     }
     async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
-        match self.resource.compression() {
+        match self.compression.or(self.resource.compression()) {
             None => Ok(AsyncDecompressedReader::None(
                 self.resource.read_async().await?,
             )),
