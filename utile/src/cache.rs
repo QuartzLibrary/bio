@@ -45,6 +45,10 @@ impl FsCache {
     pub fn entry(&self, key: impl AsRef<Path>) -> FsCacheEntry {
         FsCacheEntry::new(self, key)
     }
+
+    pub fn subfolder(&self, key: impl AsRef<Path>) -> Self {
+        Self::new(self.path.join(key))
+    }
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FsCacheEntry {
@@ -87,7 +91,10 @@ impl FsCacheEntry {
     pub fn write_file(&self, mut data: impl std::io::BufRead) -> std::io::Result<()> {
         std::fs::create_dir_all(self.path.parent().unwrap())?;
 
-        let mut tmp_file = tempfile::Builder::new().tempfile()?;
+        let mut tmp_file = tempfile::Builder::new()
+            .prefix("tempfile_")
+            .suffix("_utile")
+            .tempfile_in(self.path.parent().unwrap())?;
         std::io::copy(&mut data, &mut tmp_file)?;
 
         rename_or_copy(tmp_file, self)?;
@@ -101,7 +108,10 @@ impl FsCacheEntry {
     ) -> std::io::Result<()> {
         tokio::fs::create_dir_all(self.path.parent().unwrap()).await?;
 
-        let tmp_file = tempfile::Builder::new().tempfile()?;
+        let tmp_file = tempfile::Builder::new()
+            .prefix("tempfile_")
+            .suffix("_utile")
+            .tempfile_in(self.path.parent().unwrap())?;
         tokio::io::copy(
             &mut std::pin::pin!(data),
             &mut tokio::fs::File::create(tmp_file.path()).await?,
