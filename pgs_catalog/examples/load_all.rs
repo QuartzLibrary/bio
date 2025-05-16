@@ -21,17 +21,17 @@ async fn main() {
 
         Metadata::load(id).await.unwrap();
 
-        Study::load(id)
+        Study::load_associations_default(id)
             .await
             .unwrap()
             .for_each(|v| drop(v.unwrap()));
 
-        HarmonizedStudy::load(id, GenomeBuild::GRCh37)
+        HarmonizedStudy::load_associations_default(id, GenomeBuild::GRCh37)
             .await
             .unwrap()
             .for_each(|v| drop(v.unwrap()));
 
-        HarmonizedStudy::load(id, GenomeBuild::GRCh38)
+        HarmonizedStudy::load_associations_default(id, GenomeBuild::GRCh38)
             .await
             .unwrap()
             .for_each(|v| {
