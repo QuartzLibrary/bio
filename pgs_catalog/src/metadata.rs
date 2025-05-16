@@ -9,7 +9,7 @@ use tar::Archive;
 use ids::pgs::PgsId;
 use utile::resource::{RawResource, RawResourceExt};
 
-use crate::PgsCatalogResource;
+use crate::{PgsCatalogResource, WeightType};
 
 pub struct Metadata {
     pub cohorts: Vec<Cohort>,
@@ -235,7 +235,7 @@ pub struct Score {
     #[serde(rename = "Number of Interaction Terms")]
     pub number_of_interaction_terms: String,
     #[serde(rename = "Type of Variant Weight")]
-    pub type_of_variant_weight: String,
+    pub type_of_variant_weight: WeightType,
     #[serde(rename = "PGS Publication (PGP) ID")]
     pub pgs_publication_id: String,
     #[serde(rename = "Publication (PMID)")]

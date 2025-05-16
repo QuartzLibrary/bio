@@ -1,6 +1,6 @@
 #![feature(iterator_try_collect)]
 
-use std::io::Read;
+use std::io::{self, Read};
 
 use ordered_float::NotNan;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -42,7 +42,7 @@ impl PgsCatalogResource {
     }
 }
 impl RawResource for PgsCatalogResource {
-    const NAMESPACE: &'static str = "pan_ukbb";
+    const NAMESPACE: &'static str = "pgs_catalog";
 
     fn key(&self) -> String {
         self.key()
@@ -116,7 +116,7 @@ pub struct PgsInfo {
     /// Number of variants listed in the PGS
     variant_number: String,
     /// Variant weight type, e.g. 'beta', 'OR/HR' (default 'NR')
-    weight_type: String,
+    weight_type: WeightType,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceInfo {
@@ -466,10 +466,89 @@ pub enum HarmonizedSource {
     Liftover,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum WeightType {
+    #[serde(rename = "Beta (corrected for sample overlap)")]
+    BetaCorrectedForSampleOverlap,
+    #[serde(rename = "Dosage")]
+    Dosage,
+    #[serde(rename = "Inverse-variance weighting")]
+    InverseVarianceWeighting,
+    #[serde(rename = "Log2(OR)")]
+    Log2OR,
+    #[serde(rename = "MetaPRS Weight")]
+    MetaPRSWeight,
+    #[serde(rename = "NR")]
+    NR,
+    #[serde(rename = "Odds Ratio over expected risk")]
+    OddsRatioOverExpectedRisk,
+    #[serde(rename = "PHS log(HR)")]
+    PHSLogHR,
+    #[serde(rename = "Unweighted")]
+    Unweighted,
+    #[serde(rename = "beta")]
+    Beta,
+    #[serde(rename = "ln(OR)")]
+    LnOR,
+    #[serde(rename = "log(HR)")]
+    LogHR,
+    #[serde(rename = "log(OR)")]
+    LogOR,
+    #[serde(
+        rename = "log(OR) for the effect allele *NOTE* a EAF-normalised weight was used for the PRS (see \"variant_description\" and dosage_#_weight columns)"
+    )]
+    LogOREffectAllele,
+    #[serde(rename = "metaGRS")]
+    MetaGRS,
+    #[serde(rename = "metaPRS")]
+    MetaPRS,
+    #[serde(rename = "posterior beta")]
+    PosteriorBeta,
+    #[serde(rename = "posterior effect size")]
+    PosteriorEffectSize,
+    #[serde(rename = "weighted by functional implication")]
+    WeightedByFunctionalImplication,
+    #[serde(rename = "weights.HC132")]
+    WeightsHC132,
+    #[serde(rename = "weights.HC171")]
+    WeightsHC171,
+    #[serde(rename = "weights.HC188")]
+    WeightsHC188,
+    #[serde(rename = "weights.HC215")]
+    WeightsHC215,
+    #[serde(rename = "weights.HC225")]
+    WeightsHC225,
+    #[serde(rename = "weights.HC294")]
+    WeightsHC294,
+    #[serde(rename = "weights.HC299")]
+    WeightsHC299,
+    #[serde(rename = "weights.HC326")]
+    WeightsHC326,
+    #[serde(rename = "weights.HC328")]
+    WeightsHC328,
+    #[serde(rename = "weights.T2D")]
+    WeightsT2D,
+    #[serde(rename = "weights.T2D_HbA1c_39")]
+    WeightsT2dHbA1c39,
+}
+
 impl Study {
-    pub async fn load(
+    pub fn load_associations<R>(
+        resource: R,
+    ) -> io::Result<impl Iterator<Item = csv::Result<StudyAssociation>>>
+    where
+        R: RawResource,
+        <R as RawResource>::Reader: io::BufRead,
+    {
+        let mut file = resource.read()?;
+        let _header = comments::read(&mut file)?;
+        Ok(read_file(file))
+    }
+
+    pub async fn load_associations_default(
         id: PgsId,
-    ) -> Result<impl Iterator<Item = Result<StudyAssociation, csv::Error>>, std::io::Error> {
+    ) -> io::Result<impl Iterator<Item = csv::Result<StudyAssociation>>> {
         let resource = PgsCatalogResource::Study { id }
             .log_progress()
             .with_global_fs_cache()
@@ -478,18 +557,26 @@ impl Study {
             .decompressed()
             .buffered();
 
-        let mut file = resource.read()?;
-        let _header = comments::read(&mut file)?;
-        Ok(read_file(file))
+        Self::load_associations(resource)
     }
 }
 
 impl HarmonizedStudy {
-    pub async fn load(
+    pub fn load_associations<R>(
+        resource: R,
+    ) -> io::Result<impl Iterator<Item = csv::Result<HarmonizedStudyAssociation>>>
+    where
+        R: RawResource,
+        <R as RawResource>::Reader: io::BufRead,
+    {
+        let mut file = resource.read()?;
+        let _header = comments::read(&mut file)?;
+        Ok(read_file(file))
+    }
+    pub async fn load_associations_default(
         id: PgsId,
         build: GenomeBuild,
-    ) -> Result<impl Iterator<Item = Result<HarmonizedStudyAssociation, csv::Error>>, std::io::Error>
-    {
+    ) -> io::Result<impl Iterator<Item = csv::Result<HarmonizedStudyAssociation>>> {
         let resource = PgsCatalogResource::HarmonizedStudy { id, build }
             .log_progress()
             .with_global_fs_cache()
@@ -498,9 +585,7 @@ impl HarmonizedStudy {
             .decompressed()
             .buffered();
 
-        let mut file = resource.read()?;
-        let _header = comments::read(&mut file)?;
-        Ok(read_file(file))
+        Self::load_associations(resource)
     }
 }
 
