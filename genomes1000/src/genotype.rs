@@ -217,9 +217,9 @@ mod tests {
             .filter_module("hyper_util", log::LevelFilter::Info)
             .init();
 
-        let genotypes: HashSet<_> = crate::load_all()
-            .await
-            .unwrap()
+        let (_sample_names, records) = crate::load_all().await.unwrap();
+
+        let genotypes: HashSet<_> = records
             .flat_map(|r| r.unwrap().alternate_alleles)
             .filter(|g| !matches!(g, AltGenotype::Sequence(_)))
             .collect();

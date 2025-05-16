@@ -1,5 +1,7 @@
 #![feature(never_type)]
 #![feature(ascii_char)]
+#![feature(iterator_try_collect)]
+#![feature(let_chains)]
 
 mod contig;
 mod genotype;
@@ -7,18 +9,26 @@ mod info;
 mod parse;
 mod slow;
 
-use biocore::dna::DnaBase;
-use resource::Genomes1000Resource;
+pub mod pedigree;
+pub mod resource;
+pub mod simplified;
+
+use either::Either;
+use std::io;
+
+use biocore::{
+    dna::{DnaBase, DnaSequence},
+    genome::Contig,
+    location::{GenomePosition, SequenceOrientation},
+};
 use utile::{
     io::FromUtf8Bytes,
     resource::{RawResource, RawResourceExt},
 };
 
-pub mod resource;
+use self::{pedigree::Pedigree, resource::Genomes1000Resource, simplified::SimplifiedRecord};
 
-pub use contig::GRCh38Contig;
-pub use genotype::AltGenotype;
-pub use info::RecordInfo;
+pub use self::{contig::GRCh38Contig, genotype::AltGenotype, info::RecordInfo};
 
 #[allow(dead_code)]
 pub struct VcfFile<S> {
@@ -107,20 +117,190 @@ pub struct ExtendedSample<GT> {
     /// ##FORMAT=<ID=SB,Number=4,Type=Integer,Description="Per-sample component statistics which comprise the Fisher's Exact Test to detect strand bias.">
     SB: Option<Vec<u64>>,
 }
+impl<S> Record<S> {
+    pub fn at(&self) -> GenomePosition {
+        GenomePosition {
+            name: self.contig.name().to_owned(),
+            orientation: SequenceOrientation::Forward,
+            at: self.position - 1,
+        }
+    }
+}
+impl Record<Genotype> {
+    /// Splits a multi-allelic variant into multiple bi-allelic variants.
+    ///
+    /// Note: invalidates info.
+    pub fn split(self) -> impl Iterator<Item = Self> {
+        if self.alternate_alleles.len() == 1 {
+            return Either::Left([self].into_iter());
+        }
 
-pub async fn load_all(
-) -> Result<impl Iterator<Item = Result<Record<Genotype>, std::io::Error>>, std::io::Error> {
+        // log::info!(
+        //     "[1000 Genomes][Split] Splitting {} alleles",
+        //     self.alternate_alleles.len()
+        // );
+
+        Either::Right(self.alternate_alleles.clone().into_iter().enumerate().map(
+            move |(i, alt)| {
+                let mut record = self.clone();
+                record.alternate_alleles = vec![alt];
+                let i: u8 = i.try_into().unwrap();
+                for sample in record.samples.iter_mut() {
+                    Genotype::visit_values_mut(sample, |value| {
+                        *value = if *value == i { 1 } else { 0 }
+                    });
+                }
+                record
+            },
+        ))
+    }
+    /// Forces all alt alleles to be sequences.
+    /// Returns [None] and clears its genotype back to reference if it fails to do so.
+    ///
+    /// NOTE: invalidates info.
+    pub fn normalized(mut self) -> Option<Self> {
+        let mut to_drop = vec![];
+        for (i, alt) in self.alternate_alleles.iter_mut().enumerate() {
+            if let AltGenotype::Sequence(_) = alt {
+                continue;
+            }
+
+            if let Some(ref_allele) = self
+                .reference_allele
+                .iter()
+                .copied()
+                .try_collect::<DnaSequence>()
+                && let Some(sequence) = alt.unpack(&ref_allele)
+            {
+                *alt = AltGenotype::Sequence(sequence);
+                continue;
+            };
+
+            to_drop.push(i);
+        }
+
+        if to_drop.is_empty() {
+            return Some(self);
+        } else {
+            self.info = "".to_owned();
+        }
+
+        // log::warn!(
+        //     "[1000 Genomes][Normalize] Dropping {} alleles",
+        //     to_drop.len()
+        // );
+
+        if self.alternate_alleles.len() == to_drop.len() {
+            return None;
+        }
+
+        for i in to_drop.into_iter().rev() {
+            self.alternate_alleles.remove(i);
+
+            let i: u8 = i.try_into().unwrap();
+
+            for sample in self.samples.iter_mut() {
+                Genotype::visit_values_mut(sample, |value| match Ord::cmp(&*value, &i) {
+                    Ordering::Less => {}
+                    Ordering::Equal => *value = 0,
+                    Ordering::Greater => *value -= 1,
+                });
+            }
+        }
+
+        Some(self)
+    }
+    pub fn simplified(self) -> Option<SimplifiedRecord> {
+        let Some(reference_allele) = self
+            .reference_allele
+            .iter()
+            .copied()
+            .try_collect::<DnaSequence>()
+        else {
+            log::warn!("[1000 Genomes][Simplify] Incomplete reference allele");
+            return None;
+        };
+
+        if self.alternate_alleles.len() != 1 {
+            log::warn!(
+                "[1000 Genomes][Simplify] Dropping {} alleles",
+                self.alternate_alleles.len()
+            );
+            return None;
+        }
+        let alternate_allele = self.alternate_alleles.into_iter().next().unwrap();
+        let AltGenotype::Sequence(alternate_allele) = alternate_allele else {
+            log::warn!("[1000 Genomes][Simplify] Non-sequence alternate allele");
+            return None;
+        };
+
+        Some(SimplifiedRecord {
+            contig: self.contig,
+            position: self.position,
+            // id: self.id,
+            reference_allele,
+            alternate_allele,
+            quality: self.quality,
+            filter: self.filter,
+            samples: self.samples,
+        })
+    }
+}
+impl Genotype {
+    pub fn dosage(&self, variant: u8) -> u8 {
+        let dose = |v: &u8| (*v == variant).into();
+        match self {
+            Genotype::Missing => 0,
+            Genotype::Haploid(HaploidGenotype { value }) => dose(value),
+            Genotype::Diploid(DiploidGenotype { left, right, .. }) => dose(left) + dose(right),
+        }
+    }
+    pub fn ploidy(&self) -> Option<u8> {
+        match self {
+            Genotype::Missing => None,
+            Genotype::Haploid(_) => Some(1),
+            Genotype::Diploid(_) => Some(2),
+        }
+    }
+    fn visit_values_mut(&mut self, mut f: impl FnMut(&mut u8)) {
+        match self {
+            Genotype::Missing => {}
+            Genotype::Haploid(HaploidGenotype { value }) => f(value),
+            Genotype::Diploid(DiploidGenotype { left, right, .. }) => {
+                f(left);
+                f(right);
+            }
+        }
+    }
+}
+
+pub async fn load_all() -> io::Result<(
+    Vec<String>,
+    impl Iterator<Item = io::Result<Record<Genotype>>>,
+)> {
+    let mut names = None;
     let mut chromosomes = vec![];
     for contig in GRCh38Contig::CHROMOSOMES {
-        chromosomes.push(load_contig(contig).await?);
+        let (new_names, variants) = load_contig(contig).await?;
+        chromosomes.push(variants);
+        names = match names {
+            Some(names) => {
+                assert_eq!(names, new_names);
+                Some(names)
+            }
+            None => Some(new_names),
+        }
     }
 
-    Ok(chromosomes.into_iter().flatten())
+    Ok((names.unwrap(), chromosomes.into_iter().flatten()))
 }
 
 pub async fn load_contig(
     c: GRCh38Contig,
-) -> Result<impl Iterator<Item = Result<Record<Genotype>, std::io::Error>>, std::io::Error> {
+) -> io::Result<(
+    Vec<String>,
+    impl Iterator<Item = io::Result<Record<Genotype>>>,
+)> {
     let resource = Genomes1000Resource::high_coverage_genotypes_contig_vcf(c)
         .log_progress()
         .with_global_fs_cache()
@@ -165,46 +345,38 @@ pub async fn load_contig(
     )
 }
 
-pub async fn load_grch38_reference_genome(
-) -> std::io::Result<noodles::fasta::IndexedReader<std::io::BufReader<std::fs::File>>> {
-    let resource = Genomes1000Resource::grch38_reference_genome()
-        .log_progress()
-        .with_global_fs_cache()
-        .ensure_cached_async()
-        .await?;
-    let index_resource = Genomes1000Resource::grch38_reference_genome_index()
-        .log_progress()
-        .with_global_fs_cache()
-        .ensure_cached_async()
-        .await?;
-
-    Ok(noodles::fasta::IndexedReader::new(
-        resource.buffered().read()?,
-        noodles::fasta::fai::Reader::new(index_resource.decompressed().buffered().read()?)
-            .read_index()?,
-    ))
+pub async fn load_pedigree(resource: impl RawResource) -> io::Result<Vec<Pedigree>> {
+    Ok(csv::ReaderBuilder::new()
+        .delimiter(b' ')
+        .from_reader(resource.read()?)
+        .into_deserialize()
+        .try_collect()?)
 }
 
-pub async fn load_grch37_reference_genome(
-) -> std::io::Result<noodles::fasta::IndexedReader<std::io::BufReader<std::fs::File>>> {
-    let resource = Genomes1000Resource::old_grch37_reference_genome()
-        .log_progress()
-        .with_global_fs_cache()
-        .decompressed() // Decompress *before* caching, so we have a file to index into.
-        .with_global_fs_cache()
-        .ensure_cached_async()
-        .await?;
-    let index_resource = Genomes1000Resource::old_grch37_reference_genome_index()
-        .log_progress()
-        .with_global_fs_cache()
-        .ensure_cached_async()
-        .await?;
+/// The fasta reader should be decompressed.
+/// It should also implement [Seek](std::io::Seek) if random access is needed.
+pub async fn load_grch38_reference_genome<F>(
+    fasta: F,
+    index: impl RawResource,
+) -> io::Result<biocore::fasta::IndexedFastaReader<F::Reader>>
+where
+    F: RawResource,
+    <F as RawResource>::Reader: std::io::BufRead,
+{
+    biocore::fasta::IndexedFastaReader::new(fasta.read()?, index.decompressed().buffered().read()?)
+}
 
-    Ok(noodles::fasta::IndexedReader::new(
-        resource.buffered().read()?,
-        noodles::fasta::fai::Reader::new(index_resource.decompressed().buffered().read()?)
-            .read_index()?,
-    ))
+/// The fasta reader should be decompressed.
+/// It should also implement [Seek](std::io::Seek) if random access is needed.
+pub async fn load_grch37_reference_genome<F>(
+    fasta: F,
+    index: impl RawResource,
+) -> io::Result<biocore::fasta::IndexedFastaReader<F::Reader>>
+where
+    F: RawResource,
+    <F as RawResource>::Reader: std::io::BufRead,
+{
+    biocore::fasta::IndexedFastaReader::new(fasta.read()?, index.decompressed().buffered().read()?)
 }
 
 mod boilerplate {
@@ -232,6 +404,17 @@ mod boilerplate {
                 right,
             } = self;
             write!(f, "{left}{phasing}{right}")
+        }
+    }
+    impl fmt::Display for Genotype {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Self::Missing => write!(f, "."),
+                Self::Haploid(HaploidGenotype { value }) => write!(f, "{value}"),
+                Self::Diploid(v) => {
+                    write!(f, "{v}")
+                }
+            }
         }
     }
 

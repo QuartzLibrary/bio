@@ -9,7 +9,7 @@ use utile::io::FromUtf8Bytes;
 
 use biocore::genome::Contig;
 
-use crate::Sex;
+use crate::pedigree::Sex;
 
 mod grch37_meta;
 mod grch38_meta;

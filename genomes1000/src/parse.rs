@@ -1,7 +1,6 @@
 use std::{
     io::{self, BufRead},
     str,
-    sync::Arc,
 };
 
 use biocore::dna::DnaBase;
@@ -14,19 +13,22 @@ use super::Record;
 pub(super) fn parse<S>(
     reader: impl BufRead,
     read_sample: fn(&[u8], &[u8]) -> io::Result<S>,
-) -> io::Result<impl Iterator<Item = io::Result<Record<S>>>> {
+) -> io::Result<(Vec<String>, Lines<S, impl BufRead>)> {
     let mut reader = comments::skip(reader)?;
     let sample_names = read_header(&mut reader)?;
 
-    Ok(Lines {
-        buf: vec![],
-        inner: reader,
-        sample_names,
-        read_sample,
-    })
+    Ok((
+        sample_names.clone(),
+        Lines {
+            buf: vec![],
+            inner: reader,
+            sample_names,
+            read_sample,
+        },
+    ))
 }
 
-pub(super) fn read_header(reader: &mut impl BufRead) -> Result<Vec<Arc<str>>, io::Error> {
+pub(super) fn read_header(reader: &mut impl BufRead) -> Result<Vec<String>, io::Error> {
     const EXPECTED_SAMPLE_COUNT: usize = 2500;
     const REFERENCE: [u8; 46] = *b"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t";
     let mut buf = [0; REFERENCE.len()];
@@ -45,15 +47,15 @@ pub(super) fn read_header(reader: &mut impl BufRead) -> Result<Vec<Arc<str>>, io
         log::warn!("[Data][1000 Genomes] File header is not valid UTF-8.");
         io::ErrorKind::InvalidData
     })?;
-    sample_names.extend(line.split('\t').map(Arc::from));
+    sample_names.extend(line.split('\t').map(str::to_owned));
     Ok(sample_names)
 }
 
 #[derive(Debug)]
-struct Lines<S, B> {
+pub(super) struct Lines<S, B> {
     buf: Vec<u8>,
     inner: B,
-    sample_names: Vec<Arc<str>>,
+    sample_names: Vec<String>,
     read_sample: fn(&[u8], &[u8]) -> io::Result<S>,
 }
 impl<S, B> Iterator for Lines<S, B>
@@ -78,7 +80,7 @@ where
 
 pub(super) fn read_record<S>(
     buf: &mut Vec<u8>,
-    sample_names: &[Arc<str>],
+    sample_names: &[String],
     reader: &mut impl BufRead,
     read_sample: fn(&[u8], &[u8]) -> Result<S, io::Error>,
 ) -> Result<Option<Record<S>>, io::Error> {
