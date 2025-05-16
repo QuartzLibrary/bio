@@ -14,7 +14,7 @@ pub mod resource;
 pub mod simplified;
 
 use either::Either;
-use std::io;
+use std::{cmp::Ordering, io};
 
 use biocore::{
     dna::{DnaBase, DnaSequence},
@@ -23,6 +23,7 @@ use biocore::{
 };
 use utile::{
     io::FromUtf8Bytes,
+    iter::IteratorExt,
     resource::{RawResource, RawResourceExt},
 };
 
@@ -272,6 +273,28 @@ impl Genotype {
             }
         }
     }
+}
+
+pub async fn load_all_simplified() -> (Vec<String>, impl Iterator<Item = SimplifiedRecord>) {
+    fn stage_one(a: &SimplifiedRecord, b: &SimplifiedRecord) -> Ordering {
+        Ord::cmp(&a.at(), &b.at()).then_with(|| Ord::cmp(&a.reference_allele, &b.reference_allele))
+    }
+    fn stage_two(a: &SimplifiedRecord, b: &SimplifiedRecord) -> Ordering {
+        Ord::cmp(&a.at(), &b.at())
+            .then_with(|| Ord::cmp(&a.reference_allele, &b.reference_allele))
+            .then_with(|| Ord::cmp(&a.alternate_allele, &b.alternate_allele))
+    }
+
+    let (sample_names, variants) = load_all().await.unwrap();
+    let sample_names: Vec<_> = sample_names.into_iter().map(|s| s.to_string()).collect();
+
+    let variants = variants
+        .map(|v| v.unwrap()) // TODO
+        .filter_map(|v| v.normalized()) // Drops mutations we don't know the sequence of.
+        .flat_map(|v| v.split()) // Splits multi-allelic variants into separate rows.
+        .map(|v| v.simplified().unwrap()) // Cleaner simplified form given above.
+        .staged_sorted_by(stage_one, stage_two);
+    (sample_names, variants)
 }
 
 pub async fn load_all() -> io::Result<(
