@@ -918,6 +918,7 @@ version = "0.1.0"
 dependencies = [
  "biocore",
  "csv",
+ "either",
  "env_logger",
  "flate2",
  "futures",

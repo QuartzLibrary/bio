@@ -8,6 +8,7 @@ biocore = { path = "../biocore" }
 utile = { path = "../utile" }
 
 csv = "1"
+either = "1"
 flate2 = "1"
 jiff = { version = "0.2", features = ["serde"] }
 log = "0.4"
