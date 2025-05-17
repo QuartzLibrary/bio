@@ -1,5 +1,3 @@
-use crate::io::messagepack_error;
-
 pub struct JsonLinesReader<I, T> {
     iter: I,
     data: Vec<u8>,
@@ -34,9 +32,28 @@ where
                 };
                 self.fill_data_with(item)?;
             }
-            total_read += self.copy_data(&mut buf[total_read..]);
+            total_read += self.read_inner(&mut buf[total_read..]);
         }
         Ok(total_read)
+    }
+}
+impl<I, T> std::io::BufRead for JsonLinesReader<I, T>
+where
+    I: Iterator<Item = T>,
+    T: serde::Serialize,
+{
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        if self.data_left().is_empty() {
+            let Some(item) = self.iter.next() else {
+                return Ok(&[]);
+            };
+            self.fill_data_with(item)?;
+        }
+        Ok(self.data_left())
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.pos += amt;
     }
 }
 impl<I, T> JsonLinesReader<I, T>
@@ -55,7 +72,7 @@ where
         self.pos = 0;
         Ok(())
     }
-    fn copy_data(&mut self, buf: &mut [u8]) -> usize {
+    fn read_inner(&mut self, buf: &mut [u8]) -> usize {
         let data_left = self.data_left();
         let span = std::cmp::min(buf.len(), data_left.len());
         buf[..span].copy_from_slice(&data_left[..span]);
@@ -96,11 +113,30 @@ where
                 let Some(item) = self.iter.next() else {
                     break;
                 };
-                self.fill_data_with(item).map_err(messagepack_error)?;
+                self.fill_data_with(item).map_err(std::io::Error::other)?;
             }
-            total_read += self.copy_data(&mut buf[total_read..]);
+            total_read += self.read_inner(&mut buf[total_read..]);
         }
         Ok(total_read)
+    }
+}
+impl<I, T> std::io::BufRead for MessagePackLinesReader<I, T>
+where
+    I: Iterator<Item = T>,
+    T: serde::Serialize,
+{
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        if self.data_left().is_empty() {
+            let Some(item) = self.iter.next() else {
+                return Ok(&[]);
+            };
+            self.fill_data_with(item).map_err(std::io::Error::other)?;
+        }
+        Ok(self.data_left())
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.pos += amt;
     }
 }
 impl<I, T> MessagePackLinesReader<I, T>
@@ -114,12 +150,12 @@ where
     fn fill_data_with(&mut self, item: T) -> Result<(), rmp_serde::encode::Error> {
         debug_assert_eq!(self.data.len(), self.pos);
         self.data.clear();
-        rmp_serde::encode::write(&mut self.data, &item)?;
+        rmp_serde::encode::write_named(&mut self.data, &item)?;
         self.data.push(b'\n');
         self.pos = 0;
         Ok(())
     }
-    fn copy_data(&mut self, buf: &mut [u8]) -> usize {
+    fn read_inner(&mut self, buf: &mut [u8]) -> usize {
         let data_left = self.data_left();
         let span = std::cmp::min(buf.len(), data_left.len());
         buf[..span].copy_from_slice(&data_left[..span]);

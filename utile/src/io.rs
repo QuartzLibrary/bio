@@ -193,9 +193,6 @@ pub fn reqwest_error(e: reqwest::Error) -> std::io::Error {
     };
     std::io::Error::new(kind, e)
 }
-pub fn messagepack_error(e: rmp_serde::encode::Error) -> std::io::Error {
-    std::io::Error::other(e)
-}
 pub fn utf8_error(type_: &'static str, e: std::str::Utf8Error) -> std::io::Error {
     std::io::Error::new(
         std::io::ErrorKind::InvalidData,
