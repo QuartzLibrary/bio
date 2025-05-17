@@ -422,55 +422,32 @@ impl PhenotypeManifestEntry {
             .into_deserialize()
             .try_collect()
     }
-
-    pub fn passes_qc(&self) -> bool {
-        // Kind of arbitrary, just to shave the number.
-        self.pops_pass_qc.contains(&Population::Eur)
-            && self.n_cases_full_cohort_both_sexes > 100_000
-    }
 }
 
 impl PhenotypeManifestEntry {
-    pub fn get_summary_stats_resource(&self) -> io::Result<PanUKBBS3Resource> {
+    pub fn summary_stats_resource(&self) -> PanUKBBS3Resource {
         let key = format!("sumstats_flat_files/{}", self.filename);
         assert!(self.aws_path.as_str().ends_with(&key));
-        Ok(PanUKBBS3Resource::new(key))
+        PanUKBBS3Resource::new(key)
     }
-    pub async fn get_summary_stats(
+    pub async fn summary_stats_load_default(
         &self,
     ) -> io::Result<impl Iterator<Item = csv::Result<SummaryStats>> + use<>> {
-        let key = format!("sumstats_flat_files/{}", self.filename);
-        assert!(self.aws_path.as_str().ends_with(&key));
-        let resource = PanUKBBS3Resource::new(key.clone())
-            .log_progress()
-            .with_global_fs_cache()
-            .ensure_cached_async()
-            .await?
-            .decompressed()
-            .buffered();
-
-        Ok(csv::ReaderBuilder::new()
-            .delimiter(b'\t')
-            .has_headers(true)
-            .from_reader(resource.read()?)
-            .into_deserialize())
+        SummaryStats::load(
+            self.summary_stats_resource()
+                .log_progress()
+                .with_global_fs_cache()
+                .ensure_cached_async()
+                .await?
+                .decompressed()
+                .buffered(),
+        )
     }
 
-    pub fn get_summary_stats_tabix_resource(&self) -> io::Result<PanUKBBS3Resource> {
-        let key = format!("sumstats_release/{}", self.filename_tabix);
-        assert!(self.aws_path_tabix.as_str().ends_with(&key));
-        Ok(PanUKBBS3Resource::new(key))
-    }
-    pub async fn get_summary_stats_tabix(&self) -> io::Result<Vec<u8>> {
+    pub fn summary_stats_tabix_resource(&self) -> PanUKBBS3Resource {
         let key = format!("sumstats_release/{}", self.filename_tabix);
         assert!(self.aws_path_tabix.as_str().ends_with(&key));
         PanUKBBS3Resource::new(key)
-            .log_progress()
-            .with_global_fs_cache()
-            .ensure_cached_async()
-            .await?
-            .read_vec_async()
-            .await
     }
 }
 
@@ -629,6 +606,14 @@ pub struct SummaryStats {
     pub low_confidence_MID: Option<bool>,
 }
 impl SummaryStats {
+    pub fn load(resource: impl RawResource) -> io::Result<impl Iterator<Item = csv::Result<Self>>> {
+        Ok(csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(resource.read()?)
+            .into_deserialize())
+    }
+
     pub fn at(&self) -> GenomePosition {
         GenomePosition {
             name: self.chr.clone(),
@@ -1008,24 +993,8 @@ mod tests {
 
         println!("Number of phenotypes: {}", result.len());
 
-        // let count = result
-        //     .iter()
-        //     .filter(|e| e.n_cases_full_cohort_both_sexes)
-        //     .count();
-        // println!("count: {count:?}");
-
         let values: BTreeSet<_> = result.iter().map(|e| e.in_max_independent_set).collect();
         println!("{values:?}");
-        println!("{:?}", values.iter().next());
-
-        let values: usize = result.iter().map(|e| e.size_in_bytes).sum();
-        println!("{values:?}");
-
-        // // Log the first few entries for debugging
-        // println!(
-        //     "First entries: {:#?}",
-        //     &result[..std::cmp::min(3, result.len())]
-        // );
     }
 
     #[tokio::test]
@@ -1041,30 +1010,9 @@ mod tests {
         let manifest = PhenotypeManifestEntry::load_default().await.unwrap();
         let entry = manifest.first().unwrap();
 
-        // Only fetch the first few rows to avoid a large download during tests
-        // In a real scenario, you might want to process the stats differently
-        let stats_result = entry.get_summary_stats().await.unwrap();
-
-        // let mut count = 0;
-        // let mut count_beta_meta_hq = 0;
-        // for (i, e) in stats_result.enumerate() {
-        //     if i % 100_000 == 0 {
-        //         println!("{}", i);
-        //     }
-        //     let e = e.unwrap();
-        //     count += 1;
-        //     if e.beta_meta_hq.is_some() {
-        //         count_beta_meta_hq += 1;
-        //     }
-        // }
-
-        // println!("count: {count:?}");
-        // println!("count_beta_meta_hq: {count_beta_meta_hq:?}");
+        let stats_result = entry.summary_stats_load_default().await.unwrap();
 
         let values: BTreeSet<_> = stats_result.map(|e| e.unwrap().chr).collect();
         println!("{values:?}");
-        // println!("{:?}", values.iter().next());
-
-        // println!("{:?} {:?}", stats_result.len(), stats_result.first());
     }
 }
