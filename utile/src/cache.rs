@@ -81,13 +81,19 @@ impl FsCacheEntry {
     }
 
     pub fn write_file(&self, mut data: impl std::io::BufRead) -> std::io::Result<()> {
+        self.write_file_with(|tmp_file| std::io::copy(&mut data, tmp_file).map(drop))
+    }
+    pub fn write_file_with(
+        &self,
+        f: impl FnOnce(&mut tempfile::NamedTempFile) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
         std::fs::create_dir_all(self.path.parent().unwrap())?;
 
         let mut tmp_file = tempfile::Builder::new()
             .prefix("tempfile_")
             .suffix("_utile")
             .tempfile_in(self.path.parent().unwrap())?;
-        std::io::copy(&mut data, &mut tmp_file)?;
+        f(&mut tmp_file)?;
 
         rename_or_copy(tmp_file, self)?;
 
@@ -116,15 +122,13 @@ impl FsCacheEntry {
     }
 
     pub fn write_json<T: serde::Serialize>(&self, data: T) -> std::io::Result<()> {
-        self.write_file(serde_json::to_string(&data)?.as_bytes())
+        self.write_file_with(|file| Ok(serde_json::to_writer(file, &data)?))
     }
     pub fn write_json_lines<T: serde::Serialize>(
         &self,
         data: impl IntoIterator<Item = T>,
     ) -> std::io::Result<()> {
-        self.write_file(io::BufReader::new(crate::jsonl::JsonLinesReader::new(
-            data.into_iter(),
-        )))
+        self.write_file(crate::jsonl::JsonLinesReader::new(data.into_iter()))
     }
 
     /// Unfortunately some sources aren't pure.
