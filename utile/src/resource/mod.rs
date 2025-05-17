@@ -3,6 +3,7 @@
 pub mod buffered;
 pub mod cached;
 pub mod compression;
+pub mod iter;
 pub mod progress;
 pub mod uri;
 

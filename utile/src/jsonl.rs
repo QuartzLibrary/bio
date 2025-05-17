@@ -163,3 +163,28 @@ where
         span
     }
 }
+
+mod boilerplate {
+    use super::*;
+
+    impl<I: std::fmt::Debug, T> std::fmt::Debug for JsonLinesReader<I, T> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("JsonLinesReader")
+                .field("iter", &self.iter)
+                .field("data", &self.data)
+                .field("pos", &self.pos)
+                .field("_marker", &self._marker)
+                .finish()
+        }
+    }
+    impl<I: Clone, T> Clone for JsonLinesReader<I, T> {
+        fn clone(&self) -> Self {
+            Self {
+                iter: self.iter.clone(),
+                data: self.data.clone(),
+                pos: self.pos,
+                _marker: self._marker,
+            }
+        }
+    }
+}
