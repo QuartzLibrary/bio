@@ -25,12 +25,12 @@ impl<R> FsCacheResource<R> {
         }
     }
 
-    pub fn exists(&self) -> std::io::Result<bool> {
-        self.entry.exists()
+    pub fn try_exists(&self) -> std::io::Result<bool> {
+        self.entry.try_exists()
     }
     #[cfg(not(target_arch = "wasm32"))] // TODO
-    pub async fn exists_async(&self) -> std::io::Result<bool> {
-        self.entry.exists_async().await
+    pub async fn try_exists_async(&self) -> std::io::Result<bool> {
+        self.entry.try_exists_async().await
     }
     #[cfg(target_arch = "wasm32")] // TODO
     pub async fn exists_async(&self) -> std::io::Result<bool> {
@@ -64,7 +64,7 @@ impl<R> FsCacheResource<R> {
     where
         R: RawResource,
     {
-        if !self.exists()? {
+        if !self.try_exists()? {
             self.read()?;
         }
         Ok(self.entry.clone())
@@ -74,7 +74,7 @@ impl<R> FsCacheResource<R> {
     where
         R: RawResource,
     {
-        if !self.exists_async().await? {
+        if !self.try_exists_async().await? {
             self.read_async().await?;
         }
         Ok(self.entry.clone())
@@ -118,7 +118,7 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
         }
     }
     fn read(&self) -> std::io::Result<Self::Reader> {
-        if self.exists()? {
+        if self.try_exists()? {
             log::info!("Cache hit at {self}");
             return self.entry.read();
         }
@@ -145,7 +145,7 @@ impl<R: RawResource> RawResource for FsCacheResource<R> {
     }
     #[cfg(not(target_arch = "wasm32"))] // TODO
     async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
-        if self.exists_async().await? {
+        if self.try_exists_async().await? {
             log::info!("Cache hit at {self}");
             return self.entry.read_async().await;
         }
