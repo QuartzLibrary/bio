@@ -72,20 +72,12 @@ impl FsCacheEntry {
         Self { path }
     }
 
-    pub fn exists(&self) -> std::io::Result<bool> {
-        match std::fs::File::open(self) {
-            Ok(_) => Ok(true),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(e),
-        }
+    pub fn try_exists(&self) -> std::io::Result<bool> {
+        self.as_ref().try_exists()
     }
     #[cfg(not(target_arch = "wasm32"))] // TODO
-    pub async fn exists_async(&self) -> std::io::Result<bool> {
-        match tokio::fs::File::open(&self).await {
-            Ok(_) => Ok(true),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(e),
-        }
+    pub async fn try_exists_async(&self) -> std::io::Result<bool> {
+        tokio::fs::try_exists(&self).await
     }
 
     pub fn write_file(&self, mut data: impl std::io::BufRead) -> std::io::Result<()> {
