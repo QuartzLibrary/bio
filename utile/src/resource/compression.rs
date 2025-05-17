@@ -1,3 +1,5 @@
+#![allow(clippy::large_enum_variant)]
+
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -60,6 +62,10 @@ impl<R: RawResource> RawResource for DecompressedResource<R> {
                     ResourceRef::new(&self.resource).buffered().read()?,
                 ),
             )),
+            Some(Compression::Brotli) => Ok(DecompressedReader::Brotli(brotli::Decompressor::new(
+                self.resource.read()?,
+                4096,
+            ))),
         }
     }
 
@@ -84,16 +90,24 @@ impl<R: RawResource> RawResource for DecompressedResource<R> {
                 ),
             )),
             Some(Compression::MultiGzip) => todo!(),
+            Some(Compression::Brotli) => Ok(AsyncDecompressedReader::Brotli(
+                async_compression::tokio::bufread::BrotliDecoder::new(
+                    ResourceRef::new(&self.resource)
+                        .buffered()
+                        .read_async()
+                        .await?,
+                ),
+            )),
         }
     }
 }
 
-#[derive(Debug)]
-pub enum DecompressedReader<R> {
+pub enum DecompressedReader<R: std::io::Read> {
     None(R),
     Gzip(flate2::bufread::GzDecoder<std::io::BufReader<R>>),
     // GzipTrailingGarbage(flate2::bufread::GzDecoder<std::io::BufReader<R>>),
     MultiGzip(flate2::bufread::MultiGzDecoder<std::io::BufReader<R>>),
+    Brotli(brotli::Decompressor<R>),
 }
 impl<R: std::io::Read> std::io::Read for DecompressedReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
@@ -101,6 +115,7 @@ impl<R: std::io::Read> std::io::Read for DecompressedReader<R> {
             Self::None(r) => r.read(buf),
             Self::Gzip(r) => r.read(buf),
             Self::MultiGzip(r) => r.read(buf),
+            Self::Brotli(r) => r.read(buf),
         }
     }
 }
@@ -112,6 +127,7 @@ pub enum AsyncDecompressedReader<R> {
     Gzip(#[pin] async_compression::tokio::bufread::GzipDecoder<tokio::io::BufReader<R>>),
     // // TODO: async multi-gz?
     // MultiGzip(#[pin] async_compression::tokio::bufread::GzipDecoder<tokio::io::BufReader<R>>),
+    Brotli(#[pin] async_compression::tokio::bufread::BrotliDecoder<tokio::io::BufReader<R>>),
 }
 impl<R: tokio::io::AsyncRead> tokio::io::AsyncRead for AsyncDecompressedReader<R> {
     fn poll_read(
@@ -123,6 +139,7 @@ impl<R: tokio::io::AsyncRead> tokio::io::AsyncRead for AsyncDecompressedReader<R
             AsyncDecompressedReaderProj::None(reader) => reader.poll_read(cx, buf),
             AsyncDecompressedReaderProj::Gzip(decoder) => decoder.poll_read(cx, buf),
             // AsyncDecompressedReaderProj::MultiGzip(decoder) => decoder.poll_read(cx, buf),
+            AsyncDecompressedReaderProj::Brotli(decoder) => decoder.poll_read(cx, buf),
         }
     }
 }
@@ -173,6 +190,12 @@ impl<R: RawResource> RawResource for CompressedResource<R> {
                 std::io::ErrorKind::Unsupported,
                 "Multi-gzip compression is not supported.",
             )),
+            Compression::Brotli => Ok(CompressedReader::Brotli(brotli::CompressorReader::new(
+                self.resource.read()?,
+                4096,
+                9,
+                20,
+            ))),
         }
     }
 
@@ -199,18 +222,27 @@ impl<R: RawResource> RawResource for CompressedResource<R> {
                 std::io::ErrorKind::Unsupported,
                 "Multi-gzip compression is not supported.",
             )),
+            Compression::Brotli => Ok(AsyncCompressedReader::Brotli(
+                async_compression::tokio::bufread::BrotliEncoder::new(
+                    ResourceRef::new(&self.resource)
+                        .buffered()
+                        .read_async()
+                        .await?,
+                ),
+            )),
         }
     }
 }
-#[derive(Debug)]
-pub enum CompressedReader<R> {
+pub enum CompressedReader<R: std::io::Read> {
     Gzip(flate2::bufread::GzEncoder<std::io::BufReader<R>>),
     // MultiGzip(flate2::read::GzEncoder<std::io::BufReader<R>>), //
+    Brotli(brotli::CompressorReader<R>),
 }
 impl<R: std::io::Read> std::io::Read for CompressedReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match self {
             Self::Gzip(r) => r.read(buf),
+            Self::Brotli(r) => r.read(buf),
         }
     }
 }
@@ -220,6 +252,7 @@ impl<R: std::io::Read> std::io::Read for CompressedReader<R> {
 pub enum AsyncCompressedReader<R> {
     Gzip(#[pin] async_compression::tokio::bufread::GzipEncoder<tokio::io::BufReader<R>>),
     // MultiGzip(#[pin] async_compression::tokio::bufread::GzipDecoder<tokio::io::BufReader<R>>), //
+    Brotli(#[pin] async_compression::tokio::bufread::BrotliEncoder<tokio::io::BufReader<R>>),
 }
 impl<R: tokio::io::AsyncRead> tokio::io::AsyncRead for AsyncCompressedReader<R> {
     fn poll_read(
@@ -229,6 +262,31 @@ impl<R: tokio::io::AsyncRead> tokio::io::AsyncRead for AsyncCompressedReader<R> 
     ) -> Poll<std::io::Result<()>> {
         match self.project() {
             AsyncCompressedReaderProj::Gzip(reader) => reader.poll_read(cx, buf),
+            AsyncCompressedReaderProj::Brotli(reader) => reader.poll_read(cx, buf),
+        }
+    }
+}
+
+mod boilerplate {
+    use super::*;
+
+    impl<R: std::io::Read + std::fmt::Debug> std::fmt::Debug for DecompressedReader<R> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::None(arg0) => f.debug_tuple("None").field(arg0).finish(),
+                Self::Gzip(arg0) => f.debug_tuple("Gzip").field(arg0).finish(),
+                Self::MultiGzip(arg0) => f.debug_tuple("MultiGzip").field(arg0).finish(),
+                Self::Brotli(_) => f.debug_tuple("Brotli").finish_non_exhaustive(),
+            }
+        }
+    }
+
+    impl<R: std::io::Read + std::fmt::Debug> std::fmt::Debug for CompressedReader<R> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Gzip(arg0) => f.debug_tuple("Gzip").field(arg0).finish(),
+                Self::Brotli(_) => f.debug_tuple("Brotli").finish_non_exhaustive(),
+            }
         }
     }
 }

@@ -123,6 +123,7 @@ pub enum Compression {
     Gzip,
     MultiGzip,
     // TODO: nested
+    Brotli,
 }
 impl Compression {
     pub fn infer_strict(filename: &str) -> Option<Self> {
@@ -130,6 +131,8 @@ impl Compression {
             Some(Self::Gzip)
         } else if filename.ends_with(".bgz") {
             Some(Self::MultiGzip)
+        } else if filename.ends_with(".br") {
+            Some(Self::Brotli)
         } else {
             None
         }
@@ -138,6 +141,8 @@ impl Compression {
         if filename.ends_with(".gz") || filename.ends_with(".bgz") {
             // We default to multi-gzip because it doesn't fail silently.
             Some(Self::MultiGzip)
+        } else if filename.ends_with(".br") {
+            Some(Self::Brotli)
         } else {
             None
         }
@@ -146,6 +151,7 @@ impl Compression {
         match self {
             Self::Gzip => "gz",
             Self::MultiGzip => "bgz",
+            Self::Brotli => "br",
         }
     }
     pub fn trim_extension(self, filename: &str) -> &str {
@@ -154,6 +160,7 @@ impl Compression {
             Compression::MultiGzip => filename
                 .strip_suffix(".bgz")
                 .unwrap_or_else(|| filename.strip_suffix(".gz").unwrap_or(filename)),
+            Compression::Brotli => filename.strip_suffix(".br").unwrap_or(filename),
         }
     }
 }
