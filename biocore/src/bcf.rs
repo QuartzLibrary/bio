@@ -31,11 +31,13 @@ impl<R: Read> IndexedBcfReader<R> {
         &self.header
     }
 
-    pub fn query(&mut self, at: &GenomeRange) -> io::Result<Query<noodles::bgzf::Reader<R>>>
+    pub fn query<C>(&mut self, at: &GenomeRange<C>) -> io::Result<Query<noodles::bgzf::Reader<R>>>
     where
         R: Seek,
+        C: AsRef<str>,
     {
-        let reference_sequence_id = resolve_region(self.header.string_maps().contigs(), &at.name)?;
+        let reference_sequence_id =
+            resolve_region(self.header.string_maps().contigs(), at.name.as_ref())?;
         let chunks = self
             .index
             .query(reference_sequence_id, at.try_into().unwrap())?;
@@ -44,7 +46,7 @@ impl<R: Read> IndexedBcfReader<R> {
             &self.header,
             self.reader.get_mut(),
             chunks,
-            at.name.as_bytes().to_vec(),
+            at.name.as_ref().as_bytes().to_vec(),
             at.at.clone(),
         ))
     }

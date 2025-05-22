@@ -5,12 +5,23 @@ use utile::range::RangeExt;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Serialize, Deserialize)]
-pub struct GenomePosition {
-    pub name: String,
+pub struct GenomePosition<Contig = String> {
+    pub name: Contig,
     pub orientation: SequenceOrientation,
     pub at: u64,
 }
-impl GenomePosition {
+impl<Contig> GenomePosition<Contig> {
+    pub fn map_contig<NewContig>(
+        self,
+        f: impl FnOnce(Contig) -> NewContig,
+    ) -> GenomePosition<NewContig> {
+        GenomePosition {
+            name: f(self.name),
+            at: self.at,
+            orientation: self.orientation,
+        }
+    }
+
     #[track_caller]
     pub fn set_orientation(&mut self, orientation: SequenceOrientation, size: u64) {
         if self.orientation != orientation {
@@ -29,12 +40,12 @@ impl GenomePosition {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct GenomeRange {
-    pub name: String,
+pub struct GenomeRange<Contig = String> {
+    pub name: Contig,
     pub orientation: SequenceOrientation,
     pub at: Range<u64>,
 }
-impl GenomeRange {
+impl<Contig> GenomeRange<Contig> {
     pub fn len(&self) -> u64 {
         let &Range { start, end } = &self.at;
         end.saturating_sub(start)
@@ -42,7 +53,10 @@ impl GenomeRange {
     pub fn is_empty(&self) -> bool {
         self.at.is_empty()
     }
-    pub fn contains(&self, loc: &GenomePosition, size: u64) -> bool {
+    pub fn contains(&self, loc: &GenomePosition<Contig>, size: u64) -> bool
+    where
+        Contig: PartialEq + Clone,
+    {
         self.name == loc.name && {
             let loc = if self.orientation == loc.orientation {
                 loc
@@ -52,7 +66,10 @@ impl GenomeRange {
             self.at.contains(&loc.at)
         }
     }
-    pub fn contains_range(&self, range: &GenomeRange, size: u64) -> bool {
+    pub fn contains_range(&self, range: &Self, size: u64) -> bool
+    where
+        Contig: PartialEq + Clone,
+    {
         self.name == range.name && {
             let range = if self.orientation == range.orientation {
                 range
@@ -63,6 +80,18 @@ impl GenomeRange {
                 && (self.at.contains(&range.at.end) || self.at.end == range.at.end)
         }
     }
+
+    pub fn map_contig<NewContig>(
+        self,
+        f: impl FnOnce(Contig) -> NewContig,
+    ) -> GenomeRange<NewContig> {
+        GenomeRange {
+            name: f(self.name),
+            at: self.at,
+            orientation: self.orientation,
+        }
+    }
+
     #[track_caller]
     pub fn set_orientation(&mut self, orientation: SequenceOrientation, size: u64) {
         if self.orientation != orientation {
@@ -87,7 +116,10 @@ impl GenomeRange {
         }
     }
     /// Preserves the orientation of `self`.
-    pub fn intersect(&self, b: Self, size: u64) -> Option<Self> {
+    pub fn intersect(&self, b: Self, size: u64) -> Option<Self>
+    where
+        Contig: PartialEq,
+    {
         if self.name != b.name {
             return None;
         }
@@ -105,12 +137,29 @@ impl GenomeRange {
         })
     }
 }
-impl PartialOrd for GenomeRange {
+impl<Contig> PartialOrd for GenomeRange<Contig>
+where
+    Contig: PartialOrd,
+{
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(Ord::cmp(self, other))
+        let Self {
+            name: _,
+            at: _,
+            orientation: _,
+        } = self; // Exhaustiveness check
+
+        Some(
+            PartialOrd::partial_cmp(&self.name, &other.name)?
+                .then_with(|| Ord::cmp(&self.orientation, &other.orientation))
+                .then_with(|| Ord::cmp(&self.at.start, &other.at.start))
+                .then_with(|| Ord::cmp(&self.at.end, &other.at.end)),
+        )
     }
 }
-impl Ord for GenomeRange {
+impl<Contig> Ord for GenomeRange<Contig>
+where
+    Contig: Ord,
+{
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let Self {
             name: _,
@@ -172,9 +221,42 @@ impl TryFrom<GenomeRange> for GenomePosition {
 }
 
 mod noodles {
+    use std::{fmt, ops::Range};
+
     use noodles::core::{region::Interval, Position, Region};
 
     use super::{GenomePosition, GenomeRange};
+
+    impl<T: fmt::Display> fmt::Display for GenomePosition<T> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Self {
+                name,
+                orientation,
+                at,
+            } = self;
+            let o = if orientation.is_forward() {
+                ""
+            } else {
+                "(reverse)"
+            };
+            write!(f, "{name}:{at}{o}")
+        }
+    }
+    impl<T: fmt::Display> fmt::Display for GenomeRange<T> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Self {
+                name,
+                orientation,
+                at: Range { start, end },
+            } = self;
+            let o = if orientation.is_forward() {
+                ""
+            } else {
+                "(reverse)"
+            };
+            write!(f, "{name}:{start}..{end}{o}")
+        }
+    }
 
     #[derive(Debug, Clone, thiserror::Error)]
     pub enum GenomeLocationConversionError {
@@ -186,7 +268,10 @@ mod noodles {
         InvalidRange,
     }
 
-    impl TryFrom<GenomeRange> for Region {
+    impl<C> TryFrom<GenomeRange<C>> for Region
+    where
+        C: AsRef<str>,
+    {
         type Error = GenomeLocationConversionError;
 
         fn try_from(
@@ -194,7 +279,7 @@ mod noodles {
                 name,
                 orientation,
                 at,
-            }: GenomeRange,
+            }: GenomeRange<C>,
         ) -> Result<Self, Self::Error> {
             if !orientation.is_forward() {
                 return Err(GenomeLocationConversionError::ReverseOrientation);
@@ -210,31 +295,40 @@ mod noodles {
 
             let start = Position::new(at.start + 1).unwrap();
             let end = Position::new((at.end + 1) - 1).unwrap();
-            Ok(Region::new(name, Interval::from(start..=end)))
+            Ok(Region::new(name.as_ref(), Interval::from(start..=end)))
         }
     }
-    impl TryFrom<GenomePosition> for Region {
+    impl<C> TryFrom<GenomePosition<C>> for Region
+    where
+        C: AsRef<str>,
+    {
         type Error = GenomeLocationConversionError;
 
-        fn try_from(value: GenomePosition) -> Result<Self, Self::Error> {
+        fn try_from(value: GenomePosition<C>) -> Result<Self, Self::Error> {
             if !value.orientation.is_forward() {
                 return Err(GenomeLocationConversionError::ReverseOrientation);
             }
 
             let pos = usize::try_from(value.at).unwrap();
             let pos = Position::new(pos + 1).unwrap();
-            Ok(Region::new(value.name, Interval::from(pos..=pos)))
+            Ok(Region::new(value.name.as_ref(), Interval::from(pos..=pos)))
         }
     }
 
-    impl TryFrom<GenomeRange> for Interval {
+    impl<C> TryFrom<GenomeRange<C>> for Interval
+    where
+        C: AsRef<str>,
+    {
         type Error = GenomeLocationConversionError;
 
-        fn try_from(value: GenomeRange) -> Result<Self, Self::Error> {
+        fn try_from(value: GenomeRange<C>) -> Result<Self, Self::Error> {
             (&value).try_into()
         }
     }
-    impl TryFrom<&GenomeRange> for Interval {
+    impl<C> TryFrom<&GenomeRange<C>> for Interval
+    where
+        C: AsRef<str>,
+    {
         type Error = GenomeLocationConversionError;
 
         fn try_from(
@@ -242,7 +336,7 @@ mod noodles {
                 name: _,
                 orientation: _,
                 at,
-            }: &GenomeRange,
+            }: &GenomeRange<C>,
         ) -> Result<Self, Self::Error> {
             if at.is_empty() {
                 return Err(GenomeLocationConversionError::EmptyRange);

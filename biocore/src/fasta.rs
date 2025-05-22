@@ -18,23 +18,25 @@ impl<R: BufRead> IndexedFastaReader<R> {
         })
     }
 
-    pub fn query_position<C: AsciiChar>(&mut self, loc: &GenomePosition) -> io::Result<Sequence<C>>
+    pub fn query_position<B: AsciiChar>(&mut self, loc: &GenomePosition) -> io::Result<Sequence<B>>
     where
         R: Seek,
     {
         self.query(&loc.clone().into())
     }
 
-    pub fn query<C: AsciiChar>(&mut self, at: &GenomeRange) -> io::Result<Sequence<C>>
+    pub fn query<B, C>(&mut self, at: &GenomeRange<C>) -> io::Result<Sequence<B>>
     where
         R: Seek,
+        B: AsciiChar,
+        C: AsRef<str> + Clone,
     {
         let record = self
             .reader
             .query(&self.index, &at.clone().try_into().unwrap())?;
         let sequence = record.sequence();
         // TODO: avoid clone
-        Sequence::<C>::try_from(sequence.clone()).map_err(Into::into)
+        Sequence::<B>::try_from(sequence.clone()).map_err(Into::into)
     }
 
     pub fn records(&mut self) -> noodles::fasta::reader::Records<'_, R> {
