@@ -9,6 +9,7 @@ categories = ["science"]
 
 [dependencies]
 biocore = { path = "../biocore" }
+hail = { path = "../hail" }
 ids = { path = "../ids" }
 utile = { path = "../utile" }
 

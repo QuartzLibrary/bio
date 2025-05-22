@@ -6,8 +6,9 @@ use biocore::{
     dna::DnaSequence,
     location::{GenomePosition, GenomeRange, SequenceOrientation},
 };
+use hail::contig::GRCh37Contig;
 use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use url::Url;
 
 use utile::resource::{RawResource, RawResourceExt, UrlResource};
@@ -455,10 +456,10 @@ impl PhenotypeManifestEntry {
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
-pub struct SummaryStats {
+pub struct SummaryStats<Contig = GRCh37Contig> {
     // Variant fields
     /// Chromosome of the variant.
-    pub chr: String,
+    pub chr: Contig,
     /// Position of the variant (original is in GRCh37 coordinates).
     pub pos: u64,
     /// Reference allele on the forward strand.
@@ -605,8 +606,11 @@ pub struct SummaryStats {
     #[serde(with = "s::opt", default)]
     pub low_confidence_MID: Option<bool>,
 }
-impl SummaryStats {
-    pub fn load(resource: impl RawResource) -> io::Result<impl Iterator<Item = csv::Result<Self>>> {
+impl<Contig> SummaryStats<Contig> {
+    pub fn load(resource: impl RawResource) -> io::Result<impl Iterator<Item = csv::Result<Self>>>
+    where
+        Contig: DeserializeOwned,
+    {
         Ok(csv::ReaderBuilder::new()
             .delimiter(b'\t')
             .has_headers(true)
@@ -614,18 +618,92 @@ impl SummaryStats {
             .into_deserialize())
     }
 
-    pub fn at(&self) -> GenomePosition {
+    pub fn at(&self) -> GenomePosition<Contig>
+    where
+        Contig: Clone,
+    {
         GenomePosition {
             name: self.chr.clone(),
             orientation: SequenceOrientation::Forward,
             at: self.pos - 1,
         }
     }
-    pub fn at_range(&self) -> GenomeRange {
+    pub fn at_range(&self) -> GenomeRange<Contig>
+    where
+        Contig: Clone,
+    {
         GenomeRange {
             name: self.chr.clone(),
             orientation: SequenceOrientation::Forward,
             at: self.pos - 1..(self.pos - 1 + u64::try_from(self.ref_allele.len()).unwrap()),
+        }
+    }
+
+    pub fn map_contig<NewContig>(
+        self,
+        f: impl FnOnce(Contig) -> NewContig,
+    ) -> SummaryStats<NewContig> {
+        SummaryStats {
+            chr: f(self.chr),
+            pos: self.pos,
+            ref_allele: self.ref_allele,
+            alt: self.alt,
+            af_meta_hq: self.af_meta_hq,
+            af_cases_meta_hq: self.af_cases_meta_hq,
+            af_controls_meta_hq: self.af_controls_meta_hq,
+            beta_meta_hq: self.beta_meta_hq,
+            se_meta_hq: self.se_meta_hq,
+            neglog10_pval_meta_hq: self.neglog10_pval_meta_hq,
+            neglog10_pval_heterogeneity_hq: self.neglog10_pval_heterogeneity_hq,
+            af_meta: self.af_meta,
+            af_cases_meta: self.af_cases_meta,
+            af_controls_meta: self.af_controls_meta,
+            beta_meta: self.beta_meta,
+            se_meta: self.se_meta,
+            neglog10_pval_meta: self.neglog10_pval_meta,
+            neglog10_pval_heterogeneity: self.neglog10_pval_heterogeneity,
+            af_AFR: self.af_AFR,
+            af_AMR: self.af_AMR,
+            af_CSA: self.af_CSA,
+            af_EAS: self.af_EAS,
+            af_EUR: self.af_EUR,
+            af_MID: self.af_MID,
+            af_cases_AFR: self.af_cases_AFR,
+            af_cases_AMR: self.af_cases_AMR,
+            af_cases_CSA: self.af_cases_CSA,
+            af_cases_EAS: self.af_cases_EAS,
+            af_cases_EUR: self.af_cases_EUR,
+            af_cases_MID: self.af_cases_MID,
+            af_controls_AFR: self.af_controls_AFR,
+            af_controls_AMR: self.af_controls_AMR,
+            af_controls_CSA: self.af_controls_CSA,
+            af_controls_EAS: self.af_controls_EAS,
+            af_controls_EUR: self.af_controls_EUR,
+            af_controls_MID: self.af_controls_MID,
+            beta_AFR: self.beta_AFR,
+            beta_AMR: self.beta_AMR,
+            beta_CSA: self.beta_CSA,
+            beta_EAS: self.beta_EAS,
+            beta_EUR: self.beta_EUR,
+            beta_MID: self.beta_MID,
+            se_AFR: self.se_AFR,
+            se_AMR: self.se_AMR,
+            se_CSA: self.se_CSA,
+            se_EAS: self.se_EAS,
+            se_EUR: self.se_EUR,
+            se_MID: self.se_MID,
+            neglog10_pval_AFR: self.neglog10_pval_AFR,
+            neglog10_pval_AMR: self.neglog10_pval_AMR,
+            neglog10_pval_CSA: self.neglog10_pval_CSA,
+            neglog10_pval_EAS: self.neglog10_pval_EAS,
+            neglog10_pval_EUR: self.neglog10_pval_EUR,
+            neglog10_pval_MID: self.neglog10_pval_MID,
+            low_confidence_AFR: self.low_confidence_AFR,
+            low_confidence_AMR: self.low_confidence_AMR,
+            low_confidence_CSA: self.low_confidence_CSA,
+            low_confidence_EAS: self.low_confidence_EAS,
+            low_confidence_EUR: self.low_confidence_EUR,
+            low_confidence_MID: self.low_confidence_MID,
         }
     }
 
@@ -669,7 +747,10 @@ impl SummaryStats {
         Some(-NotNan::from(dosage) * self.beta_meta_hq?)
     }
 
-    pub fn normalised(self, std_dev: NotNan<f64>, std_dev_hq: NotNan<f64>) -> Self {
+    pub fn normalised(self, std_dev: NotNan<f64>, std_dev_hq: NotNan<f64>) -> Self
+    where
+        Contig: Clone,
+    {
         fn normalise(x: Option<NotNan<f64>>, std_dev: NotNan<f64>) -> Option<NotNan<f64>> {
             Some(x? / std_dev)
         }

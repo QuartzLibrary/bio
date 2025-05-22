@@ -1935,6 +1935,7 @@ dependencies = [
  "biocore",
  "csv",
  "flate2",
+ "hail",
  "ids",
  "log",
  "ordered-float",

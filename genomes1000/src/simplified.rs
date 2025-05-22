@@ -1,6 +1,5 @@
 use biocore::{
     dna::DnaSequence,
-    genome::Contig,
     location::{GenomePosition, SequenceOrientation},
 };
 
@@ -20,9 +19,9 @@ pub struct SimplifiedRecord {
 }
 
 impl SimplifiedRecord {
-    pub fn at(&self) -> GenomePosition {
+    pub fn at(&self) -> GenomePosition<GRCh38Contig> {
         GenomePosition {
-            name: self.contig.name().to_owned(),
+            name: self.contig,
             orientation: SequenceOrientation::Forward,
             at: self.position - 1,
         }

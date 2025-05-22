@@ -18,7 +18,6 @@ use std::{cmp::Ordering, io};
 
 use biocore::{
     dna::{DnaBase, DnaSequence},
-    genome::Contig,
     location::{GenomePosition, SequenceOrientation},
 };
 use utile::{
@@ -119,9 +118,9 @@ pub struct ExtendedSample<GT> {
     SB: Option<Vec<u64>>,
 }
 impl<S> Record<S> {
-    pub fn at(&self) -> GenomePosition {
+    pub fn at(&self) -> GenomePosition<GRCh38Contig> {
         GenomePosition {
-            name: self.contig.name().to_owned(),
+            name: self.contig,
             orientation: SequenceOrientation::Forward,
             at: self.position - 1,
         }
