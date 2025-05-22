@@ -1,4 +1,3 @@
-pub trait Contig {
-    fn name(&self) -> &str;
+pub trait Contig: AsRef<str> {
     fn size(&self) -> u64;
 }

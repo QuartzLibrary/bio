@@ -1,5 +1,6 @@
 use std::{
     borrow::Borrow,
+    cmp::Ordering,
     fmt::{self, Display},
     str::FromStr,
 };
@@ -12,9 +13,19 @@ use biocore::genome::Contig;
 mod grch37_meta;
 mod grch38_meta;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GRCh38Contig {
     contig: &'static str,
+}
+impl PartialOrd for GRCh38Contig {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for GRCh38Contig {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Ord::cmp(&self.meta().ord, &other.meta().ord)
+    }
 }
 impl GRCh38Contig {
     pub const CHR1: Self = Self { contig: "chr1" };
@@ -39,9 +50,9 @@ impl GRCh38Contig {
     pub const CHR20: Self = Self { contig: "chr20" };
     pub const CHR21: Self = Self { contig: "chr21" };
     pub const CHR22: Self = Self { contig: "chr22" };
-    pub const MT: Self = Self { contig: "chrM" };
     pub const X: Self = Self { contig: "chrX" };
     pub const Y: Self = Self { contig: "chrY" };
+    pub const MT: Self = Self { contig: "chrM" };
 
     pub fn new(v: &str) -> Option<Self> {
         let contig = grch38_meta::META.get_entry(v)?.0;
@@ -50,11 +61,20 @@ impl GRCh38Contig {
     pub fn new_chr(number: usize) -> Option<Self> {
         Self::new(&format!("chr{number}"))
     }
+    pub fn static_value(self) -> &'static str {
+        self.contig
+    }
 
-    // Note that these are intentionally ordered as if they were strings,
-    // to maintain maximum compatibility with string representations.
     pub const CHROMOSOMES: [Self; 25] = [
         Self::CHR1,
+        Self::CHR2,
+        Self::CHR3,
+        Self::CHR4,
+        Self::CHR5,
+        Self::CHR6,
+        Self::CHR7,
+        Self::CHR8,
+        Self::CHR9,
         Self::CHR10,
         Self::CHR11,
         Self::CHR12,
@@ -65,20 +85,12 @@ impl GRCh38Contig {
         Self::CHR17,
         Self::CHR18,
         Self::CHR19,
-        Self::CHR2,
         Self::CHR20,
         Self::CHR21,
         Self::CHR22,
-        Self::CHR3,
-        Self::CHR4,
-        Self::CHR5,
-        Self::CHR6,
-        Self::CHR7,
-        Self::CHR8,
-        Self::CHR9,
-        Self::MT,
         Self::X,
         Self::Y,
+        Self::MT,
     ];
 
     pub fn is_other(self) -> bool {
@@ -133,13 +145,14 @@ impl GRCh38Contig {
     fn new_from_bytes(bytes: &[u8]) -> Option<Self> {
         Self::new(bytes.as_ascii()?.as_str())
     }
+
+    fn meta(self) -> &'static grch38_meta::ContigMeta {
+        &grch38_meta::META[self.contig]
+    }
 }
 impl Contig for GRCh38Contig {
-    fn name(&self) -> &str {
-        self.contig
-    }
     fn size(&self) -> u64 {
-        grch38_meta::META[self.contig]
+        self.meta().len
     }
 }
 impl Display for GRCh38Contig {
@@ -213,7 +226,7 @@ impl<'de> Deserialize<'de> for GRCh38Contig {
             type Value = GRCh38Contig;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a string")
+                formatter.write_str("a GRCh38 contig")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -227,9 +240,19 @@ impl<'de> Deserialize<'de> for GRCh38Contig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GRCh37Contig {
     contig: &'static str,
+}
+impl PartialOrd for GRCh37Contig {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for GRCh37Contig {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Ord::cmp(&self.meta().ord, &other.meta().ord)
+    }
 }
 impl GRCh37Contig {
     pub const CHR1: Self = Self { contig: "1" };
@@ -254,9 +277,9 @@ impl GRCh37Contig {
     pub const CHR20: Self = Self { contig: "20" };
     pub const CHR21: Self = Self { contig: "21" };
     pub const CHR22: Self = Self { contig: "22" };
-    pub const MT: Self = Self { contig: "MT" };
     pub const X: Self = Self { contig: "X" };
     pub const Y: Self = Self { contig: "Y" };
+    pub const MT: Self = Self { contig: "MT" };
 
     pub fn new(v: &str) -> Option<Self> {
         let contig = grch37_meta::META.get_entry(v)?.0;
@@ -266,10 +289,16 @@ impl GRCh37Contig {
         Self::new(&format!("chr{number}"))
     }
 
-    // Note that these are intentionally ordered as if they were strings,
-    // to maintain maximum compatibility with string representations.
     pub const CHROMOSOMES: [Self; 25] = [
         Self::CHR1,
+        Self::CHR2,
+        Self::CHR3,
+        Self::CHR4,
+        Self::CHR5,
+        Self::CHR6,
+        Self::CHR7,
+        Self::CHR8,
+        Self::CHR9,
         Self::CHR10,
         Self::CHR11,
         Self::CHR12,
@@ -280,20 +309,12 @@ impl GRCh37Contig {
         Self::CHR17,
         Self::CHR18,
         Self::CHR19,
-        Self::CHR2,
         Self::CHR20,
         Self::CHR21,
         Self::CHR22,
-        Self::CHR3,
-        Self::CHR4,
-        Self::CHR5,
-        Self::CHR6,
-        Self::CHR7,
-        Self::CHR8,
-        Self::CHR9,
-        Self::MT,
         Self::X,
         Self::Y,
+        Self::MT,
     ];
 
     pub fn is_other(self) -> bool {
@@ -329,13 +350,14 @@ impl GRCh37Contig {
     fn new_from_bytes(bytes: &[u8]) -> Option<Self> {
         Self::new(bytes.as_ascii()?.as_str())
     }
+
+    fn meta(self) -> &'static grch37_meta::ContigMeta {
+        &grch37_meta::META[self.contig]
+    }
 }
 impl Contig for GRCh37Contig {
-    fn name(&self) -> &str {
-        self.contig
-    }
     fn size(&self) -> u64 {
-        grch37_meta::META[self.contig]
+        self.meta().len
     }
 }
 impl Display for GRCh37Contig {
@@ -409,7 +431,7 @@ impl<'de> Deserialize<'de> for GRCh37Contig {
             type Value = GRCh37Contig;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a string")
+                formatter.write_str("a GRCh37 contig")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -420,5 +442,20 @@ impl<'de> Deserialize<'de> for GRCh37Contig {
             }
         }
         deserializer.deserialize_str(Visitor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_grch38_contig_chromosomes_sorted() {
+        assert!(GRCh38Contig::CHROMOSOMES.iter().is_sorted());
+    }
+
+    #[test]
+    fn test_grch37_contig_chromosomes_sorted() {
+        assert!(GRCh37Contig::CHROMOSOMES.iter().is_sorted());
     }
 }
