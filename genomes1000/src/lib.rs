@@ -372,7 +372,18 @@ pub async fn load_pedigree(resource: impl RawResource) -> io::Result<Vec<Pedigre
         .delimiter(b' ')
         .from_reader(resource.read()?)
         .into_deserialize()
-        .try_collect()?)
+        .try_collect::<Vec<_>>()?
+        .into_iter()
+        .map(|mut p: Pedigree| {
+            // "Based on these thresholds, two individuals, NA21310 and HG02300,
+            // were listed as males, but had genotypes consistent with females"
+            // https://www.biorxiv.org/content/10.1101/078600v1.full.pdf
+            if p.id == "NA21310" || p.id == "HG02300" {
+                p.sex = pedigree::Sex::Female;
+            }
+            p
+        })
+        .collect())
 }
 
 /// The fasta reader should be decompressed.
