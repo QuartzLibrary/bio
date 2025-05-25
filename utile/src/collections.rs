@@ -1,10 +1,13 @@
 pub mod counting_set {
+    use serde::{Deserialize, Serialize};
     use std::{
         collections::{BTreeMap, HashMap},
         hash::Hash,
     };
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(transparent)]
+    #[serde(bound(deserialize = "T: Deserialize<'de> + Hash + Eq"))]
     pub struct CountingHashSet<T>(HashMap<T, usize>);
     impl<T> Default for CountingHashSet<T> {
         fn default() -> Self {
@@ -115,7 +118,9 @@ pub mod counting_set {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+    #[serde(transparent)]
+    #[serde(bound(deserialize = "T: Deserialize<'de> + Ord"))]
     pub struct CountingBTreeSet<T>(BTreeMap<T, usize>);
     impl<T> Default for CountingBTreeSet<T> {
         fn default() -> Self {
