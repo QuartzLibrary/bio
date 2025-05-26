@@ -11,14 +11,14 @@ use crate::location::GenomeRange;
 
 pub struct IndexedBcfReader<R> {
     header: noodles::vcf::Header,
-    reader: noodles::bcf::io::Reader<noodles::bgzf::Reader<R>>,
+    reader: noodles::bcf::io::Reader<noodles::bgzf::io::Reader<R>>,
     index: noodles::csi::Index,
 }
 impl<R: Read> IndexedBcfReader<R> {
     pub fn new(reader: R, index: impl Read) -> io::Result<Self> {
         let mut reader = noodles::bcf::io::Reader::new(reader);
         let header = reader.read_header()?;
-        let index = noodles::csi::Reader::new(index).read_index().unwrap();
+        let index = noodles::csi::io::Reader::new(index).read_index().unwrap();
 
         Ok(Self {
             header,
@@ -31,7 +31,10 @@ impl<R: Read> IndexedBcfReader<R> {
         &self.header
     }
 
-    pub fn query<C>(&mut self, at: &GenomeRange<C>) -> io::Result<Query<noodles::bgzf::Reader<R>>>
+    pub fn query<C>(
+        &mut self,
+        at: &GenomeRange<C>,
+    ) -> io::Result<Query<noodles::bgzf::io::Reader<R>>>
     where
         R: Seek,
         C: AsRef<str>,

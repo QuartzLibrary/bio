@@ -3398,7 +3398,7 @@ mod tests {
             .decompressed()
             .buffered();
 
-        let mut reader = noodles::fasta::Reader::new(resource.read().unwrap());
+        let mut reader = noodles::fasta::io::Reader::new(resource.read().unwrap());
 
         for (ord, record) in reader.records().enumerate() {
             let record = record.unwrap();
@@ -3432,7 +3432,7 @@ mod tests {
             .unwrap()
             .decompressed()
             .buffered();
-        let mut reader = noodles::fasta::Reader::new(resource.read().unwrap());
+        let mut reader = noodles::fasta::io::Reader::new(resource.read().unwrap());
 
         for (ord, record) in reader.records().enumerate() {
             let record = record.unwrap();

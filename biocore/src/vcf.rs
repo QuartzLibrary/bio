@@ -10,16 +10,16 @@ use crate::location::GenomeRange;
 
 pub struct IndexedVcfReader<R> {
     header: noodles::vcf::Header,
-    reader: noodles::vcf::io::Reader<noodles::bgzf::Reader<R>>,
+    reader: noodles::vcf::io::Reader<noodles::bgzf::io::Reader<R>>,
     index: noodles::tabix::Index,
 }
 impl<R: Read> IndexedVcfReader<R> {
     pub fn new(reader: R, index: impl Read) -> io::Result<Self> {
-        let mut reader = noodles::vcf::io::Reader::new(noodles::bgzf::Reader::new(reader));
+        let mut reader = noodles::vcf::io::Reader::new(noodles::bgzf::io::Reader::new(reader));
         log::info!("reading header");
         let header = reader.read_header()?;
         log::info!("reading index");
-        let index = noodles::tabix::Reader::new(index).read_index()?;
+        let index = noodles::tabix::io::Reader::new(index).read_index()?;
         log::info!("done");
         Ok(Self {
             header,
@@ -32,7 +32,10 @@ impl<R: Read> IndexedVcfReader<R> {
         &self.header
     }
 
-    pub fn query<C>(&mut self, at: &GenomeRange<C>) -> io::Result<Query<noodles::bgzf::Reader<R>>>
+    pub fn query<C>(
+        &mut self,
+        at: &GenomeRange<C>,
+    ) -> io::Result<Query<noodles::bgzf::io::Reader<R>>>
     where
         R: Seek,
         C: AsRef<str>,

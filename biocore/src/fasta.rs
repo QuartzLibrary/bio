@@ -1,20 +1,22 @@
 use std::io::{self, BufRead, Seek};
 
+use noodles::fasta::io::{reader::Records, Reader};
+
 use crate::{
     location::{GenomePosition, GenomeRange},
     sequence::{AsciiChar, Sequence},
 };
 
 pub struct IndexedFastaReader<R> {
-    reader: noodles::fasta::Reader<R>,
+    reader: Reader<R>,
     index: noodles::fasta::fai::Index,
 }
 
 impl<R: BufRead> IndexedFastaReader<R> {
     pub fn new(reader: R, index: impl BufRead) -> io::Result<Self> {
         Ok(Self {
-            reader: noodles::fasta::Reader::new(reader),
-            index: noodles::fasta::fai::Reader::new(index).read_index()?,
+            reader: Reader::new(reader),
+            index: noodles::fasta::fai::io::Reader::new(index).read_index()?,
         })
     }
 
@@ -39,7 +41,7 @@ impl<R: BufRead> IndexedFastaReader<R> {
         Sequence::<B>::try_from(sequence.clone()).map_err(Into::into)
     }
 
-    pub fn records(&mut self) -> noodles::fasta::reader::Records<'_, R> {
+    pub fn records(&mut self) -> Records<'_, R> {
         self.reader.records()
     }
 
@@ -52,7 +54,7 @@ impl<R: BufRead> IndexedFastaReader<R> {
 }
 
 pub struct IntoRecords<R> {
-    inner: noodles::fasta::Reader<R>,
+    inner: Reader<R>,
     line_buf: String,
 }
 impl<R> Iterator for IntoRecords<R>
