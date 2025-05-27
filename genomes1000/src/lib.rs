@@ -14,13 +14,15 @@ pub mod resource;
 pub mod simplified;
 
 use either::Either;
-use std::{cmp::Ordering, io};
+use std::{cmp::Ordering, collections::BTreeMap, io};
 
 use biocore::{
     dna::{DnaBase, DnaSequence},
-    location::{GenomePosition, SequenceOrientation},
+    location::{GenomePosition, GenomeRange, SequenceOrientation},
+    vcf::IndexedVcfReader,
 };
 use utile::{
+    cache::FsCache,
     io::FromUtf8Bytes,
     iter::IteratorExt,
     resource::{RawResource, RawResourceExt},
@@ -274,16 +276,102 @@ impl Genotype {
     }
 }
 
-pub async fn load_all_simplified() -> (Vec<String>, impl Iterator<Item = SimplifiedRecord>) {
-    fn stage_one(a: &SimplifiedRecord, b: &SimplifiedRecord) -> Ordering {
-        Ord::cmp(&a.at(), &b.at()).then_with(|| Ord::cmp(&a.reference_allele, &b.reference_allele))
-    }
-    fn stage_two(a: &SimplifiedRecord, b: &SimplifiedRecord) -> Ordering {
-        Ord::cmp(&a.at(), &b.at())
-            .then_with(|| Ord::cmp(&a.reference_allele, &b.reference_allele))
-            .then_with(|| Ord::cmp(&a.alternate_allele, &b.alternate_allele))
-    }
+#[derive(Debug)]
+pub struct Genomes1000Fs {
+    sample_names: Vec<String>,
+    readers: BTreeMap<GRCh38Contig, IndexedVcfReader<std::fs::File>>,
+}
 
+impl Genomes1000Fs {
+    pub async fn new() -> io::Result<Self> {
+        Self::new_with_cache(&FsCache::global()).await
+    }
+    pub async fn new_with_cache(cache: &FsCache) -> io::Result<Self> {
+        let mut sample_names = None;
+
+        let mut readers = BTreeMap::new();
+        for contig in GRCh38Contig::CHROMOSOMES {
+            let data = Genomes1000Resource::high_coverage_genotypes_contig_vcf(contig)
+                .log_progress()
+                .with_fs_cache(cache)
+                .ensure_cached_async()
+                .await?;
+
+            let index = Genomes1000Resource::high_coverage_genotypes_contig_vcf_index(contig)
+                .log_progress()
+                .with_fs_cache(cache)
+                .ensure_cached_async()
+                .await?
+                .decompressed();
+
+            let reader = IndexedVcfReader::new(data.read()?, index.read()?)?;
+            let names: Vec<_> = reader.header().sample_names().clone().into_iter().collect();
+
+            if let Some(sample_names) = &sample_names {
+                assert_eq!(sample_names, &names);
+            } else {
+                sample_names = Some(names);
+            }
+
+            readers.insert(contig, IndexedVcfReader::new(data.read()?, index.read()?)?);
+        }
+
+        Ok(Self {
+            sample_names: sample_names.unwrap(),
+            readers,
+        })
+    }
+    pub fn query(
+        &mut self,
+        at: &GenomeRange<GRCh38Contig>,
+    ) -> io::Result<impl Iterator<Item = io::Result<Record<Genotype>>> + use<'_>> {
+        let entry_c = if at.name.is_core() {
+            at.name
+        } else {
+            GRCh38Contig::MT
+        };
+
+        let sample_count = self.sample_names.len();
+        let reader = self.readers.get_mut(&entry_c).unwrap();
+
+        let mut buf = vec![];
+        let read_sample = sample_reading_function(entry_c);
+
+        Ok(reader.query_raw(at)?.map(move |r| {
+            let r = r?;
+            Ok(parse::read_record(
+                &mut buf,
+                sample_count,
+                &mut std::io::Cursor::new(r),
+                read_sample,
+            )?
+            .unwrap())
+        }))
+    }
+    pub fn query_simplified(
+        &mut self,
+        at: &GenomeRange<GRCh38Contig>,
+    ) -> io::Result<impl Iterator<Item = SimplifiedRecord> + use<'_>> {
+        Ok(self
+            .query(at)?
+            .filter_map(|r: io::Result<Record<Genotype>>| match r {
+                Ok(r) => Some(Ok(r.normalized()?)),
+                Err(e) => Some(Err(e)),
+            })
+            .flat_map(|r: io::Result<Record<Genotype>>| match r {
+                Ok(r) => Either::Left(r.split().map(Ok)),
+                Err(e) => Either::Right([Err(e)].into_iter()),
+            })
+            .filter_map(|r: io::Result<Record<Genotype>>| match r {
+                Ok(r) => Some(Ok(r.simplified()?)),
+                Err(e) => Some(Err(e)),
+            })
+            .map(|r| r.unwrap()) // TODO
+            .staged_sorted_by(simplified_stage_one, simplified_stage_two))
+    }
+}
+
+pub async fn load_all_simplified() -> (Vec<String>, impl Iterator<Item = SimplifiedRecord>) {
     let (sample_names, variants) = load_all().await.unwrap();
     let sample_names: Vec<_> = sample_names.into_iter().map(|s| s.to_string()).collect();
 
@@ -291,8 +379,8 @@ pub async fn load_all_simplified() -> (Vec<String>, impl Iterator<Item = Simplif
         .map(|v| v.unwrap()) // TODO
         .filter_map(|v| v.normalized()) // Drops mutations we don't know the sequence of.
         .flat_map(|v| v.split()) // Splits multi-allelic variants into separate rows.
-        .map(|v| v.simplified().unwrap()) // Cleaner simplified form given above.
-        .staged_sorted_by(stage_one, stage_two);
+        .map(|v| v.simplified().unwrap()) // Cleaner simplified form given above. (TODO unwrap)
+        .staged_sorted_by(simplified_stage_one, simplified_stage_two);
     (sample_names, variants)
 }
 
@@ -331,40 +419,7 @@ pub async fn load_contig(
         .decompressed()
         .buffered();
 
-    parse::parse(
-        resource.read()?,
-        match c {
-            GRCh38Contig::CHR1
-            | GRCh38Contig::CHR2
-            | GRCh38Contig::CHR3
-            | GRCh38Contig::CHR4
-            | GRCh38Contig::CHR5
-            | GRCh38Contig::CHR6
-            | GRCh38Contig::CHR7
-            | GRCh38Contig::CHR8
-            | GRCh38Contig::CHR9
-            | GRCh38Contig::CHR10
-            | GRCh38Contig::CHR11
-            | GRCh38Contig::CHR12
-            | GRCh38Contig::CHR13
-            | GRCh38Contig::CHR14
-            | GRCh38Contig::CHR15
-            | GRCh38Contig::CHR16
-            | GRCh38Contig::CHR17
-            | GRCh38Contig::CHR18
-            | GRCh38Contig::CHR19
-            | GRCh38Contig::CHR20
-            | GRCh38Contig::CHR21
-            | GRCh38Contig::CHR22 => |_, buf| DiploidGenotype::from_bytes(buf).map(Genotype::from),
-            GRCh38Contig::X => |_, buf| Genotype::from_bytes(buf),
-            GRCh38Contig::Y => |format, buf| {
-                ExtendedSample::<HaploidGenotype>::from_bytes(format, buf).map(Genotype::from)
-            },
-            _ => |format, buf| {
-                ExtendedSample::<Genotype>::from_bytes(format, buf).map(Genotype::from)
-            },
-        },
-    )
+    parse::parse(resource.read()?, sample_reading_function(c))
 }
 
 pub async fn load_pedigree(resource: impl RawResource) -> io::Result<Vec<Pedigree>> {
@@ -410,6 +465,47 @@ where
     <F as RawResource>::Reader: std::io::BufRead,
 {
     biocore::fasta::IndexedFastaReader::new(fasta.read()?, index.decompressed().buffered().read()?)
+}
+
+fn simplified_stage_one(a: &SimplifiedRecord, b: &SimplifiedRecord) -> Ordering {
+    Ord::cmp(&a.at(), &b.at()).then_with(|| Ord::cmp(&a.reference_allele, &b.reference_allele))
+}
+fn simplified_stage_two(a: &SimplifiedRecord, b: &SimplifiedRecord) -> Ordering {
+    Ord::cmp(&a.at(), &b.at())
+        .then_with(|| Ord::cmp(&a.reference_allele, &b.reference_allele))
+        .then_with(|| Ord::cmp(&a.alternate_allele, &b.alternate_allele))
+}
+
+fn sample_reading_function(contig: GRCh38Contig) -> fn(&[u8], &[u8]) -> io::Result<Genotype> {
+    match contig {
+        GRCh38Contig::CHR1
+        | GRCh38Contig::CHR2
+        | GRCh38Contig::CHR3
+        | GRCh38Contig::CHR4
+        | GRCh38Contig::CHR5
+        | GRCh38Contig::CHR6
+        | GRCh38Contig::CHR7
+        | GRCh38Contig::CHR8
+        | GRCh38Contig::CHR9
+        | GRCh38Contig::CHR10
+        | GRCh38Contig::CHR11
+        | GRCh38Contig::CHR12
+        | GRCh38Contig::CHR13
+        | GRCh38Contig::CHR14
+        | GRCh38Contig::CHR15
+        | GRCh38Contig::CHR16
+        | GRCh38Contig::CHR17
+        | GRCh38Contig::CHR18
+        | GRCh38Contig::CHR19
+        | GRCh38Contig::CHR20
+        | GRCh38Contig::CHR21
+        | GRCh38Contig::CHR22 => |_, buf| DiploidGenotype::from_bytes(buf).map(Genotype::from),
+        GRCh38Contig::X => |_, buf| Genotype::from_bytes(buf),
+        GRCh38Contig::Y => |format, buf| {
+            ExtendedSample::<HaploidGenotype>::from_bytes(format, buf).map(Genotype::from)
+        },
+        _ => |format, buf| ExtendedSample::<Genotype>::from_bytes(format, buf).map(Genotype::from),
+    }
 }
 
 mod boilerplate {

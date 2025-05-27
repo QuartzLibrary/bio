@@ -16,13 +16,14 @@ pub(super) fn parse<S>(
 ) -> io::Result<(Vec<String>, Lines<S, impl BufRead>)> {
     let mut reader = comments::skip(reader)?;
     let sample_names = read_header(&mut reader)?;
+    let sample_count = sample_names.len();
 
     Ok((
-        sample_names.clone(),
+        sample_names,
         Lines {
             buf: vec![],
             inner: reader,
-            sample_names,
+            sample_count,
             read_sample,
         },
     ))
@@ -55,7 +56,7 @@ pub(super) fn read_header(reader: &mut impl BufRead) -> Result<Vec<String>, io::
 pub(super) struct Lines<S, B> {
     buf: Vec<u8>,
     inner: B,
-    sample_names: Vec<String>,
+    sample_count: usize,
     read_sample: fn(&[u8], &[u8]) -> io::Result<S>,
 }
 impl<S, B> Iterator for Lines<S, B>
@@ -67,7 +68,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         match read_record(
             &mut self.buf,
-            &self.sample_names,
+            self.sample_count,
             &mut self.inner,
             self.read_sample,
         ) {
@@ -80,11 +81,11 @@ where
 
 pub(super) fn read_record<S>(
     buf: &mut Vec<u8>,
-    sample_names: &[String],
+    sample_count: usize,
     reader: &mut impl BufRead,
-    read_sample: fn(&[u8], &[u8]) -> Result<S, io::Error>,
-) -> Result<Option<Record<S>>, io::Error> {
-    fn take_string(buf: &mut Vec<u8>, reader: &mut impl BufRead) -> Result<String, io::Error> {
+    read_sample: fn(&[u8], &[u8]) -> io::Result<S>,
+) -> io::Result<Option<Record<S>>> {
+    fn take_string(buf: &mut Vec<u8>, reader: &mut impl BufRead) -> io::Result<String> {
         buf.clear();
         reader.read_until(b'\t', buf)?;
         let buf = &buf[..buf.len() - 1];
@@ -149,27 +150,9 @@ pub(super) fn read_record<S>(
     let info = take_string(buf, reader)?;
     let format = take_string(buf, reader)?;
 
-    let mut samples = Vec::with_capacity(sample_names.len());
-
-    for _ in 0..sample_names.len() - 1 {
-        buf.clear();
-        reader.read_until(b'\t', buf)?;
-        let buf = &buf[..buf.len() - 1];
-        samples.push(read_sample(format.as_bytes(), buf)?);
-    }
-
-    {
-        buf.clear();
-        reader.read_until(b'\n', buf)?;
-        let mut buf = &**buf;
-        if buf.last() == Some(&b'\n') {
-            buf = &buf[..buf.len() - 1];
-        }
-        if buf.last() == Some(&b'\r') {
-            buf = &buf[..buf.len() - 1];
-        }
-        samples.push(read_sample(format.as_bytes(), buf)?);
-    }
+    let samples = read_samples(buf, sample_count, reader, |buf| {
+        read_sample(format.as_bytes(), buf)
+    })?;
 
     Ok(Some(Record {
         contig,
@@ -183,6 +166,42 @@ pub(super) fn read_record<S>(
         format,
         samples,
     }))
+}
+
+fn read_samples<S>(
+    buf: &mut Vec<u8>,
+    count: usize,
+    reader: &mut impl BufRead,
+    read_sample: impl Fn(&[u8]) -> io::Result<S>,
+) -> io::Result<Vec<S>> {
+    if count == 0 {
+        reader.read_until(b'\n', buf)?;
+        return Ok(vec![]);
+    }
+
+    let mut samples = Vec::with_capacity(count);
+
+    for _ in 0..count - 1 {
+        buf.clear();
+        reader.read_until(b'\t', buf)?;
+        let buf = &buf[..buf.len() - 1];
+        samples.push(read_sample(buf)?);
+    }
+
+    {
+        buf.clear();
+        reader.read_until(b'\n', buf)?;
+        let mut buf = &**buf;
+        if buf.last() == Some(&b'\n') {
+            buf = &buf[..buf.len() - 1];
+        }
+        if buf.last() == Some(&b'\r') {
+            buf = &buf[..buf.len() - 1];
+        }
+        samples.push(read_sample(buf)?);
+    }
+
+    Ok(samples)
 }
 
 mod ysample {

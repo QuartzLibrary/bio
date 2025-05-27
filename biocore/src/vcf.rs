@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Read, Seek},
+    io::{self, BufRead, Read, Seek},
     ops::Range,
 };
 
@@ -16,11 +16,8 @@ pub struct IndexedVcfReader<R> {
 impl<R: Read> IndexedVcfReader<R> {
     pub fn new(reader: R, index: impl Read) -> io::Result<Self> {
         let mut reader = noodles::vcf::io::Reader::new(noodles::bgzf::io::Reader::new(reader));
-        log::info!("reading header");
         let header = reader.read_header()?;
-        log::info!("reading index");
         let index = noodles::tabix::io::Reader::new(index).read_index()?;
-        log::info!("done");
         Ok(Self {
             header,
             reader,
@@ -48,6 +45,29 @@ impl<R: Read> IndexedVcfReader<R> {
             .query(reference_sequence_id, at.try_into().unwrap())?;
 
         Ok(Query::new(
+            self.reader.get_mut(),
+            chunks,
+            reference_sequence_name,
+            at.at.clone(),
+        ))
+    }
+
+    pub fn query_raw<C>(
+        &mut self,
+        at: &GenomeRange<C>,
+    ) -> io::Result<QueryRaw<noodles::bgzf::io::Reader<R>>>
+    where
+        R: Seek,
+        C: AsRef<str>,
+    {
+        let reference_sequence_name = at.name.as_ref().as_bytes().to_vec();
+
+        let reference_sequence_id = resolve_region(&self.index, at.name.as_ref())?;
+        let chunks = self
+            .index
+            .query(reference_sequence_id, at.try_into().unwrap())?;
+
+        Ok(QueryRaw::new(
             self.reader.get_mut(),
             chunks,
             reference_sequence_name,
@@ -124,6 +144,66 @@ where
         }
     }
 }
+
+pub struct QueryRaw<'r, R> {
+    reader: noodles::vcf::io::Reader<noodles::csi::io::Query<'r, R>>,
+    record: Vec<u8>,
+
+    reference_sequence_name: Vec<u8>,
+    range: Range<u64>,
+}
+
+impl<'r, R> QueryRaw<'r, R>
+where
+    R: noodles::bgzf::io::BufRead + noodles::bgzf::io::Seek,
+{
+    pub(super) fn new(
+        reader: &'r mut R,
+        chunks: Vec<noodles::csi::binning_index::index::reference_sequence::bin::Chunk>,
+        reference_sequence_name: Vec<u8>,
+        range: Range<u64>,
+    ) -> Self {
+        Self {
+            reader: noodles::vcf::io::Reader::new(noodles::csi::io::Query::new(reader, chunks)),
+            reference_sequence_name,
+            range,
+            record: vec![],
+        }
+    }
+}
+impl<R> Iterator for QueryRaw<'_, R>
+where
+    R: noodles::bgzf::io::BufRead + noodles::bgzf::io::Seek,
+{
+    type Item = io::Result<Vec<u8>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            self.record.clear();
+
+            let read = self.reader.get_mut().read_until(b'\n', &mut self.record);
+
+            match read {
+                Ok(0) => return None,
+                Ok(_) => {}
+                Err(e) => return Some(Err(e)),
+            };
+
+            // TODO: avoid parsing here to intersect.
+            let record = match noodles::vcf::Record::try_from(&*self.record) {
+                Ok(record) => record,
+                Err(e) => return Some(Err(e)),
+            };
+
+            match intersects(&record, &self.reference_sequence_name, &self.range) {
+                Ok(false) => continue,
+                Ok(true) => return Some(Ok(self.record.clone())),
+                Err(e) => return Some(Err(e)),
+            }
+        }
+    }
+}
+
 fn intersects(
     record: &noodles::vcf::Record,
     reference_sequence_name: &[u8],
@@ -143,4 +223,13 @@ fn intersects(
         record_interval.start.try_into().unwrap()..record_interval.end.try_into().unwrap();
 
     Ok(record_interval.overlaps(range))
+}
+
+impl<R: std::fmt::Debug> std::fmt::Debug for IndexedVcfReader<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IndexedVcfReader")
+            .field("header", &self.header)
+            .field("index", &self.index)
+            .finish_non_exhaustive()
+    }
 }
