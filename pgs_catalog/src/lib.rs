@@ -466,71 +466,91 @@ pub enum HarmonizedSource {
     Liftover,
 }
 
+/// Current counts:
+/// WeightsHc132: 1, WeightsHc171: 1, WeightsHc188: 1, WeightsHc215: 1, WeightsHc225: 1, WeightsHc294: 1,
+/// WeightsHc299: 1, WeightsHc326: 1, WeightsHc328: 1, WeightsT2d: 1, WeightsT2dHbA1c39: 1,
+/// LogHr: 4, LogOr: 175, Log2Or: 1, LnOr: 9, MetaGrs: 6, MetaPrsWeight: 1, MetaPrs: 1, PhsLogHr: 1,
+/// OddsRatioOverExpectedRisk: 11, PosteriorEffectSize: 1, PosteriorBeta: 1, BetaCorrectedForSampleOverlap: 12,
+/// Beta: 3346, Unweighted: 9, InverseVarianceWeighting: 16, WeightedByFunctionalImplication: 1, Dosage: 1,
+/// NotReported: 1386, LogOrEafNormalized: 3
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Serialize, Deserialize)]
 pub enum WeightType {
-    #[serde(rename = "Beta (corrected for sample overlap)")]
-    BetaCorrectedForSampleOverlap,
-    #[serde(rename = "Dosage")]
-    Dosage,
-    #[serde(rename = "Inverse-variance weighting")]
-    InverseVarianceWeighting,
+    // Named weights
+    #[serde(rename = "weights.HC132")]
+    WeightsHc132,
+    #[serde(rename = "weights.HC171")]
+    WeightsHc171,
+    #[serde(rename = "weights.HC188")]
+    WeightsHc188,
+    #[serde(rename = "weights.HC215")]
+    WeightsHc215,
+    #[serde(rename = "weights.HC225")]
+    WeightsHc225,
+    #[serde(rename = "weights.HC294")]
+    WeightsHc294,
+    #[serde(rename = "weights.HC299")]
+    WeightsHc299,
+    #[serde(rename = "weights.HC326")]
+    WeightsHc326,
+    #[serde(rename = "weights.HC328")]
+    WeightsHc328,
+    #[serde(rename = "weights.T2D")]
+    WeightsT2d,
+    #[serde(rename = "weights.T2D_HbA1c_39")]
+    WeightsT2dHbA1c39,
+
+    // Log-based weights
+    #[serde(rename = "log(HR)")]
+    LogHr,
+    #[serde(rename = "log(OR)")]
+    LogOr,
     #[serde(rename = "Log2(OR)")]
-    Log2OR,
+    Log2Or,
+    #[serde(rename = "ln(OR)")]
+    LnOr,
+
+    // Meta analysis weights
+    #[serde(rename = "metaGRS")]
+    MetaGrs,
     #[serde(rename = "MetaPRS Weight")]
-    MetaPRSWeight,
-    #[serde(rename = "NR")]
-    NR,
+    MetaPrsWeight,
+    #[serde(rename = "metaPRS")]
+    MetaPrs,
+
+    // PHS and risk-based weights
+    #[serde(rename = "PHS log(HR)")]
+    PhsLogHr,
     #[serde(rename = "Odds Ratio over expected risk")]
     OddsRatioOverExpectedRisk,
-    #[serde(rename = "PHS log(HR)")]
-    PHSLogHR,
-    #[serde(rename = "Unweighted")]
-    Unweighted,
+
+    // Effect size weights
+    #[serde(rename = "posterior effect size")]
+    PosteriorEffectSize,
+    #[serde(rename = "posterior beta")]
+    PosteriorBeta,
+    #[serde(rename = "Beta (corrected for sample overlap)")]
+    BetaCorrectedForSampleOverlap,
     #[serde(rename = "beta")]
     Beta,
-    #[serde(rename = "ln(OR)")]
-    LnOR,
-    #[serde(rename = "log(HR)")]
-    LogHR,
-    #[serde(rename = "log(OR)")]
-    LogOR,
+
+    // Other weights
+    #[serde(rename = "Unweighted")]
+    Unweighted,
+    #[serde(rename = "Inverse-variance weighting")]
+    InverseVarianceWeighting,
+    #[serde(rename = "weighted by functional implication")]
+    WeightedByFunctionalImplication,
+    #[serde(rename = "Dosage")]
+    Dosage,
+    #[serde(rename = "NR")]
+    NotReported,
+
+    // Special case for the long description
     #[serde(
         rename = "log(OR) for the effect allele *NOTE* a EAF-normalised weight was used for the PRS (see \"variant_description\" and dosage_#_weight columns)"
     )]
-    LogOREffectAllele,
-    #[serde(rename = "metaGRS")]
-    MetaGRS,
-    #[serde(rename = "metaPRS")]
-    MetaPRS,
-    #[serde(rename = "posterior beta")]
-    PosteriorBeta,
-    #[serde(rename = "posterior effect size")]
-    PosteriorEffectSize,
-    #[serde(rename = "weighted by functional implication")]
-    WeightedByFunctionalImplication,
-    #[serde(rename = "weights.HC132")]
-    WeightsHC132,
-    #[serde(rename = "weights.HC171")]
-    WeightsHC171,
-    #[serde(rename = "weights.HC188")]
-    WeightsHC188,
-    #[serde(rename = "weights.HC215")]
-    WeightsHC215,
-    #[serde(rename = "weights.HC225")]
-    WeightsHC225,
-    #[serde(rename = "weights.HC294")]
-    WeightsHC294,
-    #[serde(rename = "weights.HC299")]
-    WeightsHC299,
-    #[serde(rename = "weights.HC326")]
-    WeightsHC326,
-    #[serde(rename = "weights.HC328")]
-    WeightsHC328,
-    #[serde(rename = "weights.T2D")]
-    WeightsT2D,
-    #[serde(rename = "weights.T2D_HbA1c_39")]
-    WeightsT2dHbA1c39,
+    LogOrEafNormalized,
 }
 
 impl Study {
