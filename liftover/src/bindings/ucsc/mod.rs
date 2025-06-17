@@ -1,7 +1,7 @@
 pub mod cli;
 pub mod web;
 
-use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::collections::{hash_map::Entry, HashMap};
 
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
@@ -251,6 +251,8 @@ pub(super) fn combine_success_and_failure(
 
     #[cfg(debug_assertions)]
     {
+        use std::collections::HashSet;
+
         assert!(success.is_some() || failure.is_some());
         let query_unique_count = locations.iter().collect::<HashSet<_>>().len();
         let success_unique_count = success.as_ref().map(|success| success.len()).unwrap_or(0);

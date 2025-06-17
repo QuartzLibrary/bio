@@ -649,7 +649,7 @@ pub mod comments {
 
         let mut v = String::new();
         reader.read_to_string(&mut v)?;
-        assert_eq!(v, "#Header\nMore content\n##Ignored comment");
+        assert_eq!(v, "More content\n##Ignored comment");
 
         Ok(())
     }

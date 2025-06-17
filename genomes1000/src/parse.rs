@@ -454,16 +454,6 @@ mod genotype {
 pub mod comments {
     use std::io::{self, Read};
 
-    #[allow(dead_code)]
-    pub fn read(reader: &mut impl io::BufRead) -> io::Result<String> {
-        let mut vec = vec![];
-
-        while let [b'#', b'#', ..] = reader.fill_buf()? {
-            reader.read_until(b'\n', &mut vec)?;
-        }
-
-        String::from_utf8(vec).map_err(utile::io::invalid_data)
-    }
     pub fn skip<R: io::BufRead>(mut reader: R) -> io::Result<io::Chain<io::Cursor<[u8; 2]>, R>> {
         let mut buf = [0, 0];
 
@@ -479,12 +469,12 @@ pub mod comments {
 
     #[test]
     fn test_skip_comments() -> io::Result<()> {
-        use io::{Cursor, Read};
+        use io::Cursor;
 
-        let mut reader = Cursor::new(
+        let reader = Cursor::new(
             "##Comment 1\n##Comment 2\n##Comment 3\n#Header\nMore content\n##Ignored comment",
         );
-        skip(&mut reader)?;
+        let mut reader = skip(reader)?;
 
         let mut v = String::new();
         reader.read_to_string(&mut v)?;
