@@ -79,7 +79,6 @@ pub async fn liftover(
 
     let settings = settings.preprocess();
 
-    // Add arguments to the command
     command
         .arg(utile::wsl::to_wsl_path(input.path())?)
         .arg(utile::wsl::to_wsl_path(chain_file)?)
@@ -91,8 +90,9 @@ pub async fn liftover(
         .arg(format!("-minChainT={}", settings.min_chain))
         .arg(format!("-minBlocks={}", settings.min_blocks));
 
-    // Execute the command
-    let result = command.output().unwrap();
+    let result = command
+        .output()
+        .unwrap_or_else(|e| panic!("Failed to run command: {command:?}\n{e:?}"));
 
     if !result.status.success() {
         return Err(std::io::Error::other(format!(
