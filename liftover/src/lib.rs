@@ -58,17 +58,11 @@ impl Liftover {
         LiftoverIndexed::from_liftover(self)
     }
 
-    pub fn map(&self, loc: GenomePosition) -> Vec<GenomePosition> {
-        let mut matches: Vec<_> = self.map_raw(loc).map(|(r, _)| r).collect();
-        matches.sort();
-        matches.dedup();
-        matches
+    pub fn map(&self, loc: GenomePosition) -> impl Iterator<Item = GenomePosition> + use<'_> {
+        self.map_raw(loc).map(|(r, _)| r)
     }
-    pub fn map_range(&self, range: GenomeRange) -> Vec<GenomeRange> {
-        let mut matches: Vec<_> = self.map_range_raw(range).map(|(r, _)| r).collect();
-        matches.sort();
-        matches.dedup();
-        matches
+    pub fn map_range(&self, range: GenomeRange) -> impl Iterator<Item = GenomeRange> + use<'_> {
+        self.map_range_raw(range).map(|(r, _)| r)
     }
 
     pub fn map_raw(
@@ -307,21 +301,11 @@ impl LiftoverIndexed {
         Self { chromosomes }
     }
 
-    pub fn map(&self, loc: GenomePosition) -> Vec<GenomePosition> {
-        let mut matches: Vec<_> = self.map_raw(loc).map(|(r, _)| r).collect();
-
-        matches.sort();
-        matches.dedup();
-
-        matches
+    pub fn map(&self, loc: GenomePosition) -> impl Iterator<Item = GenomePosition> + use<'_> {
+        self.map_raw(loc).map(|(r, _)| r)
     }
-    pub fn map_range(&self, from: GenomeRange) -> Vec<GenomeRange> {
-        let mut intersections: Vec<_> = self.map_range_raw(from).map(|(r, _)| r).collect();
-
-        intersections.sort();
-        intersections.dedup();
-
-        intersections
+    pub fn map_range(&self, from: GenomeRange) -> impl Iterator<Item = GenomeRange> + use<'_> {
+        self.map_range_raw(from).map(|(r, _)| r)
     }
 
     pub fn map_raw(

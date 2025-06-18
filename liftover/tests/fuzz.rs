@@ -115,12 +115,21 @@ async fn check_against_ucsc() -> anyhow::Result<()> {
 
         let (snps_ucsc, ranges_ucsc) = ucsc::cache::get("ucsc", &resource.key());
 
-        assert!(snps_internal == snps_ucsc);
+        // assert!(snps_internal == snps_ucsc);
+        for (mut internal, mut ucsc) in snps_internal.into_iter().zip(snps_ucsc) {
+            internal.sort();
+            ucsc.sort();
+            ucsc.dedup();
+            assert_eq!(internal, ucsc);
+        }
 
         assert_eq!(ranges_ucsc.len(), ranges.len());
 
-        for (internal, ucsc) in ranges_internal.iter().zip(&ranges_ucsc) {
-            assert_range(internal, ucsc);
+        for (mut internal, mut ucsc) in ranges_internal.into_iter().zip(ranges_ucsc) {
+            internal.sort();
+            ucsc.sort();
+            ucsc.dedup();
+            assert_range(&internal, &ucsc);
         }
     }
 
@@ -143,12 +152,21 @@ async fn check_against_ucsc() -> anyhow::Result<()> {
 
         let (snps_ucsc, ranges_ucsc) = ucsc::cache::get("ensembl", &resource.key());
 
-        assert!(snps_internal == snps_ucsc);
+        // assert!(snps_internal == snps_ucsc);
+        for (mut internal, mut ucsc) in snps_internal.into_iter().zip(snps_ucsc) {
+            internal.sort();
+            ucsc.sort();
+            ucsc.dedup();
+            assert_eq!(internal, ucsc);
+        }
 
         assert_eq!(ranges_ucsc.len(), ranges.len());
 
-        for (internal, ucsc) in ranges_internal.iter().zip(&ranges_ucsc) {
-            assert_range(internal, ucsc);
+        for (mut internal, mut ucsc) in ranges_internal.into_iter().zip(ranges_ucsc) {
+            internal.sort();
+            ucsc.sort();
+            ucsc.dedup();
+            assert_range(&internal, &ucsc);
         }
     }
 

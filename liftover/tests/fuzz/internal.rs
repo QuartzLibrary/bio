@@ -120,24 +120,28 @@ fn check_testpoints_slow() -> anyhow::Result<()> {
 }
 
 pub fn run_snps(liftover: &LiftoverIndexed, snps: Vec<GenomePosition>) -> Vec<Vec<GenomePosition>> {
-    snps.into_iter().map(|l| liftover.map(l)).collect()
+    snps.into_iter()
+        .map(|l| liftover.map(l).collect())
+        .collect()
 }
 pub fn run_ranges(liftover: &LiftoverIndexed, ranges: Vec<GenomeRange>) -> Vec<Vec<GenomeRange>> {
     ranges
         .clone()
         .into_iter()
-        .map(|r| liftover.map_range(r))
+        .map(|r| liftover.map_range(r).collect())
         .collect()
 }
 
 pub fn run_snps_slow(liftover: &Liftover, snps: Vec<GenomePosition>) -> Vec<Vec<GenomePosition>> {
-    snps.into_iter().map(|l| liftover.map(l)).collect()
+    snps.into_iter()
+        .map(|l| liftover.map(l).collect())
+        .collect()
 }
 pub fn run_ranges_slow(liftover: &Liftover, ranges: Vec<GenomeRange>) -> Vec<Vec<GenomeRange>> {
     ranges
         .clone()
         .into_iter()
-        .map(|r| liftover.map_range(r))
+        .map(|r| liftover.map_range(r).collect())
         .collect()
 }
 
@@ -167,22 +171,31 @@ pub mod cache {
         prefix: &str,
         key: &str,
     ) {
-        assert!(
-            snps_internal
-                == snp_testpoints_internal_target(prefix, key)
-                    .read_json_lines::<Vec<GenomePosition>>()
-                    .unwrap()
-                    .try_collect::<Vec<_>>()
-                    .unwrap()
-        );
-        assert!(
-            ranges_internal
-                == range_testpoints_internal_target(prefix, key)
-                    .read_json_lines::<Vec<GenomeRange>>()
-                    .unwrap()
-                    .try_collect::<Vec<_>>()
-                    .unwrap()
-        );
+        let snps_target: Vec<_> = snp_testpoints_internal_target(prefix, key)
+            .read_json_lines::<Vec<GenomePosition>>()
+            .unwrap()
+            .map(|l| l.unwrap())
+            .collect();
+        assert_eq!(snps_internal.len(), snps_target.len());
+        for (mut snps_internal, mut snp_target) in snps_internal.into_iter().zip(snps_target) {
+            snps_internal.sort();
+            snp_target.sort();
+            assert_eq!(snps_internal, snp_target);
+        }
+
+        let ranges_target: Vec<_> = range_testpoints_internal_target(prefix, key)
+            .read_json_lines::<Vec<GenomeRange>>()
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(ranges_internal.len(), ranges_target.len());
+        for (mut ranges_internal, mut range_target) in
+            ranges_internal.into_iter().zip(ranges_target)
+        {
+            ranges_internal.sort();
+            range_target.sort();
+            assert!(ranges_internal == range_target);
+        }
     }
 
     fn snp_testpoints_internal_target(prefix: &str, key: &str) -> FsCacheEntry {

@@ -228,11 +228,6 @@ pub(super) fn combine_success_and_failure(
             result.entry(from).or_default().push(to);
         }
 
-        for vec in result.values_mut() {
-            vec.sort();
-            vec.dedup(); // A range might appear in the input multiple times.
-        }
-
         result
     });
 
@@ -241,8 +236,8 @@ pub(super) fn combine_success_and_failure(
 
         for (loc, reason) in failure {
             match result.entry(loc) {
-                Entry::Occupied(occupied_entry) => assert_eq!(*occupied_entry.get(), reason),
-                Entry::Vacant(vacant_entry) => drop(vacant_entry.insert(reason)),
+                Entry::Occupied(e) => assert_eq!(*e.get(), reason),
+                Entry::Vacant(e) => drop(e.insert(reason)),
             }
         }
 
