@@ -270,12 +270,14 @@ impl LiftoverIndexed {
     fn from_liftover(liftover: &Liftover) -> Self {
         let mut chromosomes: BTreeMap<String, (Vec<LiftoverIndexedEntry>, u64)> = BTreeMap::new();
 
-        for (mut from, to) in liftover.iter_ranges() {
+        for (mut from, mut to) in liftover.iter_ranges() {
             assert!(!from.range.is_empty(), "{from:?}");
             assert!(!to.range.is_empty(), "{to:?}");
 
-            from.range
-                .set_orientation(SequenceOrientation::Forward, from.size);
+            if from.range.orientation != SequenceOrientation::Forward {
+                from.range = from.range.flip_orientation(from.size);
+                to.range = to.range.flip_orientation(to.size);
+            }
 
             let (chr, _size) = chromosomes
                 .entry(from.range.name)
