@@ -4,7 +4,7 @@ use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use biocore::location::{GenomePosition, SequenceOrientation};
+use biocore::location::GenomePosition;
 use utile::{
     io::reqwest_error,
     resource::{RawResource, RawResourceExt, UrlResource},
@@ -220,8 +220,7 @@ impl GwasCatalogAssociation {
         }
     }
     pub fn locations(&self) -> Either<Vec<Location>, Interaction> {
-        /// Not really specified in the docs.
-        const DEFAULT_ORIENTATION: SequenceOrientation = SequenceOrientation::Forward;
+        // Assumes forward orientation, (not really specified in the docs).
         if self.chr_id.is_empty() {
             assert!(self.chr_pos.is_empty());
             assert!(self.region.is_empty());
@@ -236,7 +235,6 @@ impl GwasCatalogAssociation {
                     loc: GenomePosition {
                         name: parse_human_contig(chr_id_a).unwrap().as_str().to_owned(),
                         at: chr_pos_a.trim().parse().unwrap(),
-                        orientation: DEFAULT_ORIENTATION,
                     },
                     region: region_a.trim().to_owned(),
                 },
@@ -244,7 +242,6 @@ impl GwasCatalogAssociation {
                     loc: GenomePosition {
                         name: parse_human_contig(chr_id_b).unwrap().as_str().to_owned(),
                         at: chr_pos_b.trim().parse().unwrap(),
-                        orientation: DEFAULT_ORIENTATION,
                     },
                     region: region_b.trim().to_owned(),
                 },
@@ -272,7 +269,6 @@ impl GwasCatalogAssociation {
                             loc: GenomePosition {
                                 name: parse_human_contig(chr_id).unwrap().as_str().to_owned(),
                                 at: chr_pos.trim().parse().unwrap(),
-                                orientation: DEFAULT_ORIENTATION,
                             },
                             region,
                         })

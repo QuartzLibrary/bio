@@ -71,9 +71,7 @@ async fn cache_chain_files() -> anyhow::Result<()> {
 #[tokio::test]
 async fn check_against_ucsc() -> anyhow::Result<()> {
     fn is_subset_of(a: &[GenomeRange], b: &[GenomeRange]) -> bool {
-        const DUMMY_SIZE: u64 = 0; // It doesn't matter because they have the same orientation.
-        a.iter()
-            .all(|r| b.iter().any(|r2| r2.contains_range(r, DUMMY_SIZE)))
+        a.iter().all(|r| b.iter().any(|r2| r2.contains_range(r)))
     }
     #[track_caller]
     fn assert_range(internal: &[GenomeRange], ucsc: &[GenomeRange]) {

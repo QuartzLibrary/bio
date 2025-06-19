@@ -1,7 +1,4 @@
-use biocore::{
-    dna::DnaSequence,
-    location::{GenomePosition, SequenceOrientation},
-};
+use biocore::{dna::DnaSequence, location::GenomePosition};
 
 use crate::{GRCh38Contig, Genotype};
 
@@ -22,7 +19,6 @@ impl SimplifiedRecord {
     pub fn at(&self) -> GenomePosition<GRCh38Contig> {
         GenomePosition {
             name: self.contig,
-            orientation: SequenceOrientation::Forward,
             at: self.position - 1,
         }
     }

@@ -18,7 +18,7 @@ use std::{cmp::Ordering, collections::BTreeMap, io};
 
 use biocore::{
     dna::{DnaBase, DnaSequence},
-    location::{GenomePosition, GenomeRange, SequenceOrientation},
+    location::{GenomePosition, GenomeRange},
     vcf::IndexedVcfReader,
 };
 use utile::{
@@ -123,7 +123,6 @@ impl<S> Record<S> {
     pub fn at(&self) -> GenomePosition<GRCh38Contig> {
         GenomePosition {
             name: self.contig,
-            orientation: SequenceOrientation::Forward,
             at: self.position - 1,
         }
     }

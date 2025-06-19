@@ -6,9 +6,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
-use biocore::location::{
-    GenomePosition, GenomeRange, LocationConversionError, SequenceOrientation,
-};
+use biocore::location::{GenomePosition, GenomeRange, LocationConversionError};
 
 /// Manually checked lowest exponent before it starts to fail.
 const MIN_MATCH_FALLBACK: f64 = 1e-45;
@@ -112,6 +110,7 @@ impl UcscLiftoverSettings {
 }
 
 fn parse_success_file(res: &str) -> std::io::Result<Vec<(GenomeRange, GenomeRange, u64)>> {
+    // Returned values are in the forward orientation.
     res.split('\n')
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
@@ -134,7 +133,6 @@ fn parse_success_file(res: &str) -> std::io::Result<Vec<(GenomeRange, GenomeRang
                 GenomeRange {
                     name: name.to_owned(),
                     at: (from - 1)..to,
-                    orientation: SequenceOrientation::Forward,
                 }
             };
             let to_range = {
@@ -143,7 +141,6 @@ fn parse_success_file(res: &str) -> std::io::Result<Vec<(GenomeRange, GenomeRang
                 GenomeRange {
                     name: (*chr).to_owned(),
                     at: start..end,
-                    orientation: SequenceOrientation::Forward,
                 }
             };
             let i: u64 = i.parse().map_err(utile::io::invalid_data)?;
@@ -162,6 +159,8 @@ fn parse_failure_file(res: &str) -> std::io::Result<Vec<(GenomeRange, Option<Fai
     //     Sequence sufficiently intersects multiple chains
     // Boundary problem:
     //     Missing start or end base in an exon
+
+    // Returned values are in the forward orientation.
 
     res.split('\n')
         .map(|s| s.trim())
@@ -203,7 +202,6 @@ fn parse_failure_file(res: &str) -> std::io::Result<Vec<(GenomeRange, Option<Fai
                 GenomeRange {
                     name: (*chr).to_owned(),
                     at: start..end,
-                    orientation: SequenceOrientation::Forward,
                 }
             };
 

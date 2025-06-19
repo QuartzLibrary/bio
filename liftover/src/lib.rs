@@ -11,7 +11,10 @@ use std::{cmp, collections::BTreeMap, ops::Range};
 
 use utile::range::{RangeExt, RangeLen};
 
-use biocore::location::{GenomePosition, GenomeRange, SequenceOrientation};
+use biocore::location::{
+    orientation::{SequenceOrientation, WithOrientation},
+    GenomePosition, GenomeRange,
+};
 
 /// https://genome.ucsc.edu/goldenPath/help/chain.html
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,7 +44,7 @@ pub struct ChainHeader {
 pub struct ChainRange {
     /// chromosome size
     pub size: u64,
-    pub range: GenomeRange,
+    pub range: WithOrientation<GenomeRange>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AlignmentBlock {
@@ -69,15 +72,33 @@ impl Liftover {
         &self,
         loc: GenomePosition,
     ) -> impl Iterator<Item = (GenomePosition, bool)> + use<'_> {
-        self.chains.iter().flat_map(move |c| c.map_raw(loc.clone()))
+        let loc = WithOrientation {
+            orientation: SequenceOrientation::Forward,
+            v: loc,
+        };
+        self.chains
+            .iter()
+            .flat_map(move |c| c.map_raw(loc.clone()))
+            .map(|(r, f)| {
+                assert!(r.orientation.is_forward());
+                (r.v, f)
+            })
     }
     pub fn map_range_raw(
         &self,
         range: GenomeRange,
     ) -> impl Iterator<Item = (GenomeRange, bool)> + use<'_> {
+        let range = WithOrientation {
+            orientation: SequenceOrientation::Forward,
+            v: range,
+        };
         self.chains
             .iter()
             .flat_map(move |c| c.map_range_raw(range.clone()))
+            .map(|(r, f)| {
+                assert!(r.orientation.is_forward());
+                (r.v, f)
+            })
     }
 
     fn iter_ranges(&self) -> impl Iterator<Item = (ChainRange, ChainRange)> + use<'_> {
@@ -87,11 +108,11 @@ impl Liftover {
 impl Chain {
     pub fn map_raw(
         &self,
-        mut loc: GenomePosition,
-    ) -> impl Iterator<Item = (GenomePosition, bool)> + use<'_> {
+        mut loc: WithOrientation<GenomePosition>,
+    ) -> impl Iterator<Item = (WithOrientation<GenomePosition>, bool)> + use<'_> {
         let original_orientation = loc.orientation;
-        let flip_to_map = loc.orientation != self.header.t.range.orientation;
-        loc.set_orientation(self.header.t.range.orientation, self.header.t.size);
+        let initially_flipped = loc.orientation != self.header.t.range.orientation;
+        loc.set_orientation_with(self.header.t.range.orientation, self.header.t.size);
         if !self.header.t.contains(&loc) {
             return None.into_iter().flatten();
         }
@@ -107,10 +128,12 @@ impl Chain {
                 let mut r = None;
 
                 if (t_start..(t_start + b.size)).contains(&at) {
-                    let new = GenomePosition {
-                        name: self.header.q.range.name.clone(),
-                        at: q_start + (at - t_start),
+                    let new = WithOrientation {
                         orientation: self.header.q.range.orientation,
+                        v: GenomePosition {
+                            name: self.header.q.range.name.clone(),
+                            at: q_start + (at - t_start),
+                        },
                     };
 
                     r = Some(new);
@@ -125,7 +148,7 @@ impl Chain {
                 r
             })
             .map(move |mut r| {
-                let flipped = if flip_to_map {
+                let flipped = if initially_flipped {
                     // If we flipped before, and do not need to flip again,
                     // we are already on the original strand, but the original reference sequence
                     // for this region is on the opposite strand, so should be fixed.
@@ -134,7 +157,11 @@ impl Chain {
                     // If we ended up on the opposite strand, let's make a note that we are flipping back.
                     r.orientation != original_orientation
                 };
-                r.set_orientation(original_orientation, self.header.q.size);
+                assert_eq!(
+                    flipped,
+                    self.header.t.range.orientation != self.header.q.range.orientation
+                );
+                r.set_orientation_with(original_orientation, self.header.q.size);
                 (r, flipped)
             });
 
@@ -142,8 +169,8 @@ impl Chain {
     }
     pub fn map_range_raw(
         &self,
-        range: GenomeRange,
-    ) -> impl Iterator<Item = (GenomeRange, bool)> + use<'_> {
+        range: WithOrientation<GenomeRange>,
+    ) -> impl Iterator<Item = (WithOrientation<GenomeRange>, bool)> + use<'_> {
         let intersected = match self.header.t.intersect(range.clone()) {
             Some(intersected) if intersected.is_empty() => return None.into_iter().flatten(),
             Some(intersected) => intersected,
@@ -151,7 +178,7 @@ impl Chain {
         };
         assert_eq!(intersected.name, range.name);
         let original_orientation = range.orientation;
-        let flip_to_map = range.orientation != self.header.t.range.orientation;
+        let initially_flipped = range.orientation != self.header.t.range.orientation;
         drop(range);
 
         let mut t_start = self.header.t.range.at.start;
@@ -167,10 +194,12 @@ impl Chain {
 
                 if !intersected.is_empty() {
                     let shift = intersected.start - t_start;
-                    r = Some(GenomeRange {
-                        name: self.header.q.range.name.clone(),
-                        at: (q_start + shift)..(q_start + shift + intersected.range_len()),
+                    r = Some(WithOrientation {
                         orientation: self.header.q.range.orientation,
+                        v: GenomeRange {
+                            name: self.header.q.range.name.clone(),
+                            at: (q_start + shift)..(q_start + shift + intersected.range_len()),
+                        },
                     });
                 }
 
@@ -183,7 +212,7 @@ impl Chain {
                 r
             })
             .map(move |mut r| {
-                let flipped = if flip_to_map {
+                let flipped = if initially_flipped {
                     // If we flipped before, and do not need to flip again,
                     // we are already on the original strand, but the original reference sequence
                     // for this region is on the opposite strand, so should be fixed.
@@ -192,7 +221,11 @@ impl Chain {
                     // If we ended up on the opposite strand, let's make a note that we are flipping back.
                     r.orientation != original_orientation
                 };
-                r.set_orientation(original_orientation, self.header.q.size);
+                assert_eq!(
+                    flipped,
+                    self.header.t.range.orientation != self.header.q.range.orientation
+                );
+                r.set_orientation_with(original_orientation, self.header.q.size);
                 (r, flipped)
             });
 
@@ -226,18 +259,22 @@ impl Chain {
             (
                 ChainRange {
                     size: self.header.t.size,
-                    range: GenomeRange {
-                        name: self.header.t.range.name.clone(),
+                    range: WithOrientation {
                         orientation: self.header.t.range.orientation,
-                        at: t_fragment,
+                        v: GenomeRange {
+                            name: self.header.t.range.name.clone(),
+                            at: t_fragment,
+                        },
                     },
                 },
                 ChainRange {
                     size: self.header.q.size,
-                    range: GenomeRange {
-                        name: self.header.q.range.name.clone(),
+                    range: WithOrientation {
                         orientation: self.header.q.range.orientation,
-                        at: q_fragment,
+                        v: GenomeRange {
+                            name: self.header.q.range.name.clone(),
+                            at: q_fragment,
+                        },
                     },
                 },
             )
@@ -245,11 +282,11 @@ impl Chain {
     }
 }
 impl ChainRange {
-    fn contains(&self, loc: &GenomePosition) -> bool {
-        self.range.contains(loc, self.size)
+    fn contains(&self, loc: &WithOrientation<GenomePosition>) -> bool {
+        self.range.contains_with(loc, self.size)
     }
-    fn intersect(&self, b: GenomeRange) -> Option<GenomeRange> {
-        self.range.intersect(b, self.size)
+    fn intersect(&self, b: WithOrientation<GenomeRange>) -> Option<WithOrientation<GenomeRange>> {
+        self.range.intersection_with(b, self.size)
     }
 }
 
@@ -275,16 +312,16 @@ impl LiftoverIndexed {
             assert!(!to.range.is_empty(), "{to:?}");
 
             if from.range.orientation != SequenceOrientation::Forward {
-                from.range = from.range.flip_orientation(from.size);
-                to.range = to.range.flip_orientation(to.size);
+                from.range = from.range.flip_orientation_with(from.size);
+                to.range = to.range.flip_orientation_with(to.size);
             }
 
             let (chr, _size) = chromosomes
-                .entry(from.range.name)
+                .entry(from.range.v.name)
                 .or_insert((vec![], from.size));
 
             chr.push(LiftoverIndexedEntry {
-                range: from.range.at,
+                range: from.range.v.at,
                 max: 0,
                 data: to,
             });
@@ -304,23 +341,37 @@ impl LiftoverIndexed {
     }
 
     pub fn map(&self, loc: GenomePosition) -> impl Iterator<Item = GenomePosition> + use<'_> {
-        self.map_raw(loc).map(|(r, _)| r)
+        self.map_raw(WithOrientation {
+            orientation: SequenceOrientation::Forward,
+            v: loc,
+        })
+        .map(|(r, _)| {
+            assert!(r.orientation.is_forward());
+            r.v
+        })
     }
     pub fn map_range(&self, from: GenomeRange) -> impl Iterator<Item = GenomeRange> + use<'_> {
-        self.map_range_raw(from).map(|(r, _)| r)
+        self.map_range_raw(WithOrientation {
+            orientation: SequenceOrientation::Forward,
+            v: from,
+        })
+        .map(|(r, _)| {
+            assert!(r.orientation.is_forward());
+            r.v
+        })
     }
 
     pub fn map_raw(
         &self,
-        mut loc: GenomePosition,
-    ) -> impl Iterator<Item = (GenomePosition, bool)> + use<'_> {
-        let Some((ranges, size)) = self.chromosomes.get(&loc.name) else {
+        mut loc: WithOrientation<GenomePosition>,
+    ) -> impl Iterator<Item = (WithOrientation<GenomePosition>, bool)> + use<'_> {
+        let Some((ranges, size)) = self.chromosomes.get(&loc.v.name) else {
             return None.into_iter().flatten();
         };
 
         let original_orientation = loc.orientation;
-        let flip_to_map = loc.orientation != SequenceOrientation::Forward;
-        loc.set_orientation(SequenceOrientation::Forward, *size);
+        let initially_flipped = loc.orientation != SequenceOrientation::Forward;
+        loc.set_orientation_with(SequenceOrientation::Forward, *size);
         let at = loc.at;
         drop(loc);
 
@@ -341,12 +392,14 @@ impl LiftoverIndexed {
         Some(ranges.iter().filter_map(move |r| {
             if r.range.contains(&at) {
                 let shift = at - r.range.start;
-                let mut new = GenomePosition {
-                    name: r.data.range.name.clone(),
-                    at: r.data.range.at.start + shift,
+                let mut new = WithOrientation {
                     orientation: r.data.range.orientation,
+                    v: GenomePosition {
+                        name: r.data.range.name.clone(),
+                        at: r.data.range.at.start + shift,
+                    },
                 };
-                let flipped = if flip_to_map {
+                let flipped = if initially_flipped {
                     // If we flipped before, and do not need to flip again,
                     // we are already on the original strand, but the original reference sequence
                     // for this region is on the opposite strand, so should be fixed.
@@ -355,7 +408,11 @@ impl LiftoverIndexed {
                     // If we ended up on the opposite strand, let's make a note that we are flipping back.
                     new.orientation != original_orientation
                 };
-                new.set_orientation(original_orientation, r.data.size);
+                assert_eq!(
+                    flipped,
+                    SequenceOrientation::Forward != r.data.range.orientation
+                );
+                new.set_orientation_with(original_orientation, r.data.size);
                 Some((new, flipped))
             } else {
                 None
@@ -366,15 +423,15 @@ impl LiftoverIndexed {
     }
     pub fn map_range_raw(
         &self,
-        mut from: GenomeRange,
-    ) -> impl Iterator<Item = (GenomeRange, bool)> + use<'_> {
+        mut from: WithOrientation<GenomeRange>,
+    ) -> impl Iterator<Item = (WithOrientation<GenomeRange>, bool)> + use<'_> {
         let Some((ranges, size)) = self.chromosomes.get(&from.name) else {
             return None.into_iter().flatten();
         };
 
         let original_orientation = from.orientation;
-        let flip_to_map = from.orientation != SequenceOrientation::Forward;
-        from.set_orientation(SequenceOrientation::Forward, *size);
+        let initially_flipped = from.orientation != SequenceOrientation::Forward;
+        from.set_orientation_with(SequenceOrientation::Forward, *size);
         let at = from.at.clone();
         drop(from);
 
@@ -396,13 +453,15 @@ impl LiftoverIndexed {
             let intersected = r.range.clone().intersection(at.clone());
             if !intersected.is_empty() {
                 let shift = intersected.start - r.range.start;
-                let mut new = GenomeRange {
-                    name: r.data.range.name.clone(),
-                    at: (r.data.range.at.start + shift)
-                        ..(r.data.range.at.start + shift + intersected.range_len()),
+                let mut new = WithOrientation {
                     orientation: r.data.range.orientation,
+                    v: GenomeRange {
+                        name: r.data.range.name.clone(),
+                        at: (r.data.range.at.start + shift)
+                            ..(r.data.range.at.start + shift + intersected.range_len()),
+                    },
                 };
-                let flipped = if flip_to_map {
+                let flipped = if initially_flipped {
                     // If we flipped before, and do not need to flip again,
                     // we are already on the original strand, but the original reference sequence
                     // for this region is on the opposite strand, so should be fixed.
@@ -411,7 +470,11 @@ impl LiftoverIndexed {
                     // If we ended up on the opposite strand, let's make a note that we are flipping back.
                     new.orientation != original_orientation
                 };
-                new.set_orientation(original_orientation, r.data.size);
+                assert_eq!(
+                    flipped,
+                    SequenceOrientation::Forward != r.data.range.orientation
+                );
+                new.set_orientation_with(original_orientation, r.data.size);
                 Some((new, flipped))
             } else {
                 None
@@ -425,7 +488,7 @@ impl LiftoverIndexed {
 mod boilerplate {
     use std::fmt;
 
-    use biocore::location::SequenceOrientation;
+    use biocore::location::orientation::SequenceOrientation;
 
     use super::{AlignmentBlock, Chain, ChainHeader, Liftover};
 

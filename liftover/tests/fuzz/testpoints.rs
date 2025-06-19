@@ -1,7 +1,7 @@
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::{collections::BTreeMap, ops::Range};
 
-use biocore::location::{GenomePosition, GenomeRange, SequenceOrientation};
+use biocore::location::{GenomePosition, GenomeRange};
 use utile::resource::{RawResource, RawResourceExt};
 
 use liftover::{
@@ -74,7 +74,6 @@ fn generate_ranges(liftover: &Liftover, rng: &mut impl Rng) -> Vec<GenomeRange> 
                 .map(|range| GenomeRange {
                     name: name.clone(),
                     at: range,
-                    orientation: SequenceOrientation::Forward,
                 })
                 .collect::<Vec<_>>()
         })
@@ -98,7 +97,6 @@ fn generate_snps(liftover: &Liftover, rng: &mut impl Rng) -> Vec<GenomePosition>
                 .map(|at| GenomePosition {
                     name: name.clone(),
                     at,
-                    orientation: SequenceOrientation::Forward,
                 })
                 .collect::<Vec<_>>()
         })
@@ -161,7 +159,6 @@ fn generate_snp_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomePosit
         .map(|at| GenomePosition {
             name: chain.header.t.range.name.clone(),
             at,
-            orientation: chain.header.t.range.orientation,
         })
         .collect()
 }
@@ -221,7 +218,6 @@ fn generate_range_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomeRan
             GenomeRange {
                 name: chain.header.t.range.name.clone(),
                 at,
-                orientation: chain.header.t.range.orientation,
             }
         })
         .collect()

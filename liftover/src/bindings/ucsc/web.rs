@@ -226,10 +226,8 @@ fn build_payload(
         for GenomeRange {
             name,
             at: Range { start, end },
-            orientation,
         } in locations
         {
-            assert!(orientation.is_forward());
             l.push_str(&format!("{name} {start} {end}\n"));
         }
 

@@ -5,6 +5,7 @@ use std::{
     str,
 };
 
+use biocore::location::orientation::WithOrientation;
 use flate2::read::MultiGzDecoder;
 
 use utile::{
@@ -175,10 +176,9 @@ fn read_chain_side(
 
     Ok(ChainRange {
         size,
-        range: GenomeRange {
-            name,
-            at,
+        range: WithOrientation {
             orientation,
+            v: GenomeRange { name, at },
         },
     })
 }
