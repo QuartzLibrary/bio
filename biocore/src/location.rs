@@ -19,6 +19,13 @@ impl<Contig> GenomePosition<Contig> {
             at: self.at,
         }
     }
+
+    pub fn as_ref_contig(&self) -> GenomePosition<&Contig> {
+        GenomePosition {
+            name: &self.name,
+            at: self.at,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -36,20 +43,20 @@ impl<Contig> GenomeRange<Contig> {
     }
     pub fn contains(&self, loc: &GenomePosition<Contig>) -> bool
     where
-        Contig: PartialEq + Clone,
+        Contig: PartialEq,
     {
         self.name == loc.name && self.at.contains(&loc.at)
     }
     pub fn contains_range(&self, range: &Self) -> bool
     where
-        Contig: PartialEq + Clone,
+        Contig: PartialEq,
     {
         self.name == range.name
             && self.at.contains(&range.at.start)
             && (self.at.contains(&range.at.end) || self.at.end == range.at.end)
     }
 
-    pub fn intersection(&self, b: Self) -> Option<Self>
+    pub fn intersection(self, b: &Self) -> Option<Self>
     where
         Contig: PartialEq,
     {
@@ -58,9 +65,15 @@ impl<Contig> GenomeRange<Contig> {
         }
 
         Some(Self {
-            name: b.name,
-            at: self.at.clone().intersection(b.at),
+            name: self.name,
+            at: self.at.intersection(b.at.clone()),
         })
+    }
+    pub fn overlaps(&self, b: &Self) -> bool
+    where
+        Contig: PartialEq,
+    {
+        self.name == b.name && self.at.overlaps(&b.at)
     }
 
     pub fn map_contig<NewContig>(
@@ -70,6 +83,13 @@ impl<Contig> GenomeRange<Contig> {
         GenomeRange {
             name: f(self.name),
             at: self.at,
+        }
+    }
+
+    pub fn as_ref_contig(&self) -> GenomeRange<&Contig> {
+        GenomeRange {
+            name: &self.name,
+            at: self.at.clone(),
         }
     }
 }
@@ -222,6 +242,13 @@ pub mod orientation {
                 },
             }
         }
+
+        pub fn as_ref_contig(&self) -> WithOrientation<GenomePosition<&C>> {
+            WithOrientation {
+                orientation: self.orientation,
+                v: self.v.as_ref_contig(),
+            }
+        }
     }
 
     impl<C> WithOrientation<GenomeRange<C>>
@@ -238,22 +265,29 @@ pub mod orientation {
 
         pub fn contains(&self, loc: &WithOrientation<GenomePosition<C>>) -> bool
         where
-            C: PartialEq + Clone,
+            C: PartialEq,
         {
             self.contains_with(loc, self.v.name.size())
         }
         pub fn contains_range(&self, range: &Self) -> bool
         where
-            C: PartialEq + Clone,
+            C: PartialEq,
         {
             self.contains_range_with(range, self.v.name.size())
         }
 
-        pub fn intersection(&self, b: Self) -> Option<Self>
+        pub fn intersection(self, b: &Self) -> Option<Self>
         where
             C: PartialEq,
         {
-            self.intersection_with(b, self.v.name.size())
+            let size = self.v.name.size();
+            self.intersection_with(b, size)
+        }
+        pub fn overlaps(&self, b: &Self) -> bool
+        where
+            C: PartialEq,
+        {
+            self.overlaps_with(b, self.v.name.size())
         }
     }
     impl<C> WithOrientation<GenomeRange<C>> {
@@ -287,31 +321,29 @@ pub mod orientation {
             }
         }
 
-        pub fn contains_with(&self, loc: &WithOrientation<GenomePosition<C>>, size: u64) -> bool
+        pub fn contains_with(&self, pos: &WithOrientation<GenomePosition<C>>, size: u64) -> bool
         where
-            C: PartialEq + Clone,
+            C: PartialEq,
         {
-            let loc = if self.orientation == loc.orientation {
-                loc
-            } else {
-                &loc.clone().flip_orientation_with(size)
+            let mut pos = pos.as_ref_contig();
+            if self.orientation != pos.orientation {
+                pos = pos.clone().flip_orientation_with(size)
             };
-            self.v.contains(&loc.v)
+            self.v.as_ref_contig().contains(&pos.v)
         }
         pub fn contains_range_with(&self, range: &Self, size: u64) -> bool
         where
-            C: PartialEq + Clone,
+            C: PartialEq,
         {
-            let range = if self.orientation == range.orientation {
-                range
-            } else {
-                &range.clone().flip_orientation_with(size)
+            let mut range = range.as_ref_contig();
+            if self.orientation != range.orientation {
+                range = range.clone().flip_orientation_with(size)
             };
-            self.v.contains_range(&range.v)
+            self.v.as_ref_contig().contains_range(&range.v)
         }
 
         /// Preserves the orientation of `self`.
-        pub fn intersection_with(&self, mut b: Self, size: u64) -> Option<Self>
+        pub fn intersection_with(self, b: &Self, size: u64) -> Option<Self>
         where
             C: PartialEq,
         {
@@ -319,12 +351,34 @@ pub mod orientation {
                 return None;
             }
 
+            let mut b = b.as_ref_contig();
+
             b.set_orientation_with(self.orientation, size);
+
+            let GenomeRange { name: _, at } = self.as_ref_contig().v.intersection(&b.v)?;
 
             Some(Self {
                 orientation: self.orientation,
-                v: self.v.intersection(b.v)?,
+                v: GenomeRange {
+                    name: self.v.name,
+                    at,
+                },
             })
+        }
+        pub fn overlaps_with(&self, b: &Self, size: u64) -> bool
+        where
+            C: PartialEq,
+        {
+            let mut b = b.as_ref_contig();
+            b.set_orientation_with(self.orientation, size);
+            self.v.as_ref_contig().overlaps(&b.v)
+        }
+
+        pub fn as_ref_contig(&self) -> WithOrientation<GenomeRange<&C>> {
+            WithOrientation {
+                orientation: self.orientation,
+                v: self.v.as_ref_contig(),
+            }
         }
     }
 
