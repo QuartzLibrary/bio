@@ -121,27 +121,47 @@ fn check_testpoints_slow() -> anyhow::Result<()> {
 
 pub fn run_snps(liftover: &LiftoverIndexed, snps: Vec<GenomePosition>) -> Vec<Vec<GenomePosition>> {
     snps.into_iter()
-        .map(|l| liftover.map(l).collect())
+        .map(|l| {
+            liftover
+                .map(l)
+                .map(|l| l.map_contig(|c| c.as_ref().to_owned()))
+                .collect()
+        })
         .collect()
 }
 pub fn run_ranges(liftover: &LiftoverIndexed, ranges: Vec<GenomeRange>) -> Vec<Vec<GenomeRange>> {
     ranges
         .clone()
         .into_iter()
-        .map(|r| liftover.map_range(r).collect())
+        .map(|r| {
+            liftover
+                .map_range(r)
+                .map(|r| r.map_contig(|c| c.as_ref().to_owned()))
+                .collect()
+        })
         .collect()
 }
 
 pub fn run_snps_slow(liftover: &Liftover, snps: Vec<GenomePosition>) -> Vec<Vec<GenomePosition>> {
     snps.into_iter()
-        .map(|l| liftover.map(l).collect())
+        .map(|l| {
+            liftover
+                .map(l)
+                .map(|l| l.map_contig(|c| c.as_ref().to_owned()))
+                .collect()
+        })
         .collect()
 }
 pub fn run_ranges_slow(liftover: &Liftover, ranges: Vec<GenomeRange>) -> Vec<Vec<GenomeRange>> {
     ranges
         .clone()
         .into_iter()
-        .map(|r| liftover.map_range(r).collect())
+        .map(|r| {
+            liftover
+                .map_range(r)
+                .map(|r| r.map_contig(|c| c.as_ref().to_owned()))
+                .collect()
+        })
         .collect()
 }
 

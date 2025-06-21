@@ -1,6 +1,7 @@
 #![feature(strict_overflow_ops)]
 #![feature(iterator_try_collect)]
 #![feature(impl_trait_in_assoc_type)]
+#![feature(btree_set_entry)]
 
 mod parse;
 
@@ -11,41 +12,42 @@ use std::{cmp, collections::BTreeMap, ops::Range};
 
 use utile::range::{RangeExt, RangeLen};
 
-use biocore::location::{
-    orientation::{SequenceOrientation, WithOrientation},
-    GenomePosition, GenomeRange,
+use biocore::{
+    genome::{ArcContig, Contig},
+    location::{
+        orientation::{SequenceOrientation, WithOrientation},
+        GenomePosition, GenomeRange,
+    },
 };
 
 /// https://genome.ucsc.edu/goldenPath/help/chain.html
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Liftover {
-    pub chains: Vec<Chain>,
+pub struct Liftover<From = ArcContig, To = ArcContig> {
+    pub chains: Vec<Chain<From, To>>,
+
+    // We stash a mapping so that we can upgrade other contig types transparently for conveneince.
+    contigs: BTreeMap<String, From>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Chain {
-    pub header: ChainHeader,
+pub struct Chain<From = ArcContig, To = ArcContig> {
+    pub header: ChainHeader<From, To>,
     blocks: Vec<AlignmentBlock>,
     last_block: u64,
 }
 /// The initial header line starts with the keyword `chain`,
 /// followed by 11 required attribute values, and ends with a blank line.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChainHeader {
+pub struct ChainHeader<From, To> {
     /// Chain score
     pub score: u64,
     /// (reference/target sequence)
-    pub t: ChainRange,
+    pub t: ChainRange<From>,
     /// (query sequence)
-    pub q: ChainRange,
+    pub q: ChainRange<To>,
     /// chain ID
     pub id: u32,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChainRange {
-    /// chromosome size
-    pub size: u64,
-    pub range: WithOrientation<GenomeRange>,
-}
+pub type ChainRange<C> = WithOrientation<GenomeRange<C>>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AlignmentBlock {
     /// the size of the ungapped alignment
@@ -56,29 +58,99 @@ pub struct AlignmentBlock {
     pub dq: u64,
 }
 
-impl Liftover {
-    pub fn indexed(&self) -> LiftoverIndexed {
+impl<From, To> Liftover<From, To> {
+    pub fn indexed(&self) -> LiftoverIndexed<From, To>
+    where
+        From: Contig + Ord + Clone,
+        To: Contig + Clone,
+    {
         LiftoverIndexed::from_liftover(self)
     }
 
-    pub fn map(&self, loc: GenomePosition) -> impl Iterator<Item = GenomePosition> + use<'_> {
-        self.map_raw(loc).map(|(r, _)| r)
+    pub fn find_input_contig(&self, contig: impl AsRef<str>) -> Option<From>
+    where
+        From: Clone,
+    {
+        self.contigs.get(contig.as_ref()).cloned()
     }
-    pub fn map_range(&self, range: GenomeRange) -> impl Iterator<Item = GenomeRange> + use<'_> {
-        self.map_range_raw(range).map(|(r, _)| r)
+
+    pub fn upgrade_contigs<NewFrom, NewTo>(
+        self,
+        mut from: impl FnMut(From) -> NewFrom,
+        mut to: impl FnMut(To) -> NewTo,
+    ) -> Liftover<NewFrom, NewTo> {
+        let chains = self
+            .chains
+            .into_iter()
+            .map(|c| c.upgrade_contigs(&mut from, &mut to))
+            .collect();
+        let contigs = self
+            .contigs
+            .into_iter()
+            .map(|(k, v)| (k, from(v)))
+            .collect();
+        Liftover { chains, contigs }
+    }
+}
+impl<From, To> Liftover<From, To>
+where
+    From: Contig,
+    To: Contig + Clone,
+{
+    pub fn map<C: AsRef<str>>(
+        &self,
+        loc: GenomePosition<C>,
+    ) -> impl Iterator<Item = GenomePosition<To>> + use<'_, From, To, C>
+    where
+        From: Clone,
+    {
+        let Some(internal) = self.find_input_contig(&loc.name) else {
+            log::warn!("[Liftover] Unknown contig: {}", loc.name.as_ref());
+            return None.into_iter().flatten();
+        };
+
+        let loc = GenomePosition {
+            name: internal.clone(),
+            at: loc.at,
+        };
+
+        Some(self.map_raw(loc).map(|(r, _)| r))
+            .into_iter()
+            .flatten()
+    }
+    pub fn map_range<C: AsRef<str>>(
+        &self,
+        range: GenomeRange<C>,
+    ) -> impl Iterator<Item = GenomeRange<To>> + use<'_, From, To, C>
+    where
+        From: Clone,
+    {
+        let Some(internal) = self.find_input_contig(&range.name) else {
+            log::warn!("[Liftover] Unknown contig: {}", range.name.as_ref());
+            return None.into_iter().flatten();
+        };
+
+        let range = GenomeRange {
+            name: internal.clone(),
+            at: range.at,
+        };
+
+        Some(self.map_range_raw(range).map(|(r, _)| r))
+            .into_iter()
+            .flatten()
     }
 
     pub fn map_raw(
         &self,
-        loc: GenomePosition,
-    ) -> impl Iterator<Item = (GenomePosition, bool)> + use<'_> {
+        loc: GenomePosition<From>,
+    ) -> impl Iterator<Item = (GenomePosition<To>, bool)> + use<'_, From, To> {
         let loc = WithOrientation {
             orientation: SequenceOrientation::Forward,
             v: loc,
         };
         self.chains
             .iter()
-            .flat_map(move |c| c.map_raw(loc.clone()))
+            .flat_map(move |c| c.map_raw(&loc))
             .map(|(r, f)| {
                 assert!(r.orientation.is_forward());
                 (r.v, f)
@@ -86,41 +158,43 @@ impl Liftover {
     }
     pub fn map_range_raw(
         &self,
-        range: GenomeRange,
-    ) -> impl Iterator<Item = (GenomeRange, bool)> + use<'_> {
+        range: GenomeRange<From>,
+    ) -> impl Iterator<Item = (GenomeRange<To>, bool)> + use<'_, From, To> {
         let range = WithOrientation {
             orientation: SequenceOrientation::Forward,
             v: range,
         };
         self.chains
             .iter()
-            .flat_map(move |c| c.map_range_raw(range.clone()))
+            .flat_map(move |c| c.map_range_raw(&range))
             .map(|(r, f)| {
                 assert!(r.orientation.is_forward());
                 (r.v, f)
             })
     }
-
-    fn iter_ranges(&self) -> impl Iterator<Item = (ChainRange, ChainRange)> + use<'_> {
-        self.chains.iter().flat_map(|c| c.iter_ranges())
-    }
 }
-impl Chain {
+impl<From, To> Chain<From, To>
+where
+    From: Contig,
+    To: Contig + Clone,
+{
     pub fn map_raw(
         &self,
-        mut loc: WithOrientation<GenomePosition>,
-    ) -> impl Iterator<Item = (WithOrientation<GenomePosition>, bool)> + use<'_> {
+        loc: &WithOrientation<GenomePosition<From>>,
+    ) -> impl Iterator<Item = (WithOrientation<GenomePosition<To>>, bool)> + use<'_, From, To> {
+        let mut loc = loc.as_ref_contig();
         let original_orientation = loc.orientation;
-        let initially_flipped = loc.orientation != self.header.t.range.orientation;
-        loc.set_orientation_with(self.header.t.range.orientation, self.header.t.size);
-        if !self.header.t.contains(&loc) {
+        let initially_flipped = loc.orientation != self.header.t.orientation;
+        loc.set_orientation(self.header.t.orientation);
+        if !self.header.t.as_ref_contig().contains(&loc) {
             return None.into_iter().flatten();
         }
         let at = loc.at;
-        drop(loc);
+        #[expect(unused_variables)]
+        let loc = ();
 
-        let mut t_start = self.header.t.range.at.start;
-        let mut q_start = self.header.q.range.at.start;
+        let mut t_start = self.header.t.at.start;
+        let mut q_start = self.header.q.at.start;
 
         let mapped = self
             .blocks()
@@ -129,9 +203,9 @@ impl Chain {
 
                 if (t_start..(t_start + b.size)).contains(&at) {
                     let new = WithOrientation {
-                        orientation: self.header.q.range.orientation,
+                        orientation: self.header.q.orientation,
                         v: GenomePosition {
-                            name: self.header.q.range.name.clone(),
+                            name: self.header.q.name.clone(),
                             at: q_start + (at - t_start),
                         },
                     };
@@ -159,9 +233,9 @@ impl Chain {
                 };
                 assert_eq!(
                     flipped,
-                    self.header.t.range.orientation != self.header.q.range.orientation
+                    self.header.t.orientation != self.header.q.orientation
                 );
-                r.set_orientation_with(original_orientation, self.header.q.size);
+                r.set_orientation_with(original_orientation, self.header.q.name.size());
                 (r, flipped)
             });
 
@@ -169,35 +243,35 @@ impl Chain {
     }
     pub fn map_range_raw(
         &self,
-        range: WithOrientation<GenomeRange>,
-    ) -> impl Iterator<Item = (WithOrientation<GenomeRange>, bool)> + use<'_> {
-        let intersected = match self.header.t.intersect(range.clone()) {
-            Some(intersected) if intersected.is_empty() => return None.into_iter().flatten(),
-            Some(intersected) => intersected,
-            None => return None.into_iter().flatten(),
-        };
-        assert_eq!(intersected.name, range.name);
+        range: &WithOrientation<GenomeRange<From>>,
+    ) -> impl Iterator<Item = (WithOrientation<GenomeRange<To>>, bool)> + use<'_, From, To> {
+        let mut range = range.as_ref_contig();
         let original_orientation = range.orientation;
-        let initially_flipped = range.orientation != self.header.t.range.orientation;
-        drop(range);
+        let initially_flipped = range.orientation != self.header.t.orientation;
+        range.set_orientation(self.header.t.orientation);
+        if !self.header.t.as_ref_contig().overlaps(&range) {
+            return None.into_iter().flatten();
+        }
+        let at = range.v.at.clone();
+        #[expect(unused_variables)]
+        let range = ();
 
-        let mut t_start = self.header.t.range.at.start;
-        let mut q_start = self.header.q.range.at.start;
+        let mut t_start = self.header.t.at.start;
+        let mut q_start = self.header.q.at.start;
 
         let mapped = self
             .blocks()
             .filter_map(move |b| {
                 let mut r = None;
 
-                let intersected =
-                    (t_start..(t_start + b.size)).intersection(intersected.at.clone());
+                let intersected = (t_start..(t_start + b.size)).intersection(at.clone());
 
                 if !intersected.is_empty() {
                     let shift = intersected.start - t_start;
                     r = Some(WithOrientation {
-                        orientation: self.header.q.range.orientation,
+                        orientation: self.header.q.orientation,
                         v: GenomeRange {
-                            name: self.header.q.range.name.clone(),
+                            name: self.header.q.name.clone(),
                             at: (q_start + shift)..(q_start + shift + intersected.range_len()),
                         },
                     });
@@ -223,15 +297,17 @@ impl Chain {
                 };
                 assert_eq!(
                     flipped,
-                    self.header.t.range.orientation != self.header.q.range.orientation
+                    self.header.t.orientation != self.header.q.orientation
                 );
-                r.set_orientation_with(original_orientation, self.header.q.size);
+                r.set_orientation(original_orientation);
                 (r, flipped)
             });
 
         Some(mapped).into_iter().flatten()
     }
-    pub fn blocks(&self) -> impl Iterator<Item = AlignmentBlock> + use<'_> {
+}
+impl<From, To> Chain<From, To> {
+    pub fn blocks(&self) -> impl Iterator<Item = AlignmentBlock> + use<'_, From, To> {
         self.blocks.iter().copied().chain([AlignmentBlock {
             size: self.last_block,
             dt: 0,
@@ -239,9 +315,54 @@ impl Chain {
         }])
     }
 
-    fn iter_ranges(&self) -> impl Iterator<Item = (ChainRange, ChainRange)> + use<'_> {
-        let mut t_start = self.header.t.range.at.start;
-        let mut q_start = self.header.q.range.at.start;
+    pub fn upgrade_contigs<NewFrom, NewTo>(
+        self,
+        from: impl FnMut(From) -> NewFrom,
+        to: impl FnMut(To) -> NewTo,
+    ) -> Chain<NewFrom, NewTo> {
+        Chain {
+            header: self.header.upgrade_contigs(from, to),
+            blocks: self.blocks,
+            last_block: self.last_block,
+        }
+    }
+}
+impl<From, To> ChainHeader<From, To> {
+    pub fn upgrade_contigs<NewFrom, NewTo>(
+        self,
+        from: impl FnMut(From) -> NewFrom,
+        to: impl FnMut(To) -> NewTo,
+    ) -> ChainHeader<NewFrom, NewTo> {
+        ChainHeader {
+            score: self.score,
+            t: self.t.map_value(|v| v.map_contig(from)),
+            q: self.q.map_value(|v| v.map_contig(to)),
+            id: self.id,
+        }
+    }
+}
+
+impl<From, To> Liftover<From, To> {
+    fn iter_ranges(
+        &self,
+    ) -> impl Iterator<Item = (ChainRange<From>, ChainRange<To>)> + use<'_, From, To>
+    where
+        From: Clone,
+        To: Clone,
+    {
+        self.chains.iter().flat_map(|c| c.iter_ranges())
+    }
+}
+impl<From, To> Chain<From, To> {
+    fn iter_ranges(
+        &self,
+    ) -> impl Iterator<Item = (ChainRange<From>, ChainRange<To>)> + use<'_, From, To>
+    where
+        From: Clone,
+        To: Clone,
+    {
+        let mut t_start = self.header.t.at.start;
+        let mut q_start = self.header.q.at.start;
 
         self.blocks().map(move |b| {
             let t_fragment = t_start..(t_start + b.size);
@@ -257,77 +378,66 @@ impl Chain {
             q_start += b.dq;
 
             (
-                ChainRange {
-                    size: self.header.t.size,
-                    range: WithOrientation {
-                        orientation: self.header.t.range.orientation,
-                        v: GenomeRange {
-                            name: self.header.t.range.name.clone(),
-                            at: t_fragment,
-                        },
+                WithOrientation {
+                    orientation: self.header.t.orientation,
+                    v: GenomeRange {
+                        name: self.header.t.name.clone(),
+                        at: t_fragment,
                     },
                 },
-                ChainRange {
-                    size: self.header.q.size,
-                    range: WithOrientation {
-                        orientation: self.header.q.range.orientation,
-                        v: GenomeRange {
-                            name: self.header.q.range.name.clone(),
-                            at: q_fragment,
-                        },
+                WithOrientation {
+                    orientation: self.header.q.orientation,
+                    v: GenomeRange {
+                        name: self.header.q.name.clone(),
+                        at: q_fragment,
                     },
                 },
             )
         })
     }
 }
-impl ChainRange {
-    fn contains(&self, loc: &WithOrientation<GenomePosition>) -> bool {
-        self.range.contains_with(loc, self.size)
-    }
-    fn intersect(&self, b: WithOrientation<GenomeRange>) -> Option<WithOrientation<GenomeRange>> {
-        self.range.intersection_with(b, self.size)
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LiftoverIndexed {
-    chromosomes: BTreeMap<String, (Vec<LiftoverIndexedEntry>, u64)>,
+pub struct LiftoverIndexed<In = ArcContig, Out = ArcContig> {
+    chromosomes: BTreeMap<In, Vec<LiftoverIndexedEntry<Out>>>,
+    contigs: BTreeMap<String, In>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct LiftoverIndexedEntry {
+struct LiftoverIndexedEntry<Out> {
     range: Range<u64>,
     max: u64,
-    data: ChainRange,
+    data: ChainRange<Out>,
 }
-impl LiftoverIndexed {
-    pub fn c_size(&self, c: &str) -> u64 {
-        self.chromosomes.get(c).unwrap().1
-    }
-    fn from_liftover(liftover: &Liftover) -> Self {
-        let mut chromosomes: BTreeMap<String, (Vec<LiftoverIndexedEntry>, u64)> = BTreeMap::new();
+impl<From, To> LiftoverIndexed<From, To> {
+    fn from_liftover(liftover: &Liftover<From, To>) -> Self
+    where
+        From: Contig + Ord + Clone,
+        To: Contig + Clone,
+    {
+        let mut chromosomes: BTreeMap<From, Vec<LiftoverIndexedEntry<To>>> = BTreeMap::new();
+        let mut contigs: BTreeMap<String, From> = BTreeMap::new();
 
         for (mut from, mut to) in liftover.iter_ranges() {
-            assert!(!from.range.is_empty(), "{from:?}");
-            assert!(!to.range.is_empty(), "{to:?}");
+            assert!(!from.is_empty());
+            assert!(!to.is_empty());
 
-            if from.range.orientation != SequenceOrientation::Forward {
-                from.range = from.range.flip_orientation_with(from.size);
-                to.range = to.range.flip_orientation_with(to.size);
+            if from.orientation != SequenceOrientation::Forward {
+                from = from.flip_orientation();
+                to = to.flip_orientation();
             }
 
-            let (chr, _size) = chromosomes
-                .entry(from.range.v.name)
-                .or_insert((vec![], from.size));
+            let chr = chromosomes.entry(from.v.name.clone()).or_default();
 
             chr.push(LiftoverIndexedEntry {
-                range: from.range.v.at,
+                range: from.v.at,
                 max: 0,
                 data: to,
             });
+
+            contigs.insert(from.v.name.as_ref().to_owned(), from.v.name.clone());
         }
 
-        for (entries, _) in chromosomes.values_mut() {
+        for entries in chromosomes.values_mut() {
             entries.sort_unstable_by_key(|e| (e.range.start, e.range.end));
             if !entries.is_empty() {
                 entries[0].max = entries[0].range.end;
@@ -337,43 +447,100 @@ impl LiftoverIndexed {
             }
         }
 
-        Self { chromosomes }
+        Self {
+            chromosomes,
+            contigs,
+        }
     }
 
-    pub fn map(&self, loc: GenomePosition) -> impl Iterator<Item = GenomePosition> + use<'_> {
-        self.map_raw(WithOrientation {
-            orientation: SequenceOrientation::Forward,
-            v: loc,
-        })
-        .map(|(r, _)| {
-            assert!(r.orientation.is_forward());
-            r.v
-        })
+    pub fn find_input_contig(&self, contig: impl AsRef<str>) -> Option<From>
+    where
+        From: Clone,
+    {
+        self.contigs.get(contig.as_ref()).cloned()
     }
-    pub fn map_range(&self, from: GenomeRange) -> impl Iterator<Item = GenomeRange> + use<'_> {
-        self.map_range_raw(WithOrientation {
-            orientation: SequenceOrientation::Forward,
-            v: from,
-        })
-        .map(|(r, _)| {
-            assert!(r.orientation.is_forward());
-            r.v
-        })
+}
+impl<From, To> LiftoverIndexed<From, To>
+where
+    From: Contig + Ord,
+    To: Contig + Clone,
+{
+    pub fn map<C: AsRef<str>>(
+        &self,
+        loc: GenomePosition<C>,
+    ) -> impl Iterator<Item = GenomePosition<To>> + use<'_, From, To, C>
+    where
+        From: Clone,
+    {
+        let Some(internal) = self.find_input_contig(&loc.name) else {
+            log::warn!("[Liftover] Unknown contig: {}", loc.name.as_ref());
+            return None.into_iter().flatten();
+        };
+
+        let loc = GenomePosition {
+            name: internal.clone(),
+            at: loc.at,
+        };
+
+        Some(
+            self.map_raw(&WithOrientation {
+                orientation: SequenceOrientation::Forward,
+                v: loc,
+            })
+            .map(|(r, _)| {
+                assert!(r.orientation.is_forward());
+                r.v
+            }),
+        )
+        .into_iter()
+        .flatten()
+    }
+    pub fn map_range<C: AsRef<str>>(
+        &self,
+        range: GenomeRange<C>,
+    ) -> impl Iterator<Item = GenomeRange<To>> + use<'_, From, To, C>
+    where
+        From: Clone,
+    {
+        let Some(internal) = self.find_input_contig(&range.name) else {
+            log::warn!("[Liftover] Unknown contig: {}", range.name.as_ref());
+            return None.into_iter().flatten();
+        };
+
+        let range = GenomeRange {
+            name: internal.clone(),
+            at: range.at,
+        };
+
+        Some(
+            self.map_range_raw(&WithOrientation {
+                orientation: SequenceOrientation::Forward,
+                v: range,
+            })
+            .map(|(r, _)| {
+                assert!(r.orientation.is_forward());
+                r.v
+            }),
+        )
+        .into_iter()
+        .flatten()
     }
 
     pub fn map_raw(
         &self,
-        mut loc: WithOrientation<GenomePosition>,
-    ) -> impl Iterator<Item = (WithOrientation<GenomePosition>, bool)> + use<'_> {
-        let Some((ranges, size)) = self.chromosomes.get(&loc.v.name) else {
+        loc: &WithOrientation<GenomePosition<From>>,
+    ) -> impl Iterator<Item = (WithOrientation<GenomePosition<To>>, bool)> + use<'_, From, To> {
+        let Some(ranges) = self.chromosomes.get(&loc.v.name) else {
             return None.into_iter().flatten();
         };
 
+        let mut loc = loc.as_ref_contig();
         let original_orientation = loc.orientation;
         let initially_flipped = loc.orientation != SequenceOrientation::Forward;
-        loc.set_orientation_with(SequenceOrientation::Forward, *size);
+        loc.set_orientation(SequenceOrientation::Forward);
         let at = loc.at;
-        drop(loc);
+        #[expect(unused_variables)]
+        let loc = ();
 
         // Note: `partition_point` splits by [true, true, true,|false, false]
 
@@ -393,10 +560,10 @@ impl LiftoverIndexed {
             if r.range.contains(&at) {
                 let shift = at - r.range.start;
                 let mut new = WithOrientation {
-                    orientation: r.data.range.orientation,
+                    orientation: r.data.orientation,
                     v: GenomePosition {
-                        name: r.data.range.name.clone(),
-                        at: r.data.range.at.start + shift,
+                        name: r.data.v.name.clone(),
+                        at: r.data.v.at.start + shift,
                     },
                 };
                 let flipped = if initially_flipped {
@@ -408,11 +575,8 @@ impl LiftoverIndexed {
                     // If we ended up on the opposite strand, let's make a note that we are flipping back.
                     new.orientation != original_orientation
                 };
-                assert_eq!(
-                    flipped,
-                    SequenceOrientation::Forward != r.data.range.orientation
-                );
-                new.set_orientation_with(original_orientation, r.data.size);
+                assert_eq!(flipped, SequenceOrientation::Forward != r.data.orientation);
+                new.set_orientation(original_orientation);
                 Some((new, flipped))
             } else {
                 None
@@ -423,17 +587,19 @@ impl LiftoverIndexed {
     }
     pub fn map_range_raw(
         &self,
-        mut from: WithOrientation<GenomeRange>,
-    ) -> impl Iterator<Item = (WithOrientation<GenomeRange>, bool)> + use<'_> {
-        let Some((ranges, size)) = self.chromosomes.get(&from.name) else {
+        from: &WithOrientation<GenomeRange<From>>,
+    ) -> impl Iterator<Item = (WithOrientation<GenomeRange<To>>, bool)> + use<'_, From, To> {
+        let Some(ranges) = self.chromosomes.get(&from.v.name) else {
             return None.into_iter().flatten();
         };
 
+        let mut from = from.as_ref_contig();
         let original_orientation = from.orientation;
         let initially_flipped = from.orientation != SequenceOrientation::Forward;
-        from.set_orientation_with(SequenceOrientation::Forward, *size);
-        let at = from.at.clone();
-        drop(from);
+        from.set_orientation(SequenceOrientation::Forward);
+        let at = from.v.at.clone();
+        #[expect(unused_variables)]
+        let from = ();
 
         // Note: `partition_point` splits by [true, true, true,|false, false]
 
@@ -454,11 +620,11 @@ impl LiftoverIndexed {
             if !intersected.is_empty() {
                 let shift = intersected.start - r.range.start;
                 let mut new = WithOrientation {
-                    orientation: r.data.range.orientation,
+                    orientation: r.data.orientation,
                     v: GenomeRange {
-                        name: r.data.range.name.clone(),
-                        at: (r.data.range.at.start + shift)
-                            ..(r.data.range.at.start + shift + intersected.range_len()),
+                        name: r.data.v.name.clone(),
+                        at: (r.data.v.at.start + shift)
+                            ..(r.data.v.at.start + shift + intersected.range_len()),
                     },
                 };
                 let flipped = if initially_flipped {
@@ -470,11 +636,8 @@ impl LiftoverIndexed {
                     // If we ended up on the opposite strand, let's make a note that we are flipping back.
                     new.orientation != original_orientation
                 };
-                assert_eq!(
-                    flipped,
-                    SequenceOrientation::Forward != r.data.range.orientation
-                );
-                new.set_orientation_with(original_orientation, r.data.size);
+                assert_eq!(flipped, SequenceOrientation::Forward != r.data.orientation);
+                new.set_orientation(original_orientation);
                 Some((new, flipped))
             } else {
                 None
@@ -488,11 +651,15 @@ impl LiftoverIndexed {
 mod boilerplate {
     use std::fmt;
 
-    use biocore::location::orientation::SequenceOrientation;
+    use biocore::{genome::Contig, location::orientation::SequenceOrientation};
 
     use super::{AlignmentBlock, Chain, ChainHeader, Liftover};
 
-    impl fmt::Display for Liftover {
+    impl<From, To> fmt::Display for Liftover<From, To>
+    where
+        From: Contig,
+        To: Contig,
+    {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             for chain in &self.chains {
                 writeln!(f, "{chain}\n")?;
@@ -500,7 +667,11 @@ mod boilerplate {
             Ok(())
         }
     }
-    impl fmt::Display for Chain {
+    impl<From, To> fmt::Display for Chain<From, To>
+    where
+        From: Contig,
+        To: Contig,
+    {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let Self {
                 header,
@@ -516,7 +687,11 @@ mod boilerplate {
             Ok(())
         }
     }
-    impl fmt::Display for ChainHeader {
+    impl<From, To> fmt::Display for ChainHeader<From, To>
+    where
+        From: Contig,
+        To: Contig,
+    {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             fn o(o: SequenceOrientation) -> &'static str {
                 match o {
@@ -528,16 +703,16 @@ mod boilerplate {
                 f,
                 "chain {} {} {} {} {} {} {} {} {} {} {} {}",
                 self.score,
-                self.t.range.name,
-                self.t.size,
-                o(self.t.range.orientation),
-                self.t.range.at.start,
-                self.t.range.at.end,
-                self.q.range.name,
-                self.q.size,
-                o(self.q.range.orientation),
-                self.q.range.at.start,
-                self.q.range.at.end,
+                self.t.v.name.as_ref(),
+                self.t.v.name.size(),
+                o(self.t.orientation),
+                self.t.v.at.start,
+                self.t.v.at.end,
+                self.q.v.name.as_ref(),
+                self.q.v.name.size(),
+                o(self.q.orientation),
+                self.q.v.at.start,
+                self.q.v.at.end,
                 self.id
             )
         }
@@ -549,17 +724,29 @@ mod boilerplate {
     }
 
     struct DebugPrint<T>(T);
-    impl Liftover {
+    impl<From, To> Liftover<From, To>
+    where
+        From: Contig,
+        To: Contig,
+    {
         pub fn to_debug_display(&self) -> String {
             format!("{:?}", DebugPrint(self))
         }
     }
-    impl Chain {
+    impl<From, To> Chain<From, To>
+    where
+        From: Contig,
+        To: Contig,
+    {
         pub fn to_debug_display(&self) -> String {
             format!("{:?}", DebugPrint(self))
         }
     }
-    impl std::fmt::Debug for DebugPrint<&Liftover> {
+    impl<From, To> std::fmt::Debug for DebugPrint<&Liftover<From, To>>
+    where
+        From: Contig,
+        To: Contig,
+    {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             for chain in &self.0.chains {
                 writeln!(f, "{:?}\n", DebugPrint(chain))?;
@@ -567,7 +754,11 @@ mod boilerplate {
             Ok(())
         }
     }
-    impl std::fmt::Debug for DebugPrint<&Chain> {
+    impl<From, To> std::fmt::Debug for DebugPrint<&Chain<From, To>>
+    where
+        From: Contig,
+        To: Contig,
+    {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let Chain {
                 header,
@@ -577,8 +768,8 @@ mod boilerplate {
 
             writeln!(f, "{header}")?;
 
-            let mut t_start = header.t.range.at.start;
-            let mut q_start = header.q.range.at.start;
+            let mut t_start = header.t.v.at.start;
+            let mut q_start = header.q.v.at.start;
             for block in blocks {
                 let AlignmentBlock { size, dt, dq } = *block;
                 write!(f, "\t{block}\t\t|\t\t{t_start} {q_start} -> ")?;

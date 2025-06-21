@@ -1,11 +1,12 @@
 use std::{
+    collections::BTreeSet,
     fs::File,
     io::{BufRead, BufReader, Read},
     path::Path,
     str,
 };
 
-use biocore::location::orientation::WithOrientation;
+use biocore::{genome::ArcContig, location::orientation::WithOrientation};
 use flate2::read::MultiGzDecoder;
 
 use utile::{
@@ -17,7 +18,7 @@ use super::{
     AlignmentBlock, Chain, ChainHeader, ChainRange, GenomeRange, Liftover, SequenceOrientation,
 };
 
-impl Liftover {
+impl Liftover<ArcContig, ArcContig> {
     pub fn load(resource: impl RawResource) -> anyhow::Result<Self> {
         Ok(Self::read(resource.decompressed().buffered().read()?)?)
     }
@@ -37,11 +38,24 @@ impl Liftover {
         let mut chains = vec![];
         let mut buf = vec![];
 
-        while let Some(chain) = read_section(&mut buf, &mut reader)? {
+        let mut contigs_from = BTreeSet::new();
+        let mut contigs_to = BTreeSet::new();
+
+        while let Some(chain) =
+            read_section(&mut buf, &mut reader, &mut contigs_from, &mut contigs_to)?
+        {
             chains.push(chain)
         }
 
-        Ok(Self { chains })
+        check_contigs(&contigs_from)?;
+        check_contigs(&contigs_to)?;
+
+        let contigs = contigs_from
+            .into_iter()
+            .map(|c| (c.as_ref().to_owned(), c))
+            .collect();
+
+        Ok(Self { chains, contigs })
     }
     pub fn read_file(path: impl AsRef<Path>) -> Result<Self, std::io::Error> {
         let file = File::open(path)?;
@@ -58,11 +72,13 @@ impl Liftover {
 fn read_section(
     buf: &mut Vec<u8>,
     reader: &mut impl BufRead,
-) -> Result<Option<Chain>, std::io::Error> {
+    contigs_from: &mut BTreeSet<ArcContig>,
+    contigs_to: &mut BTreeSet<ArcContig>,
+) -> Result<Option<Chain<ArcContig, ArcContig>>, std::io::Error> {
     loop {
         let preview = reader.fill_buf()?;
         return match preview {
-            [b'c', ..] => Ok(Some(read_chain(buf, reader)?)),
+            [b'c', ..] => Ok(Some(read_chain(buf, reader, contigs_from, contigs_to)?)),
             [] => Ok(None),
             [b'\r' | b'\n' | b'#', ..] => {
                 reader.read_until(b'\n', buf)?;
@@ -75,7 +91,12 @@ fn read_section(
         };
     }
 }
-fn read_chain(buf: &mut Vec<u8>, reader: &mut impl BufRead) -> Result<Chain, std::io::Error> {
+fn read_chain(
+    buf: &mut Vec<u8>,
+    reader: &mut impl BufRead,
+    contigs_from: &mut BTreeSet<ArcContig>,
+    contigs_to: &mut BTreeSet<ArcContig>,
+) -> Result<Chain<ArcContig, ArcContig>, std::io::Error> {
     {
         buf.clear();
         reader.read_until(b' ', buf)?;
@@ -92,8 +113,8 @@ fn read_chain(buf: &mut Vec<u8>, reader: &mut impl BufRead) -> Result<Chain, std
 
     let header = ChainHeader {
         score: utile::io::read::from_str(buf, reader, b' ')?,
-        t: read_chain_side(buf, reader)?,
-        q: read_chain_side(buf, reader)?,
+        t: read_chain_side(buf, reader, contigs_from)?,
+        q: read_chain_side(buf, reader, contigs_to)?,
         id: utile::io::read::line(buf, reader)?,
     };
 
@@ -155,7 +176,8 @@ fn read_chain(buf: &mut Vec<u8>, reader: &mut impl BufRead) -> Result<Chain, std
 fn read_chain_side(
     buf: &mut Vec<u8>,
     reader: &mut impl BufRead,
-) -> Result<ChainRange, std::io::Error> {
+    contigs: &mut BTreeSet<ArcContig>,
+) -> Result<ChainRange<ArcContig>, std::io::Error> {
     let name = utile::io::read::string(buf, reader, b' ')?;
     let size = utile::io::read::from_str(buf, reader, b' ')?;
     let orientation = {
@@ -174,12 +196,13 @@ fn read_chain_side(
         start..end
     };
 
-    Ok(ChainRange {
-        size,
-        range: WithOrientation {
-            orientation,
-            v: GenomeRange { name, at },
-        },
+    let contig = contigs
+        .get_or_insert(ArcContig::new(name.into(), size))
+        .clone();
+
+    Ok(WithOrientation {
+        orientation,
+        v: GenomeRange { name: contig, at },
     })
 }
 
@@ -192,5 +215,21 @@ fn parse_sequence_orientation(s: &[u8]) -> Result<SequenceOrientation, std::io::
             std::io::ErrorKind::InvalidData,
             format!("Invalid sequence orientation: {:?}", str::from_utf8(s)),
         )),
+    }
+}
+
+fn check_contigs(contigs: &BTreeSet<ArcContig>) -> Result<(), std::io::Error> {
+    let unique_contig_name_count = contigs
+        .iter()
+        .map(|c| c.as_ref())
+        .collect::<BTreeSet<_>>()
+        .len();
+    if contigs.len() != unique_contig_name_count {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("Duplicate contig names in chain file: {contigs:?}"),
+        ))
+    } else {
+        Ok(())
     }
 }

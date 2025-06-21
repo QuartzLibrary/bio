@@ -1,7 +1,10 @@
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::{collections::BTreeMap, ops::Range};
 
-use biocore::location::{GenomePosition, GenomeRange};
+use biocore::{
+    genome::Contig,
+    location::{GenomePosition, GenomeRange},
+};
 use utile::resource::{RawResource, RawResourceExt};
 
 use liftover::{
@@ -115,16 +118,16 @@ fn contigs(liftover: &Liftover) -> Vec<(String, u64)> {
     let mut contigs = BTreeMap::new();
     for chain in &liftover.chains {
         let contig = &chain.header.t;
-        let old = contigs.insert(contig.range.name.clone(), contig.size);
+        let old = contigs.insert(contig.v.name.as_ref().to_owned(), contig.v.name.size());
         if let Some(old) = old {
-            assert_eq!(old, contig.size);
+            assert_eq!(old, contig.v.name.size());
         }
     }
     contigs.into_iter().collect()
 }
 
 fn generate_snp_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomePosition> {
-    let mut t_start = chain.header.t.range.at.start;
+    let mut t_start = chain.header.t.v.at.start;
 
     let mut cases = vec![];
 
@@ -157,13 +160,13 @@ fn generate_snp_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomePosit
     cases
         .into_iter()
         .map(|at| GenomePosition {
-            name: chain.header.t.range.name.clone(),
+            name: chain.header.t.v.name.as_ref().to_owned(),
             at,
         })
         .collect()
 }
 fn generate_range_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomeRange> {
-    let mut t_start = chain.header.t.range.at.start;
+    let mut t_start = chain.header.t.v.at.start;
 
     let mut cases = vec![];
 
@@ -216,7 +219,7 @@ fn generate_range_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomeRan
             let at = if end < start { end..start } else { start..end };
             // assert!(!at.is_empty());
             GenomeRange {
-                name: chain.header.t.range.name.clone(),
+                name: chain.header.t.v.name.as_ref().to_owned(),
                 at,
             }
         })
