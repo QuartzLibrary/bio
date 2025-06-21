@@ -84,6 +84,7 @@ fn check_testpoints_internal() -> anyhow::Result<()> {
     Ok(())
 }
 #[test]
+#[ignore = "slow"]
 fn check_testpoints_slow() -> anyhow::Result<()> {
     for (from, to) in UcscHG::valid_pairs() {
         println!("{from} {to}");

@@ -38,3 +38,25 @@ jobs:
 
       - name: Check project (WASM)
         run: cargo clippy --workspace --all-features --target wasm32-unknown-unknown -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check project
+        run: RUST_BACKTRACE=1 cargo test --workspace --all-targets --all-features
