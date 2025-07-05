@@ -706,6 +706,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ensembl"
+version = "0.1.0"
+dependencies = [
+ "biocore",
+ "env_logger",
+ "log",
+ "noodles",
+ "phf",
+ "serde",
+ "tokio",
+ "url",
+ "utile",
+]
+
+[[package]]
 name = "env_filter"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3254,6 +3269,7 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_json",
+ "serde_with",
  "suppaftp",
  "tempfile",
  "thiserror",

@@ -1,0 +1,18 @@
+[package]
+name = "ensembl"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+biocore = { path = "../biocore" }
+utile = { path = "../utile" }
+
+log = "0.4"
+noodles = { version = "0.98", features = ["core", "fasta", "vcf"] }
+phf = { version = "0.11", features = ["macros"] }
+serde = { version = "1", features = ["derive"] }
+url = { version = "2", features = ["serde"] }
+
+[dev-dependencies]
+env_logger = "0.11"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
