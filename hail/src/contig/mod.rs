@@ -286,7 +286,7 @@ impl GRCh37Contig {
         Some(Self { contig })
     }
     pub fn new_chr(number: usize) -> Option<Self> {
-        Self::new(&format!("chr{number}"))
+        Self::new(&format!("{number}"))
     }
 
     pub const CHROMOSOMES: [Self; 25] = [
@@ -455,7 +455,23 @@ mod tests {
     }
 
     #[test]
+    fn test_grch38_hardcoded() {
+        for c in GRCh38Contig::CHROMOSOMES {
+            GRCh38Contig::new(c.contig).unwrap();
+        }
+        GRCh38Contig::new(GRCh38Contig::MT.contig).unwrap();
+    }
+
+    #[test]
     fn test_grch37_contig_chromosomes_sorted() {
         assert!(GRCh37Contig::CHROMOSOMES.iter().is_sorted());
+    }
+
+    #[test]
+    fn test_grch37_hardcoded() {
+        for c in GRCh37Contig::CHROMOSOMES {
+            GRCh37Contig::new(c.contig).unwrap();
+        }
+        GRCh37Contig::new(GRCh37Contig::MT.contig).unwrap();
     }
 }
