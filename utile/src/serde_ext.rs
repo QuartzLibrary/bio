@@ -1,9 +1,17 @@
-use std::marker::PhantomData;
+use std::{
+    fmt::{self, Display},
+    marker::PhantomData,
+    str::FromStr,
+};
 
 use serde::{
-    de::{EnumAccess, SeqAccess, Unexpected, VariantAccess},
+    de::{EnumAccess, SeqAccess, Unexpected, VariantAccess, Visitor},
     Deserializer,
 };
+use serde_with::formats::{CommaSeparator, SemicolonSeparator, SpaceSeparator};
+
+pub use serde_with::formats::Separator;
+
 /// A simple deserializer that parses a string into the correct value
 /// requested by the deserialized type.
 pub struct StringDeserializer<'de, E>(&'de str, PhantomData<E>);
@@ -681,5 +689,100 @@ where
                 seed.deserialize(StringDeserializer::new(value)).map(Some)
             }
         }
+    }
+}
+
+pub type SpaceSeparated<T> = Separated<SpaceSeparator, T>;
+pub type CommaSeparated<T> = Separated<CommaSeparator, T>;
+pub type SemicolonSeparated<T> = Separated<SemicolonSeparator, T>;
+pub type PipeSeparated<T> = Separated<PipeSeparator, T>;
+
+/// Adapted from [serde_with::StringWithSeparator].
+pub struct Separated<Pattern, T> {
+    _marker: PhantomData<(Pattern, T)>,
+}
+impl<Pattern: Separator, T> Separated<Pattern, T> {
+    pub fn serialize<S, A>(v: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+        for<'a> &'a T: IntoIterator<Item = &'a A>,
+        A: Display,
+        // This set of bounds is enough to make the function compile but has inference issues
+        // making it unusable at the moment.
+        // https://github.com/rust-lang/rust/issues/89196#issuecomment-932024770
+        // for<'a> &'a T: IntoIterator,
+        // for<'a> <&'a T as IntoIterator>::Item: Display,
+    {
+        struct DisplayWithSeparator<'a, T, Pattern>(&'a T, PhantomData<Pattern>);
+
+        impl<'a, T, Pattern> Display for DisplayWithSeparator<'a, T, Pattern>
+        where
+            Pattern: Separator,
+            &'a T: IntoIterator,
+            <&'a T as IntoIterator>::Item: Display,
+        {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let mut iter = self.0.into_iter();
+
+                if let Some(first) = iter.next() {
+                    first.fmt(f)?;
+                }
+                for elem in iter {
+                    f.write_str(Pattern::separator())?;
+                    elem.fmt(f)?;
+                }
+
+                Ok(())
+            }
+        }
+
+        serializer.collect_str(&DisplayWithSeparator::<T, Pattern>(v, PhantomData))
+    }
+
+    pub fn deserialize<'de, D, A>(deserializer: D) -> Result<T, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+        T: FromIterator<A>,
+        A: FromStr,
+        A::Err: Display,
+    {
+        struct Helper<Pattern, T, A>(PhantomData<(Pattern, T, A)>);
+
+        impl<Pattern, T, A> Visitor<'_> for Helper<Pattern, T, A>
+        where
+            Pattern: Separator,
+            T: FromIterator<A>,
+            A: FromStr,
+            A::Err: Display,
+        {
+            type Value = T;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a string")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if value.is_empty() {
+                    Ok(None.into_iter().collect())
+                } else {
+                    value
+                        .split(Pattern::separator())
+                        .map(FromStr::from_str)
+                        .collect::<Result<_, _>>()
+                        .map_err(serde::de::Error::custom)
+                }
+            }
+        }
+
+        deserializer.deserialize_str(Helper::<Pattern, T, _>(PhantomData))
+    }
+}
+pub struct PipeSeparator;
+impl Separator for PipeSeparator {
+    fn separator() -> &'static str {
+        "|"
     }
 }
