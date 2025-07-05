@@ -9,7 +9,6 @@ ids = { path = "../ids" }
 utile = { path = "../utile" }
 
 csv = "1"
-flate2 = "1"
 log = "0.4"
 ordered-float = { version = "5", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }

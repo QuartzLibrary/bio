@@ -3,14 +3,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use ordered_float::NotNan;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tar::Archive;
 
-use ids::pgs::PgsId;
+use ids::{
+    pgs::{pgp::PgpId, ppm::PpmId, pss::PssId, PgsId},
+    pubmed::PubmedId,
+};
+use url::Url;
 use utile::resource::{RawResource, RawResourceExt};
 
 use crate::{PgsCatalogResource, WeightType};
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Metadata {
     pub cohorts: Vec<Cohort>,
     pub evaluation_sample_sets: Vec<EvaluationSampleSet>,
@@ -56,17 +62,20 @@ impl Cohort {
 #[serde(deny_unknown_fields)]
 pub struct EvaluationSampleSet {
     #[serde(rename = "PGS Sample Set (PSS)")]
-    pub pgs_sample_set: String,
+    pub pgs_sample_set: PssId,
     #[serde(rename = "Polygenic Score (PGS) ID")]
-    pub score_ids: String, // TODO: Vec<PgsId>
+    #[serde(with = "SpaceCommaSeparated")]
+    pub score_ids: Vec<PgsId>,
     #[serde(rename = "Number of Individuals")]
-    pub number_of_individuals: String,
+    pub number_of_individuals: usize,
     #[serde(rename = "Number of Cases")]
-    pub number_of_cases: String,
+    #[serde(with = "decimal_usize")]
+    pub number_of_cases: Option<usize>,
     #[serde(rename = "Number of Controls")]
-    pub number_of_controls: String,
+    #[serde(with = "decimal_usize")]
+    pub number_of_controls: Option<usize>,
     #[serde(rename = "Percent of Participants Who are Male")]
-    pub percent_of_participants_who_are_male: String,
+    pub percent_of_participants_who_are_male: Option<NotNan<f64>>,
     #[serde(rename = "Sample Age")]
     pub sample_age: String,
     #[serde(rename = "Broad Ancestry Category")]
@@ -84,11 +93,13 @@ pub struct EvaluationSampleSet {
     #[serde(rename = "GWAS Catalog Study ID (GCST...)")]
     pub gwas_catalog_study_id: String,
     #[serde(rename = "Source PubMed ID (PMID)")]
-    pub source_pubmed_id: String,
+    #[serde(with = "decimal_pmid")]
+    pub source_pubmed_id: Option<PubmedId>,
     #[serde(rename = "Source DOI")]
     pub source_doi: String,
     #[serde(rename = "Cohort(s)")]
-    pub cohorts: String,
+    #[serde(with = "utile::serde_ext::PipeSeparated")]
+    pub cohorts: Vec<String>,
     #[serde(rename = "Additional Sample/Cohort Information")]
     pub additional_sample_cohort_information: String,
 }
@@ -111,13 +122,13 @@ impl EvaluationSampleSet {
 #[serde(deny_unknown_fields)]
 pub struct PerformanceMetric {
     #[serde(rename = "PGS Performance Metric (PPM) ID")]
-    pub pgs_performance_metric_id: String,
+    pub id: PpmId,
     #[serde(rename = "Evaluated Score")]
-    pub evaluated_score: String,
+    pub evaluated_score: PgsId,
     #[serde(rename = "PGS Sample Set (PSS)")]
-    pub pgs_sample_set: String,
+    pub pgs_sample_set: PssId,
     #[serde(rename = "PGS Publication (PGP) ID")]
-    pub pgs_publication_id: String,
+    pub pgs_publication_id: PgpId,
     #[serde(rename = "Reported Trait")]
     pub reported_trait: String,
     #[serde(rename = "Covariates Included in the Model")]
@@ -125,7 +136,7 @@ pub struct PerformanceMetric {
     #[serde(rename = "PGS Performance: Other Relevant Information")]
     pub other_relevant_information: String,
     #[serde(rename = "Publication (PMID)")]
-    pub publication_pmid: String,
+    pub publication_pmid: Option<PubmedId>,
     #[serde(rename = "Publication (doi)")]
     pub publication_doi: String,
     #[serde(rename = "Hazard Ratio (HR)")]
@@ -135,7 +146,7 @@ pub struct PerformanceMetric {
     #[serde(rename = "Beta")]
     pub beta: String,
     #[serde(rename = "Area Under the Receiver-Operating Characteristic Curve (AUROC)")]
-    pub area_under_the_receiver_operating_characteristic_curve_auroc: String,
+    pub auroc: String,
     #[serde(rename = "Concordance Statistic (C-index)")]
     pub concordance_statistic_c_index: String,
     #[serde(rename = "Other Metric(s)")]
@@ -162,15 +173,18 @@ pub struct ScoreDevelopmentSample {
     #[serde(rename = "Polygenic Score (PGS) ID")]
     pub score_id: PgsId,
     #[serde(rename = "Stage of PGS Development")]
-    pub stage_of_pgs_development: String,
+    pub stage_of_pgs_development: StageOfPgsDevelopment,
     #[serde(rename = "Number of Individuals")]
-    pub number_of_individuals: String,
+    #[serde(with = "decimal_usize")]
+    pub number_of_individuals: Option<usize>,
     #[serde(rename = "Number of Cases")]
-    pub number_of_cases: String,
+    #[serde(with = "decimal_usize")]
+    pub number_of_cases: Option<usize>,
     #[serde(rename = "Number of Controls")]
-    pub number_of_controls: String,
+    #[serde(with = "decimal_usize")]
+    pub number_of_controls: Option<usize>,
     #[serde(rename = "Percent of Participants Who are Male")]
-    pub percent_of_participants_who_are_male: String,
+    pub percent_of_participants_who_are_male: Option<NotNan<f64>>,
     #[serde(rename = "Sample Age")]
     pub sample_age: String,
     #[serde(rename = "Broad Ancestry Category")]
@@ -188,13 +202,22 @@ pub struct ScoreDevelopmentSample {
     #[serde(rename = "GWAS Catalog Study ID (GCST...)")]
     pub gwas_catalog_study_id: String,
     #[serde(rename = "Source PubMed ID (PMID)")]
-    pub source_pubmed_id: String,
+    pub source_pubmed_id: Option<PubmedId>,
     #[serde(rename = "Source DOI")]
     pub source_doi: String,
     #[serde(rename = "Cohort(s)")]
-    pub cohorts: String,
+    #[serde(with = "utile::serde_ext::PipeSeparated")]
+    pub cohorts: Vec<String>,
     #[serde(rename = "Additional Sample/Cohort Information")]
     pub additional_sample_cohort_information: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum StageOfPgsDevelopment {
+    #[serde(rename = "Score Development/Training")]
+    ScoreDevelopmentTraining,
+    #[serde(rename = "Source of Variant Associations (GWAS)")]
+    SourceOfVariantAssociationsGwas,
 }
 impl ScoreDevelopmentSample {
     pub async fn load_all() -> Result<Vec<Self>, std::io::Error> {
@@ -215,15 +238,17 @@ impl ScoreDevelopmentSample {
 #[serde(deny_unknown_fields)]
 pub struct Score {
     #[serde(rename = "Polygenic Score (PGS) ID")]
-    pub score_id: PgsId,
+    pub id: PgsId,
     #[serde(rename = "PGS Name")]
-    pub pgs_name: String,
+    pub name: String,
     #[serde(rename = "Reported Trait")]
     pub reported_trait: String,
     #[serde(rename = "Mapped Trait(s) (EFO label)")]
-    pub mapped_traits_efo_label: String,
+    #[serde(with = "utile::serde_ext::PipeSeparated")]
+    pub mapped_traits_efo_label: Vec<String>,
     #[serde(rename = "Mapped Trait(s) (EFO ID)")]
-    pub mapped_traits_efo_id: String,
+    #[serde(with = "utile::serde_ext::PipeSeparated")]
+    pub mapped_traits_efo_id: Vec<String>,
     #[serde(rename = "PGS Development Method")]
     pub pgs_development_method: String,
     #[serde(rename = "PGS Development Details/Relevant Parameters")]
@@ -231,27 +256,31 @@ pub struct Score {
     #[serde(rename = "Original Genome Build")]
     pub original_genome_build: String,
     #[serde(rename = "Number of Variants")]
-    pub number_of_variants: String,
+    pub number_of_variants: usize,
     #[serde(rename = "Number of Interaction Terms")]
-    pub number_of_interaction_terms: String,
+    pub number_of_interaction_terms: usize,
     #[serde(rename = "Type of Variant Weight")]
     pub type_of_variant_weight: WeightType,
     #[serde(rename = "PGS Publication (PGP) ID")]
-    pub pgs_publication_id: String,
+    pub pgs_publication_id: PgpId,
     #[serde(rename = "Publication (PMID)")]
-    pub publication_pmid: String,
+    pub publication_pmid: Option<PubmedId>,
     #[serde(rename = "Publication (doi)")]
     pub publication_doi: String,
     #[serde(rename = "Score and results match the original publication")]
-    pub score_and_results_match_the_original_publication: String,
+    #[serde(with = "pgs_bool")]
+    pub score_and_results_match_the_original_publication: bool,
     #[serde(rename = "Ancestry Distribution (%) - Source of Variant Associations (GWAS)")]
-    pub ancestry_distribution_source_of_variant_associations_gwas: String,
+    #[serde(with = "utile::serde_ext::PipeSeparated")]
+    pub ancestry_distribution_source_of_variant_associations_gwas: Vec<String>,
     #[serde(rename = "Ancestry Distribution (%) - Score Development/Training")]
-    pub ancestry_distribution_score_development_and_training: String,
+    #[serde(with = "utile::serde_ext::PipeSeparated")]
+    pub ancestry_distribution_score_development_and_training: Vec<String>,
     #[serde(rename = "Ancestry Distribution (%) - PGS Evaluation")]
-    pub ancestry_distribution_pgs_evaluation: String,
+    #[serde(with = "utile::serde_ext::PipeSeparated")]
+    pub ancestry_distribution_pgs_evaluation: Vec<String>,
     #[serde(rename = "FTP link")]
-    pub ftp_link: String,
+    pub ftp_link: Url,
     #[serde(rename = "Release Date")]
     pub release_date: String,
     #[serde(rename = "License/Terms of Use")]
@@ -280,7 +309,7 @@ pub struct EfoTrait {
     #[serde(rename = "Ontology Trait Description")]
     pub description: String,
     #[serde(rename = "Ontology URL")]
-    pub url: String,
+    pub url: Url,
 }
 impl EfoTrait {
     pub async fn load_all() -> Result<Vec<Self>, std::io::Error> {
@@ -299,7 +328,7 @@ impl EfoTrait {
 #[serde(deny_unknown_fields)]
 pub struct Publication {
     #[serde(rename = "PGS Publication/Study (PGP) ID")]
-    pub pgs_publication_study_pgp_id: String,
+    pub id: PgpId,
     #[serde(rename = "First Author")]
     pub first_author: String,
     #[serde(rename = "Title")]
@@ -315,7 +344,7 @@ pub struct Publication {
     #[serde(rename = "digital object identifier (doi)")]
     pub doi: String,
     #[serde(rename = "PubMed ID (PMID)")]
-    pub pmid: String,
+    pub pmid: Option<PubmedId>,
 }
 impl Publication {
     pub async fn load_all() -> Result<Vec<Self>, std::io::Error> {
@@ -430,12 +459,13 @@ async fn load_metadata_file<T: DeserializeOwned>(
     ))?
 }
 fn read_file<T: DeserializeOwned>(file: impl Read) -> Result<Vec<T>, csv::Error> {
-    csv::ReaderBuilder::new()
+    Ok(csv::ReaderBuilder::new()
         .delimiter(b',')
         .has_headers(true)
         .from_reader(file)
         .into_deserialize()
         .try_collect()
+        .unwrap())
 }
 
 fn missing(path: impl AsRef<Path>) -> std::io::Error {
@@ -452,5 +482,154 @@ fn prefix(id: Option<PgsId>) -> String {
     match id {
         Some(id) => id.to_string(),
         None => "pgs_all".to_owned(),
+    }
+}
+
+mod pgs_bool {
+    use std::fmt;
+
+    use serde::Serialize;
+
+    pub fn serialize<S>(v: &bool, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match v {
+            true => "True".serialize(serializer),
+            false => "False".serialize(serializer),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<bool, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = bool;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a boolean value (e.g. 'True'/'TRUE' or 'False'/'FALSE')")
+            }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match v{
+                    "True" | "TRUE" => Ok(true),
+                    "False" |"FALSE" => Ok(false),
+                    "" => unreachable!(),
+                    _ => Err(serde::de::Error::custom(format!(
+                        "invalid boolean value. Expected 'True'/'TRUE' or 'False'/'FALSE', found '{v}'."
+                    ))),
+                }
+            }
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                self.visit_str(v)
+            }
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                self.visit_str(&v)
+            }
+        }
+        deserializer.deserialize_str(Visitor)
+    }
+}
+
+mod decimal_pmid {
+    use ids::pubmed::PubmedId;
+    use serde::{Deserialize, Serialize};
+
+    pub fn serialize<S>(v: &Option<PubmedId>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        v.map(|v| format!("{}.0", v.inner()))
+            .unwrap_or_default()
+            .serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<PubmedId>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        if s.is_empty() {
+            return Ok(None);
+        }
+
+        let id = s
+            .strip_suffix(".0")
+            .unwrap_or(&s)
+            .parse::<u64>()
+            .map_err(serde::de::Error::custom)?;
+
+        Ok(Some(PubmedId::new(id)))
+    }
+}
+
+mod decimal_usize {
+    use serde::{Deserialize, Serialize};
+
+    pub fn serialize<S>(v: &Option<usize>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        v.map(|v| format!("{v}.0"))
+            .unwrap_or_default()
+            .serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<usize>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        if s.is_empty() {
+            return Ok(None);
+        }
+
+        let id = s
+            .strip_suffix(".0")
+            .unwrap_or(&s)
+            .parse::<usize>()
+            .map_err(serde::de::Error::custom)?;
+
+        Ok(Some(id))
+    }
+}
+
+struct SpaceCommaSeparator;
+impl utile::serde_ext::Separator for SpaceCommaSeparator {
+    fn separator() -> &'static str {
+        ", "
+    }
+}
+type SpaceCommaSeparated<T> = utile::serde_ext::Separated<SpaceCommaSeparator, T>;
+
+mod boilerplate {
+    use std::fmt::Display;
+
+    use serde::Serialize;
+
+    use super::StageOfPgsDevelopment;
+
+    impl Display for StageOfPgsDevelopment {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", serialize(self))
+        }
+    }
+
+    fn serialize<T: Serialize>(v: &T) -> String {
+        let mut writer = csv::Writer::from_writer(Vec::new());
+        writer.serialize(v).unwrap();
+        let s = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+        s.trim_matches('"').to_owned()
     }
 }

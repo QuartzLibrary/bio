@@ -1,16 +1,21 @@
 #![feature(iterator_try_collect)]
 
+pub mod metadata;
+pub mod simplified;
+
 use std::io::{self, Read};
 
 use ordered_float::NotNan;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use simplified::SimplificationError;
 use url::Url;
 
 use biocore::dna::DnaSequence;
 use utile::resource::{RawResource, RawResourceExt, UrlResource};
 
-pub mod metadata;
 pub use ids::{pgs::PgsId, rs::RsId};
+
+use self::simplified::SimplifiedHarmonizedStudyAssociation;
 
 const URL_BASE: &str = "https://ftp.ebi.ac.uk/pub/databases/spot/pgs";
 
@@ -177,13 +182,13 @@ pub struct StudyAssociation {
     /// haplotype/diplotype rather than a single SNP. Constituent SNPs in the
     /// haplotype are semi-colon separated.
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_haplotype: Option<bool>,
     /// This is a TRUE/FALSE variable that flags whether the effect allele is a
     /// haplotype/diplotype rather than a single SNP. Constituent SNPs in the
     /// haplotype are semi-colon separated.
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_diplotype: Option<bool>,
     /// This described whether the variant was specifically called with a
     /// specific imputation or variant calling method. This is mostly kept to
@@ -208,19 +213,19 @@ pub struct StudyAssociation {
     /// demarcated with a _x_ between entries for each of the variants present
     /// in the interaction.
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_interaction: Option<bool>,
     /// This is a TRUE/FALSE variable that flags whether the weight should be
     /// added to the PGS sum if there is at least 1 copy of the effect allele
     /// (e.g. it is a dominant allele).
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_dominant: Option<bool>,
     /// This is a TRUE/FALSE variable that flags whether the weight should be
     /// added to the PGS sum only if there are 2 copies of the effect allele
     /// (e.g. it is a recessive allele).
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_recessive: Option<bool>,
     /// Weights that are specific to different dosages of the effect_allele
     /// (e.g. {0, 1, 2} copies) can also be reported when the the contribution
@@ -230,9 +235,9 @@ pub struct StudyAssociation {
     /// is formated as dosage_#_weight where the # sign indicates the number of
     /// effect_allele copies.
     pub dosage_0_weight: Option<NotNan<f64>>,
-    /// See [StudyAssociation::dosage_0_weight].
+    /// See [Self::dosage_0_weight].
     pub dosage_1_weight: Option<NotNan<f64>>,
-    /// See [StudyAssociation::dosage_0_weight].
+    /// See [Self::dosage_0_weight].
     pub dosage_2_weight: Option<NotNan<f64>>,
 
     /// Author-reported effect sizes can be supplied to the Catalog. If no other
@@ -264,7 +269,8 @@ pub struct StudyAssociation {
 
     pub variant_type: Option<String>,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HarmonizedStudyAssociation {
     /// The SNP’s rs ID.
@@ -295,13 +301,13 @@ pub struct HarmonizedStudyAssociation {
     /// haplotype/diplotype rather than a single SNP. Constituent SNPs in the
     /// haplotype are semi-colon separated.
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_haplotype: Option<bool>,
     /// This is a TRUE/FALSE variable that flags whether the effect allele is a
     /// haplotype/diplotype rather than a single SNP. Constituent SNPs in the
     /// haplotype are semi-colon separated.
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_diplotype: Option<bool>,
     /// This described whether the variant was specifically called with a
     /// specific imputation or variant calling method. This is mostly kept to
@@ -326,19 +332,19 @@ pub struct HarmonizedStudyAssociation {
     /// demarcated with a _x_ between entries for each of the variants present
     /// in the interaction.
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_interaction: Option<bool>,
     /// This is a TRUE/FALSE variable that flags whether the weight should be
     /// added to the PGS sum if there is at least 1 copy of the effect allele
     /// (e.g. it is a dominant allele).
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_dominant: Option<bool>,
     /// This is a TRUE/FALSE variable that flags whether the weight should be
     /// added to the PGS sum only if there are 2 copies of the effect allele
     /// (e.g. it is a recessive allele).
     #[serde(default)]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub is_recessive: Option<bool>,
     /// Weights that are specific to different dosages of the effect_allele
     /// (e.g. {0, 1, 2} copies) can also be reported when the the contribution
@@ -348,9 +354,9 @@ pub struct HarmonizedStudyAssociation {
     /// is formated as dosage_#_weight where the # sign indicates the number of
     /// effect_allele copies.
     pub dosage_0_weight: Option<NotNan<f64>>,
-    /// See [StudyAssociation::dosage_0_weight].
+    /// See [Self::dosage_0_weight].
     pub dosage_1_weight: Option<NotNan<f64>>,
-    /// See [StudyAssociation::dosage_0_weight].
+    /// See [Self::dosage_0_weight].
     pub dosage_2_weight: Option<NotNan<f64>>,
 
     /// Author-reported effect sizes can be supplied to the Catalog. If no other
@@ -423,7 +429,7 @@ pub struct HarmonizedStudyAssociation {
     /// column chr_name.
     #[serde(default)]
     #[serde(rename = "hm_match_chr")]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub match_chr: Option<bool>,
     /// FLAG: matching chromosome position
     ///
@@ -432,19 +438,20 @@ pub struct HarmonizedStudyAssociation {
     /// column chr_position.
     #[serde(default)]
     #[serde(rename = "hm_match_pos")]
-    #[serde(with = "boilerplate::pgs_bool")]
+    #[serde(with = "boilerplate::opt_bool")]
     pub match_pos: Option<bool>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Allele {
-    Insertion,
     Sequence(DnaSequence),
+    Insertion,
     /// See [docs::DOCUMENTED_EXCEPTIONS] for exceptions.
     Other(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
 pub enum ImputationMethod {
     #[serde(rename = "HLA*IMP:02")]
     HLAIMP02,
@@ -454,7 +461,8 @@ pub enum ImputationMethod {
     TopMed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
 pub enum HarmonizedSource {
     #[serde(rename = "Author-reported")]
     AuthorReported,
@@ -606,6 +614,55 @@ impl HarmonizedStudy {
             .buffered();
 
         Self::load_associations(resource)
+    }
+}
+
+impl HarmonizedStudyAssociation {
+    pub fn simplified<Contig>(
+        self,
+        contig: impl FnOnce(String) -> Contig,
+    ) -> Result<SimplifiedHarmonizedStudyAssociation<Contig>, SimplificationError> {
+        SimplifiedHarmonizedStudyAssociation::new(self, contig)
+    }
+    pub fn normalised(self, std_dev: NotNan<f64>) -> Self {
+        fn normalise(x: Option<NotNan<f64>>, std_dev: NotNan<f64>) -> Option<NotNan<f64>> {
+            Some(x? / std_dev)
+        }
+        Self {
+            rs_id: self.rs_id,
+            chr_name: self.chr_name,
+            chr_position: self.chr_position,
+            effect_allele: self.effect_allele,
+            other_allele: self.other_allele,
+            locus_name: self.locus_name,
+            is_haplotype: self.is_haplotype,
+            is_diplotype: self.is_diplotype,
+            imputation_method: self.imputation_method,
+            variant_description: self.variant_description,
+            inclusion_criteria: self.inclusion_criteria,
+            effect_weight: normalise(self.effect_weight, std_dev),
+            is_interaction: self.is_interaction,
+            is_dominant: self.is_dominant,
+            is_recessive: self.is_recessive,
+            dosage_0_weight: normalise(self.dosage_0_weight, std_dev),
+            dosage_1_weight: normalise(self.dosage_1_weight, std_dev),
+            dosage_2_weight: normalise(self.dosage_2_weight, std_dev),
+            or: self.or,
+            hr: self.hr,
+            allelefrequency_effect: self.allelefrequency_effect,
+            allelefrequency_effect_european: self.allelefrequency_effect_european,
+            allelefrequency_effect_asian: self.allelefrequency_effect_asian,
+            allelefrequency_effect_african: self.allelefrequency_effect_african,
+            allelefrequency_effect_hispanic: self.allelefrequency_effect_hispanic,
+            variant_type: self.variant_type,
+            source: self.source,
+            hm_rs_id: self.hm_rs_id,
+            chr: self.chr,
+            pos: self.pos,
+            infer_other_allele: self.infer_other_allele,
+            match_chr: self.match_chr,
+            match_pos: self.match_pos,
+        }
     }
 }
 
@@ -947,7 +1004,7 @@ mod boilerplate {
         sequence::AsciiChar,
     };
 
-    use crate::GenomeBuild;
+    use crate::{GenomeBuild, WeightType};
 
     use super::Allele;
 
@@ -957,6 +1014,16 @@ mod boilerplate {
                 GenomeBuild::GRCh37 => f.write_str("GRCh37"),
                 GenomeBuild::GRCh38 => f.write_str("GRCh38"),
             }
+        }
+    }
+    impl fmt::Display for WeightType {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let mut bytes = Vec::new();
+            csv::Writer::from_writer(&mut bytes)
+                .serialize(self)
+                .unwrap();
+            let s = String::from_utf8(bytes).unwrap();
+            f.write_str(s.trim().trim_matches('"'))
         }
     }
 
@@ -1016,7 +1083,7 @@ mod boilerplate {
         }
     }
 
-    pub mod pgs_bool {
+    pub mod opt_bool {
         use std::fmt;
 
         use serde::Serialize;

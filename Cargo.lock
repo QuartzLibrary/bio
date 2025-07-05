@@ -2010,7 +2010,6 @@ dependencies = [
  "biocore",
  "csv",
  "env_logger",
- "flate2",
  "ids",
  "log",
  "ordered-float",
