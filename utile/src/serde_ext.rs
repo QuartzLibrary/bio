@@ -786,3 +786,28 @@ impl Separator for PipeSeparator {
         "|"
     }
 }
+
+/// Serializes an iterator as a [Vec].
+/// Useful for example when serializing a map with non-string keys to json.
+pub mod as_vec {
+    use serde::{Deserialize, Serialize};
+
+    pub fn serialize<S, I>(iter: &I, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+        I: IntoIterator + Clone,
+        <I as IntoIterator>::Item: Serialize,
+    {
+        let vec: Vec<_> = iter.clone().into_iter().collect();
+        vec.serialize(serializer)
+    }
+    pub fn deserialize<'de, D, I>(deserializer: D) -> Result<I, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+        I: IntoIterator + FromIterator<<I as IntoIterator>::Item>,
+        <I as IntoIterator>::Item: Deserialize<'de>,
+    {
+        let vec = Vec::<_>::deserialize(deserializer)?;
+        Ok(vec.into_iter().collect())
+    }
+}
