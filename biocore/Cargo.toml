@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 utile = { path = "../utile" }
 
-anyhow = "1"
 noodles = { version = "0.98", features = ["core", "fasta", "vcf", "tabix", "bgzf", "csi", "bcf"] }
 ref-cast = "1"
 serde = { version = "1", features = ["derive"] }

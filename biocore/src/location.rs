@@ -3,7 +3,7 @@ use std::ops::Range;
 use serde::{Deserialize, Serialize};
 use utile::range::RangeExt;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct GenomePosition<Contig = String> {
     pub name: Contig,
@@ -120,8 +120,8 @@ where
     }
 }
 
-impl From<GenomePosition> for GenomeRange {
-    fn from(loc: GenomePosition) -> Self {
+impl<Contig> From<GenomePosition<Contig>> for GenomeRange<Contig> {
+    fn from(loc: GenomePosition<Contig>) -> Self {
         Self {
             name: loc.name,
             at: loc.at..(loc.at + 1),
@@ -130,12 +130,12 @@ impl From<GenomePosition> for GenomeRange {
 }
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("Expected a single base location, but found a range {from:?}.")]
-pub struct LocationConversionError {
-    pub from: GenomeRange,
+pub struct LocationConversionError<Contig> {
+    pub from: GenomeRange<Contig>,
 }
-impl TryFrom<GenomeRange> for GenomePosition {
-    type Error = LocationConversionError;
-    fn try_from(range: GenomeRange) -> Result<Self, Self::Error> {
+impl<Contig> TryFrom<GenomeRange<Contig>> for GenomePosition<Contig> {
+    type Error = LocationConversionError<Contig>;
+    fn try_from(range: GenomeRange<Contig>) -> Result<Self, Self::Error> {
         if range.at.start + 1 != range.at.end {
             return Err(LocationConversionError { from: range });
         }
@@ -327,7 +327,7 @@ pub mod orientation {
         {
             let mut pos = pos.as_ref_contig();
             if self.orientation != pos.orientation {
-                pos = pos.clone().flip_orientation_with(size)
+                pos = pos.flip_orientation_with(size)
             };
             self.v.as_ref_contig().contains(&pos.v)
         }

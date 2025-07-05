@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1"
 async-compression = { version = "0.4", default-features = false, features = ["tokio", "gzip", "brotli"] }
 brotli = "8"
 bytes = "1"

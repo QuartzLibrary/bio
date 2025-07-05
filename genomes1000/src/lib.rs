@@ -3,12 +3,12 @@
 #![feature(iterator_try_collect)]
 #![feature(let_chains)]
 
-mod contig;
 mod genotype;
 mod info;
 mod parse;
 mod slow;
 
+pub mod contig;
 pub mod pedigree;
 pub mod resource;
 pub mod simplified;
@@ -57,27 +57,27 @@ pub struct Record<S> {
     pub samples: Vec<S>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Genotype {
     Missing,
     Haploid(HaploidGenotype),
     Diploid(DiploidGenotype),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct HaploidGenotype {
     pub value: u8,
 }
 
 /// Diploid/biallelic genotype/variant
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct DiploidGenotype {
     pub left: u8,
     pub phasing: GenotypePhasing,
     pub right: u8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum GenotypePhasing {
     /// Marked with '|'
     Phased,
@@ -278,12 +278,19 @@ impl Genotype {
 #[derive(Debug)]
 pub struct Genomes1000Fs {
     sample_names: Vec<String>,
+    pedigrees: BTreeMap<String, Pedigree>,
     readers: BTreeMap<GRCh38Contig, IndexedVcfReader<std::fs::File>>,
 }
 
 impl Genomes1000Fs {
     pub async fn new() -> io::Result<Self> {
         Self::new_with_cache(&FsCache::global()).await
+    }
+    pub fn sample_names(&self) -> &[String] {
+        &self.sample_names
+    }
+    pub fn pedigree(&self, id: &str) -> Option<&Pedigree> {
+        self.pedigrees.get(id)
     }
     pub async fn new_with_cache(cache: &FsCache) -> io::Result<Self> {
         let mut sample_names = None;
@@ -315,8 +322,21 @@ impl Genomes1000Fs {
             readers.insert(contig, IndexedVcfReader::new(data.read()?, index.read()?)?);
         }
 
+        let pedigrees = load_pedigree(
+            Genomes1000Resource::high_coverage_pedigree()
+                .log_progress()
+                .with_fs_cache(cache)
+                .ensure_cached_async()
+                .await?,
+        )
+        .await?
+        .into_iter()
+        .map(|p| (p.id.clone(), p))
+        .collect();
+
         Ok(Self {
             sample_names: sample_names.unwrap(),
+            pedigrees,
             readers,
         })
     }

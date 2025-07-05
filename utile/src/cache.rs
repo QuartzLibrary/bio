@@ -24,7 +24,7 @@ impl FsCache {
     }
 
     pub fn new(path: impl AsRef<Path>) -> Self {
-        assert!(path.as_ref().is_absolute());
+        assert!(path.as_ref().is_absolute(), "{}", path.as_ref().display());
         Self {
             path: path.as_ref().to_path_buf(),
         }
@@ -121,8 +121,8 @@ impl FsCacheEntry {
         Ok(())
     }
 
-    pub fn write_json<T: serde::Serialize>(&self, data: T) -> std::io::Result<()> {
-        self.write_file_with(|file| Ok(serde_json::to_writer(file, &data)?))
+    pub fn write_json<T: serde::Serialize>(&self, data: &T) -> std::io::Result<()> {
+        self.write_file_with(|file| Ok(serde_json::to_writer(file, data)?))
     }
     pub fn write_json_lines<T: serde::Serialize>(
         &self,

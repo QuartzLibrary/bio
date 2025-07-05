@@ -713,11 +713,37 @@ pub enum DnaDecodeError {
     InvalidBaseByte { from: u8 },
     #[error("Invalid DNA base: {from}")]
     InvalidBaseChar { from: char },
-    #[error("Invalid DNA sequence: {byte:?} at {at}/{len} ('{:?}')", std::str::from_utf8(&[*byte]))]
+    #[error("Invalid DNA sequence: {byte:?} at {at}/{len} (invalid byte: '{:?}')", std::str::from_utf8(&[*byte]))]
     InvalidSequence { at: usize, byte: u8, len: usize },
 }
 impl From<DnaDecodeError> for std::io::Error {
     fn from(value: DnaDecodeError) -> Self {
         std::io::Error::new(std::io::ErrorKind::InvalidData, value)
+    }
+}
+
+mod eq {
+    use super::*;
+
+    impl PartialEq<IupacDnaBase> for DnaBase {
+        fn eq(&self, other: &IupacDnaBase) -> bool {
+            *self as u8 == *other as u8
+        }
+    }
+    impl PartialEq<DnaBase> for IupacDnaBase {
+        fn eq(&self, other: &DnaBase) -> bool {
+            *self as u8 == *other as u8
+        }
+    }
+
+    impl PartialEq<AmbiguousDnaBase> for DnaBase {
+        fn eq(&self, other: &AmbiguousDnaBase) -> bool {
+            *self as u8 == *other as u8
+        }
+    }
+    impl PartialEq<DnaBase> for AmbiguousDnaBase {
+        fn eq(&self, other: &DnaBase) -> bool {
+            *self as u8 == *other as u8
+        }
     }
 }

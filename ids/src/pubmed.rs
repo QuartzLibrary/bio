@@ -12,6 +12,12 @@ impl PubmedId {
     pub fn try_new(id: u64) -> Result<Self, PubmedIdError> {
         Ok(Self(NonZero::new(id).ok_or(PubmedIdError::Zero)?))
     }
+    pub fn inner(self) -> u64 {
+        self.0.get()
+    }
+    pub fn url(self) -> String {
+        format!("https://pubmed.ncbi.nlm.nih.gov/{}/", self.0)
+    }
 }
 impl fmt::Display for PubmedId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

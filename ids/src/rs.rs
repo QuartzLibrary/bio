@@ -2,7 +2,7 @@ use std::{fmt, num::NonZero, str::FromStr};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RsId(NonZero<u64>);
 impl RsId {
     pub fn new(id: u64) -> Self {
