@@ -28,22 +28,26 @@ impl<T> DerefMut for Sequence<T> {
 }
 impl<T> Index<usize> for Sequence<T> {
     type Output = T;
+    #[track_caller]
     fn index(&self, index: usize) -> &Self::Output {
         &self.bases[index]
     }
 }
 impl<T> IndexMut<usize> for Sequence<T> {
+    #[track_caller]
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.bases[index]
     }
 }
 impl<T> Index<Range<usize>> for Sequence<T> {
     type Output = SequenceSlice<T>;
+    #[track_caller]
     fn index(&self, index: Range<usize>) -> &Self::Output {
         SequenceSlice::ref_cast(&self.bases[index])
     }
 }
 impl<T> IndexMut<Range<usize>> for Sequence<T> {
+    #[track_caller]
     fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
         SequenceSlice::ref_cast_mut(&mut self.bases[index])
     }
@@ -120,6 +124,13 @@ impl<T> Sequence<T> {
     {
         self.bases.splice(range, replace_with).for_each(drop);
     }
+
+    pub fn get(&self, index: usize) -> Option<&T> {
+        self.bases.get(index)
+    }
+    pub fn get_range(&self, range: Range<usize>) -> Option<&SequenceSlice<T>> {
+        self.bases.get(range).map(SequenceSlice::ref_cast)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, ref_cast::RefCast)]
@@ -140,22 +151,26 @@ impl<T> DerefMut for SequenceSlice<T> {
 }
 impl<T> Index<usize> for SequenceSlice<T> {
     type Output = T;
+    #[track_caller]
     fn index(&self, index: usize) -> &Self::Output {
         &self.bases[index]
     }
 }
 impl<T> IndexMut<usize> for SequenceSlice<T> {
+    #[track_caller]
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.bases[index]
     }
 }
 impl<T> Index<Range<usize>> for SequenceSlice<T> {
     type Output = SequenceSlice<T>;
+    #[track_caller]
     fn index(&self, index: Range<usize>) -> &Self::Output {
         SequenceSlice::ref_cast(&self.bases[index])
     }
 }
 impl<T> IndexMut<Range<usize>> for SequenceSlice<T> {
+    #[track_caller]
     fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
         SequenceSlice::ref_cast_mut(&mut self.bases[index])
     }
@@ -180,6 +195,14 @@ impl<'a, T> IntoIterator for &'a SequenceSlice<T> {
     type IntoIter = std::slice::Iter<'a, T>;
     fn into_iter(self) -> Self::IntoIter {
         self.bases.iter()
+    }
+}
+impl<T> SequenceSlice<T> {
+    pub fn get(&self, index: usize) -> Option<&T> {
+        self.bases.get(index)
+    }
+    pub fn get_range(&self, range: Range<usize>) -> Option<&SequenceSlice<T>> {
+        self.bases.get(range).map(SequenceSlice::ref_cast)
     }
 }
 
