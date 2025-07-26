@@ -7,7 +7,11 @@ pub mod iter;
 pub mod progress;
 pub mod uri;
 
-use std::{fmt::Debug, io::Read, pin::pin};
+use std::{
+    fmt::Debug,
+    io::{self, Read},
+    pin::pin,
+};
 
 use futures::{stream, Stream};
 use serde::de::DeserializeOwned;
@@ -26,7 +30,7 @@ pub use self::{
 pub use self::cached::FsCacheResource;
 
 type JsonStreamDeserializer<R, T> =
-    StreamDeserializer<'static, serde_json::de::IoRead<std::io::BufReader<R>>, T>;
+    StreamDeserializer<'static, serde_json::de::IoRead<io::BufReader<R>>, T>;
 
 pub trait RawResource {
     const NAMESPACE: &'static str;
@@ -34,13 +38,13 @@ pub trait RawResource {
 
     fn compression(&self) -> Option<Compression>;
 
-    type Reader: std::io::Read;
-    fn size(&self) -> std::io::Result<u64>;
-    fn read(&self) -> std::io::Result<Self::Reader>;
+    type Reader: io::Read;
+    fn size(&self) -> io::Result<u64>;
+    fn read(&self) -> io::Result<Self::Reader>;
 
     type AsyncReader: tokio::io::AsyncRead;
-    async fn size_async(&self) -> std::io::Result<u64>;
-    async fn read_async(&self) -> std::io::Result<Self::AsyncReader>;
+    async fn size_async(&self) -> io::Result<u64>;
+    async fn read_async(&self) -> io::Result<Self::AsyncReader>;
 }
 pub trait RawResourceExt: RawResource + Sized {
     fn buffered(self) -> BufferedResource<Self> {
@@ -72,48 +76,47 @@ pub trait RawResourceExt: RawResource + Sized {
         CompressedResource::new(self, compression)
     }
 
-    fn read_vec(&self) -> std::io::Result<Vec<u8>> {
+    fn read_vec(&self) -> io::Result<Vec<u8>> {
         let mut reader = ResourceRef::new(self).read()?;
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         Ok(data)
     }
-    fn read_string(&self) -> std::io::Result<String> {
+    fn read_string(&self) -> io::Result<String> {
         let mut reader = ResourceRef::new(self).read()?;
         let mut data = String::new();
         reader.read_to_string(&mut data)?;
         Ok(data)
     }
-    fn read_json<T: DeserializeOwned>(&self) -> std::io::Result<T> {
-        serde_json::from_reader(ResourceRef::new(self).buffered().read()?)
-            .map_err(std::io::Error::from)
+    fn read_json<T: DeserializeOwned>(&self) -> io::Result<T> {
+        serde_json::from_reader(ResourceRef::new(self).buffered().read()?).map_err(io::Error::from)
     }
     fn read_json_lines<T: DeserializeOwned>(
         &self,
-    ) -> std::io::Result<JsonStreamDeserializer<Self::Reader, T>> {
+    ) -> io::Result<JsonStreamDeserializer<Self::Reader, T>> {
         let reader = ResourceRef::new(self).buffered().read()?;
         Ok(serde_json::Deserializer::from_reader(reader).into_iter())
     }
 
-    async fn read_vec_async(&self) -> std::io::Result<Vec<u8>> {
+    async fn read_vec_async(&self) -> io::Result<Vec<u8>> {
         let mut reader = ResourceRef::new(self).read_async().await?;
         let mut data = Vec::new();
         pin!(reader).read_to_end(&mut data).await?;
         Ok(data)
     }
-    async fn read_string_async(&self) -> std::io::Result<String> {
+    async fn read_string_async(&self) -> io::Result<String> {
         let mut reader = ResourceRef::new(self).read_async().await?;
         let mut data = String::new();
         pin!(reader).read_to_string(&mut data).await?;
         Ok(data)
     }
-    async fn read_json_async<T: DeserializeOwned>(&self) -> std::io::Result<T> {
+    async fn read_json_async<T: DeserializeOwned>(&self) -> io::Result<T> {
         let data = self.read_async().await?.read_into_vec().await?;
-        serde_json::from_slice(&data).map_err(std::io::Error::from)
+        serde_json::from_slice(&data).map_err(io::Error::from)
     }
     async fn read_json_lines_async<T: DeserializeOwned>(
         &self,
-    ) -> std::io::Result<impl Stream<Item = std::io::Result<T>>> {
+    ) -> io::Result<impl Stream<Item = io::Result<T>>> {
         Ok(stream::try_unfold((), |()| async move { todo!() }))
     }
 }
@@ -188,18 +191,18 @@ impl<'a, R: RawResource> RawResource for ResourceRef<'a, R> {
     }
 
     type Reader = R::Reader;
-    fn size(&self) -> std::io::Result<u64> {
+    fn size(&self) -> io::Result<u64> {
         R::size(self.resource)
     }
-    fn read(&self) -> std::io::Result<Self::Reader> {
+    fn read(&self) -> io::Result<Self::Reader> {
         R::read(self.resource)
     }
 
     type AsyncReader = R::AsyncReader;
-    async fn size_async(&self) -> std::io::Result<u64> {
+    async fn size_async(&self) -> io::Result<u64> {
         R::size_async(self.resource).await
     }
-    async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
+    async fn read_async(&self) -> io::Result<Self::AsyncReader> {
         R::read_async(self.resource).await
     }
 }
