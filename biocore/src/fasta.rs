@@ -1,8 +1,17 @@
-use std::io::{self, BufRead, Seek};
+use core::fmt;
+use std::{
+    collections::BTreeMap,
+    io::{self, BufRead, Seek},
+    str::FromStr,
+};
 
-use noodles::fasta::io::{reader::Records, Reader};
+use noodles::fasta::{
+    io::{reader::Records, Reader},
+    record::Definition,
+};
 
 use crate::{
+    genome::InMemoryGenome,
     location::{GenomePosition, GenomeRange},
     sequence::{AsciiChar, Sequence},
 };
@@ -89,5 +98,78 @@ where
             }
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+impl<C, B> InMemoryGenome<C, B> {
+    pub fn from_fasta(reader: impl BufRead) -> Result<Self, FastaGenomeError<C, B>>
+    where
+        C: FromStr + Ord,
+        <C as FromStr>::Err: fmt::Debug,
+        B: AsciiChar,
+        <B as AsciiChar>::DecodeError: fmt::Debug,
+    {
+        let mut reader = Reader::new(reader);
+
+        let mut definition = String::new();
+
+        let mut contigs = BTreeMap::new();
+
+        while reader.read_definition(&mut definition)? > 0 {
+            let def: Definition = definition.parse()?;
+            let contig = C::from_str(def.name().try_into().unwrap())
+                .map_err(FastaGenomeError::InvalidContigName)?;
+
+            let mut sequence = Vec::new();
+            reader.read_sequence(&mut sequence)?;
+            let sequence = B::decode(sequence).map_err(Into::into)?;
+
+            contigs.insert(contig, sequence);
+
+            definition.clear();
+        }
+
+        Ok(Self { contigs })
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum FastaGenomeError<C, B>
+where
+    C: FromStr,
+    <C as FromStr>::Err: fmt::Debug,
+    B: AsciiChar,
+    <B as AsciiChar>::DecodeError: fmt::Debug,
+{
+    #[error(transparent)]
+    InvalidDefinition(noodles::fasta::record::definition::ParseError),
+    #[error("Invalid contig name: {0}")]
+    InvalidContigName(<C as FromStr>::Err),
+    #[error("Invalid sequence: {0}")]
+    InvalidSequence(<B as AsciiChar>::DecodeError),
+    #[error(transparent)]
+    Io(io::Error),
+}
+impl<C, B> From<noodles::fasta::record::definition::ParseError> for FastaGenomeError<C, B>
+where
+    C: FromStr,
+    <C as FromStr>::Err: fmt::Debug,
+    B: AsciiChar,
+    <B as AsciiChar>::DecodeError: fmt::Debug,
+{
+    fn from(e: noodles::fasta::record::definition::ParseError) -> Self {
+        Self::InvalidDefinition(e)
+    }
+}
+
+impl<C, B> From<io::Error> for FastaGenomeError<C, B>
+where
+    C: FromStr,
+    <C as FromStr>::Err: fmt::Debug,
+    B: AsciiChar,
+    <B as AsciiChar>::DecodeError: fmt::Debug,
+{
+    fn from(e: io::Error) -> Self {
+        Self::Io(e)
     }
 }

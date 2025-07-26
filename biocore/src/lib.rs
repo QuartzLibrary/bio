@@ -1,3 +1,5 @@
+#![feature(iterator_try_collect)]
+
 pub mod bcf;
 pub mod dna;
 pub mod fasta;
