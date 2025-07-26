@@ -2,7 +2,10 @@ use ids::rs::RsId;
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
-use biocore::{dna::DnaSequence, location::GenomePosition};
+use biocore::{
+    dna::DnaSequence,
+    location::{GenomePosition, GenomeRange},
+};
 
 use crate::{Allele, HarmonizedSource, HarmonizedStudyAssociation, ImputationMethod};
 
@@ -221,6 +224,15 @@ impl<Contig> SimplifiedHarmonizedStudyAssociation<Contig> {
         GenomePosition {
             name: self.chr.clone(),
             at: self.pos - 1,
+        }
+    }
+    pub fn at_range(&self) -> GenomeRange<Contig>
+    where
+        Contig: Clone,
+    {
+        GenomeRange {
+            name: self.chr.clone(),
+            at: self.pos - 1..(self.pos - 1 + u64::try_from(self.effect_allele.len()).unwrap()),
         }
     }
 
