@@ -1,7 +1,10 @@
 use std::{
     borrow::Borrow,
     fmt,
-    ops::{Deref, DerefMut, Index, IndexMut, Range, RangeBounds},
+    ops::{
+        Deref, DerefMut, Index, IndexMut, Range, RangeBounds, RangeFrom, RangeFull, RangeInclusive,
+        RangeTo,
+    },
 };
 
 use ref_cast::RefCast;
@@ -49,6 +52,58 @@ impl<T> Index<Range<usize>> for Sequence<T> {
 impl<T> IndexMut<Range<usize>> for Sequence<T> {
     #[track_caller]
     fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index])
+    }
+}
+impl<T> Index<RangeInclusive<usize>> for Sequence<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeInclusive<usize>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index])
+    }
+}
+impl<T> IndexMut<RangeInclusive<usize>> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeInclusive<usize>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index])
+    }
+}
+impl<T> Index<RangeFrom<usize>> for Sequence<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index])
+    }
+}
+impl<T> IndexMut<RangeFrom<usize>> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeFrom<usize>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index])
+    }
+}
+impl<T> Index<RangeTo<usize>> for Sequence<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeTo<usize>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index])
+    }
+}
+impl<T> IndexMut<RangeTo<usize>> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeTo<usize>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index])
+    }
+}
+impl<T> Index<RangeFull> for Sequence<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeFull) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index])
+    }
+}
+impl<T> IndexMut<RangeFull> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeFull) -> &mut Self::Output {
         SequenceSlice::ref_cast_mut(&mut self.bases[index])
     }
 }
@@ -172,6 +227,58 @@ impl<T> Index<Range<usize>> for SequenceSlice<T> {
 impl<T> IndexMut<Range<usize>> for SequenceSlice<T> {
     #[track_caller]
     fn index_mut(&mut self, index: Range<usize>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index])
+    }
+}
+impl<T> Index<RangeInclusive<usize>> for SequenceSlice<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeInclusive<usize>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index])
+    }
+}
+impl<T> IndexMut<RangeInclusive<usize>> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeInclusive<usize>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index])
+    }
+}
+impl<T> Index<RangeFrom<usize>> for SequenceSlice<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index])
+    }
+}
+impl<T> IndexMut<RangeFrom<usize>> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeFrom<usize>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index])
+    }
+}
+impl<T> Index<RangeTo<usize>> for SequenceSlice<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeTo<usize>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index])
+    }
+}
+impl<T> IndexMut<RangeTo<usize>> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeTo<usize>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index])
+    }
+}
+impl<T> Index<RangeFull> for SequenceSlice<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeFull) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index])
+    }
+}
+impl<T> IndexMut<RangeFull> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeFull) -> &mut Self::Output {
         SequenceSlice::ref_cast_mut(&mut self.bases[index])
     }
 }
