@@ -141,6 +141,11 @@ impl DnaBase {
         matches!(self, Self::C | Self::T)
     }
 }
+impl From<DnaBase> for u8 {
+    fn from(value: DnaBase) -> Self {
+        value.to_byte()
+    }
+}
 impl AsciiChar for DnaBase {
     fn encode(bases: &[Self]) -> String
     where
@@ -309,6 +314,11 @@ impl MaybeDnaBase {
         !matches!(self, Self::A | Self::C | Self::G | Self::T)
     }
 }
+impl From<MaybeDnaBase> for u8 {
+    fn from(value: MaybeDnaBase) -> Self {
+        value.to_byte()
+    }
+}
 impl AsciiChar for MaybeDnaBase {
     fn encode(bases: &[Self]) -> String
     where
@@ -445,7 +455,11 @@ impl AmbiguousDnaBase {
         !matches!(self, Self::A | Self::C | Self::G | Self::T)
     }
 }
-
+impl From<AmbiguousDnaBase> for u8 {
+    fn from(value: AmbiguousDnaBase) -> Self {
+        value.to_byte()
+    }
+}
 impl AsciiChar for AmbiguousDnaBase {
     fn encode(bases: &[Self]) -> String
     where
@@ -628,7 +642,11 @@ impl IupacDnaBase {
         !matches!(self, Self::A | Self::C | Self::G | Self::T)
     }
 }
-
+impl From<IupacDnaBase> for u8 {
+    fn from(value: IupacDnaBase) -> Self {
+        value.to_byte()
+    }
+}
 impl AsciiChar for IupacDnaBase {
     fn encode(bases: &[Self]) -> String
     where
