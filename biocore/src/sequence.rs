@@ -5,6 +5,7 @@ use std::{
         Deref, DerefMut, Index, IndexMut, Range, RangeBounds, RangeFrom, RangeFull, RangeInclusive,
         RangeTo,
     },
+    str::FromStr,
 };
 
 use ref_cast::RefCast;
@@ -124,6 +125,12 @@ impl<T: fmt::Display> fmt::Display for Sequence<T> {
         Ok(())
     }
 }
+impl<T: AsciiChar> FromStr for Sequence<T> {
+    type Err = T::DecodeError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        T::decode(s.as_bytes().to_vec())
+    }
+}
 impl<T> IntoIterator for Sequence<T> {
     type Item = T;
     type IntoIter = std::vec::IntoIter<T>;
@@ -190,6 +197,13 @@ impl<T> Sequence<T> {
     }
     pub fn get_range(&self, range: Range<usize>) -> Option<&SequenceSlice<T>> {
         self.bases.get(range).map(SequenceSlice::ref_cast)
+    }
+
+    pub fn encode(&self) -> String
+    where
+        T: AsciiChar,
+    {
+        T::encode(&self.bases)
     }
 }
 
@@ -315,6 +329,14 @@ impl<T> SequenceSlice<T> {
     }
     pub fn get_range(&self, range: Range<usize>) -> Option<&SequenceSlice<T>> {
         self.bases.get(range).map(SequenceSlice::ref_cast)
+    }
+
+    // TODO: return &str instead
+    pub fn encode(&self) -> String
+    where
+        T: AsciiChar,
+    {
+        T::encode(&self.bases)
     }
 
     pub fn reverse_complement(&self) -> Sequence<T>
