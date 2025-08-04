@@ -9,6 +9,8 @@ use std::{
 
 use ref_cast::RefCast;
 
+use crate::dna::Complement;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Sequence<T> {
     bases: Vec<T>,
@@ -160,8 +162,11 @@ impl<T> Sequence<T> {
         self.bases.iter()
     }
 
-    pub fn reverse_complement(self, f: impl Fn(T) -> T) -> Self {
-        self.into_iter().rev().map(f).collect()
+    pub fn reverse_complement(self) -> Self
+    where
+        T: Complement,
+    {
+        self.bases.into_iter().rev().map(T::complement).collect()
     }
 
     pub fn spliced<R, I>(mut self, range: R, replace_with: I) -> Self
@@ -310,6 +315,13 @@ impl<T> SequenceSlice<T> {
     }
     pub fn get_range(&self, range: Range<usize>) -> Option<&SequenceSlice<T>> {
         self.bases.get(range).map(SequenceSlice::ref_cast)
+    }
+
+    pub fn reverse_complement(&self) -> Sequence<T>
+    where
+        T: Complement + Clone,
+    {
+        self.into_iter().rev().cloned().map(T::complement).collect()
     }
 }
 

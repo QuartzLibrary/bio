@@ -13,6 +13,11 @@ pub type DnaSequenceSlice = SequenceSlice<DnaBase>;
 pub type AmbiguousDnaSequenceSlice = SequenceSlice<AmbiguousDnaBase>;
 pub type IupacDnaSequenceSlice = SequenceSlice<IupacDnaBase>;
 
+pub trait Complement {
+    // Get the complementary nucleotide
+    fn complement(self) -> Self;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Serialize, Deserialize)]
 #[repr(u8)]
@@ -121,16 +126,6 @@ impl DnaBase {
         }
     }
 
-    // Get the complementary nucleotide
-    pub fn complement(&self) -> Self {
-        match self {
-            Self::A => Self::T,
-            Self::T => Self::A,
-            Self::C => Self::G,
-            Self::G => Self::C,
-        }
-    }
-
     // Check if the nucleotide is a purine (A or G)
     pub fn is_purine(&self) -> bool {
         matches!(self, Self::A | Self::G)
@@ -183,6 +178,16 @@ fn decode(mut bases: Vec<u8>) -> Result<DnaSequence, DnaDecodeError> {
             .map(Option::unwrap)
             .collect(),
     ))
+}
+impl Complement for DnaBase {
+    fn complement(self) -> Self {
+        match self {
+            Self::A => Self::T,
+            Self::T => Self::A,
+            Self::C => Self::G,
+            Self::G => Self::C,
+        }
+    }
 }
 
 // // Unsafe implementations as an exercise, this could make things faster,
@@ -289,17 +294,6 @@ impl MaybeDnaBase {
         }
     }
 
-    // Get the complementary nucleotide
-    pub fn complement(&self) -> Self {
-        match self {
-            Self::A => Self::T,
-            Self::T => Self::A,
-            Self::C => Self::G,
-            Self::G => Self::C,
-            Self::N => Self::N,
-        }
-    }
-
     // Check if the nucleotide is a purine (A or G)
     pub fn is_purine(&self) -> bool {
         matches!(self, Self::A | Self::G)
@@ -356,6 +350,17 @@ fn decode_maybe(mut bases: Vec<u8>) -> Result<Sequence<MaybeDnaBase>, DnaDecodeE
             .map(Option::unwrap)
             .collect(),
     ))
+}
+impl Complement for MaybeDnaBase {
+    fn complement(self) -> Self {
+        match self {
+            Self::A => Self::T,
+            Self::T => Self::A,
+            Self::C => Self::G,
+            Self::G => Self::C,
+            Self::N => Self::N,
+        }
+    }
 }
 
 impl std::fmt::Display for MaybeDnaBase {
@@ -431,17 +436,6 @@ impl AmbiguousDnaBase {
         }
     }
 
-    // Get the complementary nucleotide
-    pub fn complement(&self) -> Self {
-        match self {
-            Self::A => Self::T,
-            Self::T => Self::A,
-            Self::C => Self::G,
-            Self::G => Self::C,
-            Self::N => Self::N,
-        }
-    }
-
     // Check if the nucleotide is a purine (A or G)
     pub fn is_purine(&self) -> bool {
         matches!(self, Self::A | Self::G)
@@ -497,6 +491,17 @@ fn decode_ambiguous(mut bases: Vec<u8>) -> Result<AmbiguousDnaSequence, DnaDecod
             .map(Option::unwrap)
             .collect(),
     ))
+}
+impl Complement for AmbiguousDnaBase {
+    fn complement(self) -> Self {
+        match self {
+            Self::A => Self::T,
+            Self::T => Self::A,
+            Self::C => Self::G,
+            Self::G => Self::C,
+            Self::N => Self::N,
+        }
+    }
 }
 
 impl std::fmt::Display for AmbiguousDnaBase {
@@ -612,26 +617,6 @@ impl IupacDnaBase {
         }
     }
 
-    pub fn complement(&self) -> Self {
-        match self {
-            Self::A => Self::T,
-            Self::T => Self::A,
-            Self::C => Self::G,
-            Self::G => Self::C,
-            Self::R => Self::Y, // A/G -> T/C
-            Self::Y => Self::R, // C/T -> G/A
-            Self::S => Self::S, // G/C -> C/G
-            Self::W => Self::W, // A/T -> T/A
-            Self::K => Self::M, // G/T -> C/A
-            Self::M => Self::K, // A/C -> T/G
-            Self::B => Self::V, // CGT -> GCA
-            Self::D => Self::H, // AGT -> TCA
-            Self::H => Self::D, // ACT -> TGA
-            Self::V => Self::B, // ACG -> TGC
-            Self::N => Self::N,
-        }
-    }
-
     pub fn is_purine(&self) -> bool {
         matches!(self, Self::A | Self::G | Self::R)
     }
@@ -661,6 +646,27 @@ impl AsciiChar for IupacDnaBase {
         Self: Sized,
     {
         decode_iupac(bases)
+    }
+}
+impl Complement for IupacDnaBase {
+    fn complement(self) -> Self {
+        match self {
+            Self::A => Self::T,
+            Self::T => Self::A,
+            Self::C => Self::G,
+            Self::G => Self::C,
+            Self::R => Self::Y, // A/G -> T/C
+            Self::Y => Self::R, // C/T -> G/A
+            Self::S => Self::S, // G/C -> C/G
+            Self::W => Self::W, // A/T -> T/A
+            Self::K => Self::M, // G/T -> C/A
+            Self::M => Self::K, // A/C -> T/G
+            Self::B => Self::V, // CGT -> GCA
+            Self::D => Self::H, // AGT -> TCA
+            Self::H => Self::D, // ACT -> TGA
+            Self::V => Self::B, // ACG -> TGC
+            Self::N => Self::N,
+        }
     }
 }
 
