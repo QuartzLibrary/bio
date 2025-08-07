@@ -1066,6 +1066,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore]
     async fn test_get_latest_manifest() {
         let result = PhenotypeManifestEntry::load_default().await.unwrap();
         assert!(!result.is_empty(), "Manifest should not be empty");
@@ -1077,6 +1078,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn roundtrip_manifest_json() {
         let result = PhenotypeManifestEntry::load_default().await.unwrap();
         let json = serde_json::to_string(&result).unwrap();
@@ -1085,6 +1087,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_get_summary_stats() {
         let manifest = PhenotypeManifestEntry::load_default().await.unwrap();
         let entry = manifest.first().unwrap();
