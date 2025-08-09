@@ -68,8 +68,8 @@ async fn cache_chain_files() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn check_against_ucsc() -> anyhow::Result<()> {
+#[test]
+fn check_against_ucsc() -> anyhow::Result<()> {
     fn is_subset_of(a: &[GenomeRange], b: &[GenomeRange]) -> bool {
         a.iter().all(|r| b.iter().any(|r2| r2.contains_range(r)))
     }
