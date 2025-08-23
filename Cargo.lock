@@ -3264,6 +3264,7 @@ dependencies = [
  "pin-project",
  "plotly",
  "rand 0.9.1",
+ "regex",
  "reqwest",
  "rmp-serde",
  "serde",
