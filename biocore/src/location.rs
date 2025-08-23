@@ -145,8 +145,6 @@ impl<Contig> TryFrom<GenomeRange<Contig>> for GenomePosition<Contig> {
 }
 
 pub mod orientation {
-    use std::ops::{Deref, DerefMut};
-
     use serde::{Deserialize, Serialize};
 
     use crate::genome::Contig;
@@ -382,19 +380,6 @@ pub mod orientation {
                 orientation: self.orientation,
                 v: self.v.as_ref_contig(),
             }
-        }
-    }
-
-    impl<T> Deref for WithOrientation<T> {
-        type Target = T;
-
-        fn deref(&self) -> &Self::Target {
-            &self.v
-        }
-    }
-    impl<T> DerefMut for WithOrientation<T> {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.v
         }
     }
 }

@@ -182,12 +182,12 @@ where
         if !self.header.t.as_ref_contig().contains(&loc) {
             return None.into_iter().flatten();
         }
-        let at = loc.at;
+        let at = loc.v.at;
         #[expect(unused_variables)]
         let loc = ();
 
-        let mut t_start = self.header.t.at.start;
-        let mut q_start = self.header.q.at.start;
+        let mut t_start = self.header.t.v.at.start;
+        let mut q_start = self.header.q.v.at.start;
 
         let mapped = self
             .blocks()
@@ -198,7 +198,7 @@ where
                     let new = WithOrientation {
                         orientation: self.header.q.orientation,
                         v: GenomePosition {
-                            name: self.header.q.name.clone(),
+                            name: self.header.q.v.name.clone(),
                             at: q_start + (at - t_start),
                         },
                     };
@@ -238,8 +238,8 @@ where
         #[expect(unused_variables)]
         let range = ();
 
-        let mut t_start = self.header.t.at.start;
-        let mut q_start = self.header.q.at.start;
+        let mut t_start = self.header.t.v.at.start;
+        let mut q_start = self.header.q.v.at.start;
 
         let mapped = self
             .blocks()
@@ -253,7 +253,7 @@ where
                     r = Some(WithOrientation {
                         orientation: self.header.q.orientation,
                         v: GenomeRange {
-                            name: self.header.q.name.clone(),
+                            name: self.header.q.v.name.clone(),
                             at: (q_start + shift)..(q_start + shift + intersected.range_len()),
                         },
                     });
@@ -333,8 +333,8 @@ impl<From, To> Chain<From, To> {
         From: Clone,
         To: Clone,
     {
-        let mut t_start = self.header.t.at.start;
-        let mut q_start = self.header.q.at.start;
+        let mut t_start = self.header.t.v.at.start;
+        let mut q_start = self.header.q.v.at.start;
 
         self.blocks().map(move |b| {
             let t_fragment = t_start..(t_start + b.size);
@@ -353,14 +353,14 @@ impl<From, To> Chain<From, To> {
                 WithOrientation {
                     orientation: self.header.t.orientation,
                     v: GenomeRange {
-                        name: self.header.t.name.clone(),
+                        name: self.header.t.v.name.clone(),
                         at: t_fragment,
                     },
                 },
                 WithOrientation {
                     orientation: self.header.q.orientation,
                     v: GenomeRange {
-                        name: self.header.q.name.clone(),
+                        name: self.header.q.v.name.clone(),
                         at: q_fragment,
                     },
                 },
@@ -390,8 +390,8 @@ impl<From, To> LiftoverIndexed<From, To> {
         let mut contigs: BTreeMap<String, From> = BTreeMap::new();
 
         for (mut from, mut to) in liftover.iter_ranges() {
-            assert!(!from.is_empty());
-            assert!(!to.is_empty());
+            assert!(!from.v.is_empty());
+            assert!(!to.v.is_empty());
 
             if from.orientation != SequenceOrientation::Forward {
                 from = from.flip_orientation();
@@ -503,7 +503,7 @@ where
         let mut loc = loc.as_ref_contig();
         let initially_flipped = loc.orientation != SequenceOrientation::Forward;
         loc.set_orientation(SequenceOrientation::Forward);
-        let at = loc.at;
+        let at = loc.v.at;
         #[expect(unused_variables)]
         let loc = ();
 
