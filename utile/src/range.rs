@@ -21,6 +21,8 @@ pub trait RangeExt: Sized {
     /// You can use `range.intersection(other).is_empty()` to check if any actual elements overlap.
     fn overlaps(&self, other: &Self) -> bool;
     fn is_adjacent(&self, other: &Self) -> bool;
+    /// Returns true if `self` fully contains `other` as a sub-range.
+    fn contains_range(&self, other: &Self) -> bool;
 
     /// The returned range will attempt to be a subset of `self`, potentially normalised,
     /// but this is not always possible.
@@ -57,6 +59,9 @@ where
         let s = self.clone().normalize();
         let o = other.clone().normalize();
         s.end == o.start || o.end == s.start
+    }
+    fn contains_range(&self, other: &Self) -> bool {
+        self.start <= other.start && other.end <= self.end
     }
 
     fn intersection(self, other: Self) -> Self {
@@ -116,6 +121,9 @@ where
         let o = other.clone().normalize();
 
         &T::forward(s.end().clone(), 1) == o.start() || &T::forward(o.end().clone(), 1) == s.start()
+    }
+    fn contains_range(&self, other: &Self) -> bool {
+        self.start() <= other.start() && other.end() <= self.end()
     }
 
     fn intersection(self, other: Self) -> Self {

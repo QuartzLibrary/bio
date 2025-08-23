@@ -51,9 +51,7 @@ impl<Contig> GenomeRange<Contig> {
     where
         Contig: PartialEq,
     {
-        self.name == range.name
-            && self.at.contains(&range.at.start)
-            && (self.at.contains(&range.at.end) || self.at.end == range.at.end)
+        self.name == range.name && self.at.contains_range(&range.at)
     }
 
     pub fn intersection(self, b: &Self) -> Option<Self>
