@@ -165,13 +165,18 @@ pub mod orientation {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[derive(Serialize, Deserialize)]
     pub enum SequenceOrientation {
+        /// 5' -> 3'
         Forward,
+        /// 3' -> 5'
         Reverse,
     }
 
     impl SequenceOrientation {
         pub fn is_forward(self) -> bool {
             self == Self::Forward
+        }
+        pub fn is_reverse(self) -> bool {
+            self == Self::Reverse
         }
         pub fn flip(self) -> Self {
             match self {

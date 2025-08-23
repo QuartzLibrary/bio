@@ -12,6 +12,8 @@ use ref_cast::RefCast;
 
 use crate::dna::Complement;
 
+/// A sequence of bases or proteins.
+/// If this is a DNA/RNA sequence, it's 5' -> 3' by convention.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Sequence<T> {
     bases: Vec<T>,
@@ -199,11 +201,32 @@ impl<T> Sequence<T> {
         self.bases.get(range).map(SequenceSlice::ref_cast)
     }
 
+    pub fn append(&mut self, other: &mut Self) {
+        self.bases.append(&mut other.bases);
+    }
+
     pub fn encode(&self) -> String
     where
         T: AsciiChar,
     {
         T::encode(&self.bases)
+    }
+    /// By convention this type is 5' -> 3', this encodes it in reverse
+    /// to display it as 3' -> 5'.
+    pub fn encode_3_to_5(self) -> String
+    where
+        T: AsciiChar,
+    {
+        T::encode(&self.bases.into_iter().rev().collect::<Vec<_>>())
+    }
+
+    pub fn contains(&self, needle: &[T]) -> bool
+    where
+        T: PartialEq,
+    {
+        self.bases
+            .windows(needle.len())
+            .any(|window| window == needle)
     }
 }
 
