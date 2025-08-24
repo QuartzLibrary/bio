@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, ops::Range};
 
 use biocore::{
     genome::Contig,
-    location::{GenomePosition, GenomeRange},
+    location::{ContigPosition, GenomeRange},
 };
 use utile::resource::{RawResource, RawResourceExt};
 
@@ -55,7 +55,7 @@ fn check_testpoints() -> anyhow::Result<()> {
 
 /// Randomly generates testpoints for a given chain file.
 /// Equivalent chain files will generate the same testpoints.
-pub fn get(liftover: &Liftover) -> (Vec<GenomePosition>, Vec<GenomeRange>) {
+pub fn get(liftover: &Liftover) -> (Vec<ContigPosition>, Vec<GenomeRange>) {
     let snps = generate_snps(liftover, &mut SmallRng::seed_from_u64(42)); // For reproducibility.
     let ranges = generate_ranges(liftover, &mut SmallRng::seed_from_u64(42)); // For reproducibility.
 
@@ -90,15 +90,15 @@ fn generate_ranges(liftover: &Liftover, rng: &mut impl Rng) -> Vec<GenomeRange> 
         )
         .collect()
 }
-fn generate_snps(liftover: &Liftover, rng: &mut impl Rng) -> Vec<GenomePosition> {
+fn generate_snps(liftover: &Liftover, rng: &mut impl Rng) -> Vec<ContigPosition> {
     contigs(liftover)
         .into_iter()
-        .flat_map(|(name, size)| {
+        .flat_map(|(contig, size)| {
             [0, size - 1]
                 .into_iter()
                 .chain((0..100).map(|_| rng.random_range(0..size)))
-                .map(|at| GenomePosition {
-                    name: name.clone(),
+                .map(|at| ContigPosition {
+                    contig: contig.clone(),
                     at,
                 })
                 .collect::<Vec<_>>()
@@ -126,7 +126,7 @@ fn contigs(liftover: &Liftover) -> Vec<(String, u64)> {
     contigs.into_iter().collect()
 }
 
-fn generate_snp_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomePosition> {
+fn generate_snp_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<ContigPosition> {
     let mut t_start = chain.header.t.v.at.start;
 
     let mut cases = vec![];
@@ -159,8 +159,8 @@ fn generate_snp_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomePosit
 
     cases
         .into_iter()
-        .map(|at| GenomePosition {
-            name: chain.header.t.v.name.as_ref().to_owned(),
+        .map(|at| ContigPosition {
+            contig: chain.header.t.v.name.as_ref().to_owned(),
             at,
         })
         .collect()

@@ -1,15 +1,15 @@
 use std::{ffi::OsStr, fs::File, io::Write, path::Path};
 
-use biocore::location::{GenomePosition, GenomeRange};
+use biocore::location::{ContigPosition, GenomeRange};
 
 use super::{FailureReason, PositionFailureReason, UcscLiftoverSettings};
 
 pub async fn liftover_human_snps(
-    locations: &[GenomePosition],
+    locations: &[ContigPosition],
     chain_file: impl AsRef<Path>,
     liftover_command: impl AsRef<OsStr>,
     settings: UcscLiftoverSettings,
-) -> std::io::Result<Vec<Result<Vec<GenomePosition>, PositionFailureReason>>> {
+) -> std::io::Result<Vec<Result<Vec<ContigPosition>, PositionFailureReason>>> {
     Ok(liftover(
         &locations
             .iter()
@@ -27,11 +27,11 @@ pub async fn liftover_human_snps(
     .collect())
 }
 pub async fn liftover_snps(
-    locations: &[GenomePosition],
+    locations: &[ContigPosition],
     chain_file: impl AsRef<Path>,
     liftover_command: impl AsRef<OsStr>,
     settings: UcscLiftoverSettings,
-) -> std::io::Result<Vec<Result<Vec<GenomePosition>, PositionFailureReason>>> {
+) -> std::io::Result<Vec<Result<Vec<ContigPosition>, PositionFailureReason>>> {
     Ok(liftover(
         &locations
             .iter()

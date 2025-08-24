@@ -4,7 +4,7 @@ use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use biocore::location::GenomePosition;
+use biocore::location::ContigPosition;
 use utile::{
     io::reqwest_error,
     resource::{RawResource, RawResourceExt, UrlResource},
@@ -232,15 +232,15 @@ impl GwasCatalogAssociation {
 
             Either::Right(Interaction {
                 a: Location {
-                    loc: GenomePosition {
-                        name: parse_human_contig(chr_id_a).unwrap().as_str().to_owned(),
+                    loc: ContigPosition {
+                        contig: parse_human_contig(chr_id_a).unwrap().as_str().to_owned(),
                         at: chr_pos_a.trim().parse().unwrap(),
                     },
                     region: region_a.trim().to_owned(),
                 },
                 b: Location {
-                    loc: GenomePosition {
-                        name: parse_human_contig(chr_id_b).unwrap().as_str().to_owned(),
+                    loc: ContigPosition {
+                        contig: parse_human_contig(chr_id_b).unwrap().as_str().to_owned(),
                         at: chr_pos_b.trim().parse().unwrap(),
                     },
                     region: region_b.trim().to_owned(),
@@ -266,8 +266,8 @@ impl GwasCatalogAssociation {
                             None => panic!("{self:?}"),
                         };
                         locations.push(Location {
-                            loc: GenomePosition {
-                                name: parse_human_contig(chr_id).unwrap().as_str().to_owned(),
+                            loc: ContigPosition {
+                                contig: parse_human_contig(chr_id).unwrap().as_str().to_owned(),
                                 at: chr_pos.trim().parse().unwrap(),
                             },
                             region,
@@ -469,7 +469,7 @@ pub struct Interaction {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Location {
-    pub loc: GenomePosition,
+    pub loc: ContigPosition,
     pub region: String,
 }
 

@@ -16,7 +16,7 @@ use biocore::{
     genome::{ArcContig, Contig},
     location::{
         orientation::{SequenceOrientation, WithOrientation},
-        GenomePosition, GenomeRange,
+        ContigPosition, GenomeRange,
     },
 };
 
@@ -99,20 +99,20 @@ where
 {
     pub fn map<C: AsRef<str>>(
         &self,
-        loc: GenomePosition<C>,
-    ) -> impl Iterator<Item = GenomePosition<To>> + use<'_, From, To, C>
+        loc: ContigPosition<C>,
+    ) -> impl Iterator<Item = ContigPosition<To>> + use<'_, From, To, C>
     where
         From: Clone,
     {
-        let Some(internal) = self.find_input_contig(&loc.name) else {
-            log::warn!("[Liftover] Unknown contig: {}", loc.name.as_ref());
+        let Some(internal) = self.find_input_contig(&loc.contig) else {
+            log::warn!("[Liftover] Unknown contig: {}", loc.contig.as_ref());
             return None.into_iter().flatten();
         };
 
         let loc = WithOrientation {
             orientation: SequenceOrientation::Forward,
-            v: GenomePosition {
-                name: internal.clone(),
+            v: ContigPosition {
+                contig: internal.clone(),
                 at: loc.at,
             },
         };
@@ -154,8 +154,8 @@ where
 
     pub fn map_raw(
         &self,
-        loc: WithOrientation<GenomePosition<From>>,
-    ) -> impl Iterator<Item = WithOrientation<GenomePosition<To>>> + use<'_, From, To> {
+        loc: WithOrientation<ContigPosition<From>>,
+    ) -> impl Iterator<Item = WithOrientation<ContigPosition<To>>> + use<'_, From, To> {
         self.chains.iter().flat_map(move |c| c.map_raw(&loc))
     }
     pub fn map_range_raw(
@@ -174,8 +174,8 @@ where
 {
     pub fn map_raw(
         &self,
-        loc: &WithOrientation<GenomePosition<From>>,
-    ) -> impl Iterator<Item = WithOrientation<GenomePosition<To>>> + use<'_, From, To> {
+        loc: &WithOrientation<ContigPosition<From>>,
+    ) -> impl Iterator<Item = WithOrientation<ContigPosition<To>>> + use<'_, From, To> {
         let mut loc = loc.as_ref_contig();
         let initially_flipped = loc.orientation != self.header.t.orientation;
         loc.set_orientation(self.header.t.orientation);
@@ -197,8 +197,8 @@ where
                 if (t_start..(t_start + b.size)).contains(&at) {
                     let new = WithOrientation {
                         orientation: self.header.q.orientation,
-                        v: GenomePosition {
-                            name: self.header.q.v.name.clone(),
+                        v: ContigPosition {
+                            contig: self.header.q.v.name.clone(),
                             at: q_start + (at - t_start),
                         },
                     };
@@ -439,20 +439,20 @@ where
 {
     pub fn map<C: AsRef<str>>(
         &self,
-        loc: GenomePosition<C>,
-    ) -> impl Iterator<Item = GenomePosition<To>> + use<'_, From, To, C>
+        loc: ContigPosition<C>,
+    ) -> impl Iterator<Item = ContigPosition<To>> + use<'_, From, To, C>
     where
         From: Clone,
     {
-        let Some(internal) = self.find_input_contig(&loc.name) else {
-            log::warn!("[Liftover] Unknown contig: {}", loc.name.as_ref());
+        let Some(internal) = self.find_input_contig(&loc.contig) else {
+            log::warn!("[Liftover] Unknown contig: {}", loc.contig.as_ref());
             return None.into_iter().flatten();
         };
 
         let range = WithOrientation {
             orientation: SequenceOrientation::Forward,
-            v: GenomePosition {
-                name: internal.clone(),
+            v: ContigPosition {
+                contig: internal.clone(),
                 at: loc.at,
             },
         };
@@ -494,9 +494,9 @@ where
 
     pub fn map_raw(
         &self,
-        loc: &WithOrientation<GenomePosition<From>>,
-    ) -> impl Iterator<Item = WithOrientation<GenomePosition<To>>> + use<'_, From, To> {
-        let Some(ranges) = self.chromosomes.get(&loc.v.name) else {
+        loc: &WithOrientation<ContigPosition<From>>,
+    ) -> impl Iterator<Item = WithOrientation<ContigPosition<To>>> + use<'_, From, To> {
+        let Some(ranges) = self.chromosomes.get(&loc.v.contig) else {
             return None.into_iter().flatten();
         };
 
@@ -529,8 +529,8 @@ where
             let shift = at - r.range.start;
             let new = WithOrientation {
                 orientation: r.data.orientation,
-                v: GenomePosition {
-                    name: r.data.v.name.clone(),
+                v: ContigPosition {
+                    contig: r.data.v.name.clone(),
                     at: r.data.v.at.start + shift,
                 },
             };

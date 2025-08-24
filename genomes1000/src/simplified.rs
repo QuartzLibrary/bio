@@ -1,4 +1,4 @@
-use biocore::{dna::DnaSequence, location::GenomePosition};
+use biocore::{dna::DnaSequence, location::ContigPosition};
 
 use crate::{GRCh38Contig, Genotype};
 
@@ -16,9 +16,9 @@ pub struct SimplifiedRecord {
 }
 
 impl SimplifiedRecord {
-    pub fn at(&self) -> GenomePosition<GRCh38Contig> {
-        GenomePosition {
-            name: self.contig,
+    pub fn at(&self) -> ContigPosition<GRCh38Contig> {
+        ContigPosition {
+            contig: self.contig,
             at: self.position - 1,
         }
     }

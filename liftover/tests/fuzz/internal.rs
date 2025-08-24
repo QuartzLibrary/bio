@@ -1,4 +1,4 @@
-use biocore::location::{GenomePosition, GenomeRange};
+use biocore::location::{ContigPosition, GenomeRange};
 
 use liftover::{
     sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
@@ -119,7 +119,7 @@ fn check_testpoints_slow() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn run_snps(liftover: &LiftoverIndexed, snps: Vec<GenomePosition>) -> Vec<Vec<GenomePosition>> {
+pub fn run_snps(liftover: &LiftoverIndexed, snps: Vec<ContigPosition>) -> Vec<Vec<ContigPosition>> {
     snps.into_iter()
         .map(|l| {
             liftover
@@ -142,7 +142,7 @@ pub fn run_ranges(liftover: &LiftoverIndexed, ranges: Vec<GenomeRange>) -> Vec<V
         .collect()
 }
 
-pub fn run_snps_slow(liftover: &Liftover, snps: Vec<GenomePosition>) -> Vec<Vec<GenomePosition>> {
+pub fn run_snps_slow(liftover: &Liftover, snps: Vec<ContigPosition>) -> Vec<Vec<ContigPosition>> {
     snps.into_iter()
         .map(|l| {
             liftover
@@ -169,11 +169,11 @@ pub fn run_ranges_slow(liftover: &Liftover, ranges: Vec<GenomeRange>) -> Vec<Vec
 pub mod cache {
     use std::path::PathBuf;
 
-    use biocore::location::{GenomePosition, GenomeRange};
+    use biocore::location::{ContigPosition, GenomeRange};
     use utile::{cache::FsCacheEntry, resource::RawResourceExt};
 
     pub fn store(
-        snps_internal: Vec<Vec<GenomePosition>>,
+        snps_internal: Vec<Vec<ContigPosition>>,
         ranges_internal: Vec<Vec<GenomeRange>>,
         prefix: &str,
         key: &str,
@@ -186,13 +186,13 @@ pub mod cache {
             .unwrap();
     }
     pub fn assert(
-        snps_internal: Vec<Vec<GenomePosition>>,
+        snps_internal: Vec<Vec<ContigPosition>>,
         ranges_internal: Vec<Vec<GenomeRange>>,
         prefix: &str,
         key: &str,
     ) {
         let snps_target: Vec<_> = snp_testpoints_internal_target(prefix, key)
-            .read_json_lines::<Vec<GenomePosition>>()
+            .read_json_lines::<Vec<ContigPosition>>()
             .unwrap()
             .map(|l| l.unwrap())
             .collect();

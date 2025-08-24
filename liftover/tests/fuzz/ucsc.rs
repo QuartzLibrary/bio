@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use biocore::location::{GenomePosition, GenomeRange};
+use biocore::location::{ContigPosition, GenomeRange};
 
 use liftover::{
     bindings::{self, ucsc::UcscLiftoverSettings},
@@ -106,8 +106,8 @@ async fn check_testpoints_ucsc_web() -> anyhow::Result<()> {
 
 pub async fn run_snps(
     liftover_path: impl AsRef<Path>,
-    snps: &[GenomePosition],
-) -> Vec<Vec<GenomePosition>> {
+    snps: &[ContigPosition],
+) -> Vec<Vec<ContigPosition>> {
     bindings::ucsc::cli::liftover_human_snps(
         snps,
         liftover_path,
@@ -140,8 +140,8 @@ pub async fn run_ranges(
 pub async fn run_snps_web(
     from: UcscHG,
     to: UcscHG,
-    snps: &[GenomePosition],
-) -> Vec<Vec<GenomePosition>> {
+    snps: &[ContigPosition],
+) -> Vec<Vec<ContigPosition>> {
     let client = reqwest::Client::new();
 
     bindings::ucsc::web::liftover_human_snps(&client, from, snps, to, UcscLiftoverSettings::loose())
@@ -170,10 +170,10 @@ pub async fn run_ranges_web(
 pub mod cache {
     use std::path::PathBuf;
 
-    use biocore::location::{GenomePosition, GenomeRange};
+    use biocore::location::{ContigPosition, GenomeRange};
     use utile::{cache::FsCacheEntry, resource::RawResourceExt};
 
-    pub fn get(prefix: &str, key: &str) -> (Vec<Vec<GenomePosition>>, Vec<Vec<GenomeRange>>) {
+    pub fn get(prefix: &str, key: &str) -> (Vec<Vec<ContigPosition>>, Vec<Vec<GenomeRange>>) {
         (
             snp_testpoints_ucsc_target(prefix, key)
                 .read_json_lines()
@@ -188,7 +188,7 @@ pub mod cache {
         )
     }
     pub fn store(
-        snps_internal: Vec<Vec<GenomePosition>>,
+        snps_internal: Vec<Vec<ContigPosition>>,
         ranges_internal: Vec<Vec<GenomeRange>>,
         prefix: &str,
         key: &str,
@@ -201,7 +201,7 @@ pub mod cache {
             .unwrap();
     }
     pub fn assert(
-        snps_internal: Vec<Vec<GenomePosition>>,
+        snps_internal: Vec<Vec<ContigPosition>>,
         ranges_internal: Vec<Vec<GenomeRange>>,
         prefix: &str,
         key: &str,

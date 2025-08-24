@@ -18,7 +18,7 @@ use std::{cmp::Ordering, collections::BTreeMap, io};
 
 use biocore::{
     dna::{DnaBase, DnaSequence},
-    location::{GenomePosition, GenomeRange},
+    location::{ContigPosition, GenomeRange},
     vcf::IndexedVcfReader,
 };
 use utile::{
@@ -120,9 +120,9 @@ pub struct ExtendedSample<GT> {
     SB: Option<Vec<u64>>,
 }
 impl<S> Record<S> {
-    pub fn at(&self) -> GenomePosition<GRCh38Contig> {
-        GenomePosition {
-            name: self.contig,
+    pub fn at(&self) -> ContigPosition<GRCh38Contig> {
+        ContigPosition {
+            contig: self.contig,
             at: self.position - 1,
         }
     }

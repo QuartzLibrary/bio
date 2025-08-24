@@ -3,7 +3,7 @@ use std::ops::Range;
 use regex::{Regex, RegexBuilder};
 use reqwest::Client;
 
-use biocore::location::{GenomePosition, GenomeRange};
+use biocore::location::{ContigPosition, GenomeRange};
 
 use crate::sources::UcscHG;
 
@@ -14,12 +14,12 @@ pub async fn liftover_human_snps(
 
     from_db: UcscHG,
 
-    locations: &[GenomePosition],
+    locations: &[ContigPosition],
 
     to_db: UcscHG,
 
     settings: UcscLiftoverSettings,
-) -> std::io::Result<Vec<Result<Vec<GenomePosition>, PositionFailureReason>>> {
+) -> std::io::Result<Vec<Result<Vec<ContigPosition>, PositionFailureReason>>> {
     Ok(liftover(
         client,
         "Human",
@@ -46,13 +46,13 @@ pub async fn liftover_snps(
     from_org: &str,
     from_db: &str,
 
-    locations: &[GenomePosition],
+    locations: &[ContigPosition],
 
     to_org: &str,
     to_db: &str,
 
     settings: UcscLiftoverSettings,
-) -> std::io::Result<Vec<Result<Vec<GenomePosition>, PositionFailureReason>>> {
+) -> std::io::Result<Vec<Result<Vec<ContigPosition>, PositionFailureReason>>> {
     Ok(liftover(
         client,
         from_org,

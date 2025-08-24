@@ -6,7 +6,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
-use biocore::location::{GenomePosition, GenomeRange, LocationConversionError};
+use biocore::location::{ContigPosition, GenomeRange, LocationConversionError};
 
 /// Manually checked lowest exponent before it starts to fail.
 const MIN_MATCH_FALLBACK: f64 = 1e-45;
@@ -50,7 +50,7 @@ pub enum PositionFailureReason {
     /// back to individual positions.
     #[error("{CONVERSION_ERROR}\n:Original position: {from:?}\nResulting range: {to:?}")]
     Conversion {
-        from: GenomePosition,
+        from: ContigPosition,
         to: GenomeRange,
     },
 }
@@ -292,9 +292,9 @@ pub(super) fn combine_success_and_failure(
 }
 
 fn recover_positions(
-    original: &GenomePosition,
+    original: &ContigPosition,
     v: Vec<GenomeRange>,
-) -> Result<Vec<GenomePosition>, PositionFailureReason> {
+) -> Result<Vec<ContigPosition>, PositionFailureReason> {
     v.into_iter()
         .map(|v| {
             v.try_into().map_err(|LocationConversionError { from }| {

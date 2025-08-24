@@ -4,7 +4,7 @@ use std::{collections::BTreeSet, io, mem};
 
 use biocore::{
     dna::DnaSequence,
-    location::{GenomePosition, GenomeRange},
+    location::{ContigPosition, GenomeRange},
 };
 use hail::contig::GRCh37Contig;
 use ordered_float::NotNan;
@@ -618,12 +618,12 @@ impl<Contig> SummaryStats<Contig> {
             .into_deserialize())
     }
 
-    pub fn at(&self) -> GenomePosition<Contig>
+    pub fn at(&self) -> ContigPosition<Contig>
     where
         Contig: Clone,
     {
-        GenomePosition {
-            name: self.chr.clone(),
+        ContigPosition {
+            contig: self.chr.clone(),
             at: self.pos - 1,
         }
     }

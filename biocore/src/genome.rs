@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, io, ops::Index, sync::Arc};
 
 use crate::{
     dna::DnaBase,
-    location::{GenomePosition, GenomeRange},
+    location::{ContigPosition, GenomeRange},
     sequence::{Sequence, SequenceSlice},
 };
 
@@ -97,12 +97,12 @@ impl<C: Ord, B> InMemoryGenome<C, B> {
         }
         Ok(())
     }
-    pub fn get(&self, pos: &GenomePosition<C>) -> Option<B>
+    pub fn get(&self, pos: &ContigPosition<C>) -> Option<B>
     where
         B: Clone,
     {
         self.contigs
-            .get(&pos.name)?
+            .get(&pos.contig)?
             .get(usize::try_from(pos.at).unwrap())
             .cloned()
     }
@@ -129,12 +129,12 @@ impl<C: Ord, B> Index<&C> for InMemoryGenome<C, B> {
         &self.contigs[index]
     }
 }
-impl<C: Ord, B> Index<GenomePosition<C>> for InMemoryGenome<C, B> {
+impl<C: Ord, B> Index<ContigPosition<C>> for InMemoryGenome<C, B> {
     type Output = B;
     #[track_caller]
-    fn index(&self, index: GenomePosition<C>) -> &Self::Output {
+    fn index(&self, index: ContigPosition<C>) -> &Self::Output {
         let at = usize::try_from(index.at).unwrap();
-        &self[&index.name][at]
+        &self[&index.contig][at]
     }
 }
 impl<C: Ord, B> Index<GenomeRange<C>> for InMemoryGenome<C, B> {
