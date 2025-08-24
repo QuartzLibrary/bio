@@ -10,7 +10,7 @@ mod ucsc;
 
 use std::path::PathBuf;
 
-use biocore::location::GenomeRange;
+use biocore::location::ContigRange;
 use utile::{
     cache::FsCache,
     resource::{RawResource, RawResourceExt},
@@ -70,11 +70,11 @@ async fn cache_chain_files() -> anyhow::Result<()> {
 
 #[test]
 fn check_against_ucsc() -> anyhow::Result<()> {
-    fn is_subset_of(a: &[GenomeRange], b: &[GenomeRange]) -> bool {
+    fn is_subset_of(a: &[ContigRange], b: &[ContigRange]) -> bool {
         a.iter().all(|r| b.iter().any(|r2| r2.contains_range(r)))
     }
     #[track_caller]
-    fn assert_range(internal: &[GenomeRange], ucsc: &[GenomeRange]) {
+    fn assert_range(internal: &[ContigRange], ucsc: &[ContigRange]) {
         // They are not quite the same, because the liftover tool also merges some ranges,
         // so here we check that all the mapped values are a subset of the liftover tool.
 

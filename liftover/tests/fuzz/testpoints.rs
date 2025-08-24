@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, ops::Range};
 
 use biocore::{
     genome::Contig,
-    location::{ContigPosition, GenomeRange},
+    location::{ContigPosition, ContigRange},
 };
 use utile::resource::{RawResource, RawResourceExt};
 
@@ -55,17 +55,17 @@ fn check_testpoints() -> anyhow::Result<()> {
 
 /// Randomly generates testpoints for a given chain file.
 /// Equivalent chain files will generate the same testpoints.
-pub fn get(liftover: &Liftover) -> (Vec<ContigPosition>, Vec<GenomeRange>) {
+pub fn get(liftover: &Liftover) -> (Vec<ContigPosition>, Vec<ContigRange>) {
     let snps = generate_snps(liftover, &mut SmallRng::seed_from_u64(42)); // For reproducibility.
     let ranges = generate_ranges(liftover, &mut SmallRng::seed_from_u64(42)); // For reproducibility.
 
     (snps, ranges)
 }
 
-fn generate_ranges(liftover: &Liftover, rng: &mut impl Rng) -> Vec<GenomeRange> {
+fn generate_ranges(liftover: &Liftover, rng: &mut impl Rng) -> Vec<ContigRange> {
     contigs(liftover)
         .into_iter()
-        .flat_map(|(name, size)| {
+        .flat_map(|(contig, size)| {
             [0..1, 0..size, size - 1..size]
                 .into_iter()
                 .chain((0..100).map(|_| {
@@ -74,8 +74,8 @@ fn generate_ranges(liftover: &Liftover, rng: &mut impl Rng) -> Vec<GenomeRange> 
                     let to = Ord::min(size, to);
                     from..to
                 }))
-                .map(|range| GenomeRange {
-                    name: name.clone(),
+                .map(|range| ContigRange {
+                    contig: contig.clone(),
                     at: range,
                 })
                 .collect::<Vec<_>>()
@@ -118,9 +118,9 @@ fn contigs(liftover: &Liftover) -> Vec<(String, u64)> {
     let mut contigs = BTreeMap::new();
     for chain in &liftover.chains {
         let contig = &chain.header.t;
-        let old = contigs.insert(contig.v.name.as_ref().to_owned(), contig.v.name.size());
+        let old = contigs.insert(contig.v.contig.as_ref().to_owned(), contig.v.contig.size());
         if let Some(old) = old {
-            assert_eq!(old, contig.v.name.size());
+            assert_eq!(old, contig.v.contig.size());
         }
     }
     contigs.into_iter().collect()
@@ -160,12 +160,12 @@ fn generate_snp_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<ContigPosit
     cases
         .into_iter()
         .map(|at| ContigPosition {
-            contig: chain.header.t.v.name.as_ref().to_owned(),
+            contig: chain.header.t.v.contig.as_ref().to_owned(),
             at,
         })
         .collect()
 }
-fn generate_range_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomeRange> {
+fn generate_range_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<ContigRange> {
     let mut t_start = chain.header.t.v.at.start;
 
     let mut cases = vec![];
@@ -218,8 +218,8 @@ fn generate_range_edge_cases(chain: &Chain, rng: &mut impl Rng) -> Vec<GenomeRan
         .map(|Range { start, end }| {
             let at = if end < start { end..start } else { start..end };
             // assert!(!at.is_empty());
-            GenomeRange {
-                name: chain.header.t.v.name.as_ref().to_owned(),
+            ContigRange {
+                contig: chain.header.t.v.contig.as_ref().to_owned(),
                 at,
             }
         })

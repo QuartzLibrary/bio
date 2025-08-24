@@ -6,7 +6,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
-use biocore::location::{ContigPosition, GenomeRange, LocationConversionError};
+use biocore::location::{ContigPosition, ContigRange, LocationConversionError};
 
 /// Manually checked lowest exponent before it starts to fail.
 const MIN_MATCH_FALLBACK: f64 = 1e-45;
@@ -51,7 +51,7 @@ pub enum PositionFailureReason {
     #[error("{CONVERSION_ERROR}\n:Original position: {from:?}\nResulting range: {to:?}")]
     Conversion {
         from: ContigPosition,
-        to: GenomeRange,
+        to: ContigRange,
     },
 }
 
@@ -109,7 +109,7 @@ impl UcscLiftoverSettings {
     }
 }
 
-fn parse_success_file(res: &str) -> std::io::Result<Vec<(GenomeRange, GenomeRange, u64)>> {
+fn parse_success_file(res: &str) -> std::io::Result<Vec<(ContigRange, ContigRange, u64)>> {
     // Returned values are in the forward orientation.
     res.split('\n')
         .map(|s| s.trim())
@@ -126,20 +126,20 @@ fn parse_success_file(res: &str) -> std::io::Result<Vec<(GenomeRange, GenomeRang
                 return Err(error());
             };
             let from_range = {
-                let (name, rest) = old.split_once(':').ok_or(error())?;
+                let (contig, rest) = old.split_once(':').ok_or(error())?;
                 let (from, to) = rest.split_once('-').ok_or(error())?;
                 let from: u64 = from.parse().map_err(utile::io::invalid_data)?;
                 let to: u64 = to.parse().map_err(utile::io::invalid_data)?;
-                GenomeRange {
-                    name: name.to_owned(),
+                ContigRange {
+                    contig: contig.to_owned(),
                     at: (from - 1)..to,
                 }
             };
             let to_range = {
                 let start: u64 = start.parse().map_err(utile::io::invalid_data)?;
                 let end: u64 = end.parse().map_err(utile::io::invalid_data)?;
-                GenomeRange {
-                    name: (*chr).to_owned(),
+                ContigRange {
+                    contig: (*chr).to_owned(),
                     at: start..end,
                 }
             };
@@ -148,7 +148,7 @@ fn parse_success_file(res: &str) -> std::io::Result<Vec<(GenomeRange, GenomeRang
         })
         .try_collect()
 }
-fn parse_failure_file(res: &str) -> std::io::Result<Vec<(GenomeRange, Option<FailureReason>)>> {
+fn parse_failure_file(res: &str) -> std::io::Result<Vec<(ContigRange, Option<FailureReason>)>> {
     // Deleted in new:
     //     Sequence intersects no chains
     // Partially deleted in new:
@@ -199,8 +199,8 @@ fn parse_failure_file(res: &str) -> std::io::Result<Vec<(GenomeRange, Option<Fai
                 let start: u64 = start.parse().map_err(utile::io::invalid_data)?;
                 let end: u64 = end.parse().map_err(utile::io::invalid_data)?;
 
-                GenomeRange {
-                    name: (*chr).to_owned(),
+                ContigRange {
+                    contig: (*chr).to_owned(),
                     at: start..end,
                 }
             };
@@ -210,12 +210,12 @@ fn parse_failure_file(res: &str) -> std::io::Result<Vec<(GenomeRange, Option<Fai
         .try_collect()
 }
 pub(super) fn combine_success_and_failure(
-    locations: &[GenomeRange],
-    success: Option<Vec<(GenomeRange, GenomeRange, u64)>>,
-    failure: Option<Vec<(GenomeRange, Option<FailureReason>)>>,
-) -> std::io::Result<Vec<Result<Vec<GenomeRange>, FailureReason>>> {
+    locations: &[ContigRange],
+    success: Option<Vec<(ContigRange, ContigRange, u64)>>,
+    failure: Option<Vec<(ContigRange, Option<FailureReason>)>>,
+) -> std::io::Result<Vec<Result<Vec<ContigRange>, FailureReason>>> {
     let success = success.map(|success| {
-        let mut result: HashMap<GenomeRange, Vec<GenomeRange>> = HashMap::new();
+        let mut result: HashMap<ContigRange, Vec<ContigRange>> = HashMap::new();
 
         for (from, to, _i) in success {
             // `i` is the index/order of the mapped region.
@@ -230,7 +230,7 @@ pub(super) fn combine_success_and_failure(
     });
 
     let failure = failure.map(|failure| {
-        let mut result: HashMap<GenomeRange, Option<FailureReason>> = HashMap::new();
+        let mut result: HashMap<ContigRange, Option<FailureReason>> = HashMap::new();
 
         for (loc, reason) in failure {
             match result.entry(loc) {
@@ -293,7 +293,7 @@ pub(super) fn combine_success_and_failure(
 
 fn recover_positions(
     original: &ContigPosition,
-    v: Vec<GenomeRange>,
+    v: Vec<ContigRange>,
 ) -> Result<Vec<ContigPosition>, PositionFailureReason> {
     v.into_iter()
         .map(|v| {

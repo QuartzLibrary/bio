@@ -7,7 +7,7 @@ use noodles::{csi::BinningIndex, vcf::variant::record::ReferenceBases};
 
 use utile::range::RangeExt;
 
-use crate::location::GenomeRange;
+use crate::location::ContigRange;
 
 pub struct IndexedBcfReader<R> {
     header: noodles::vcf::Header,
@@ -33,14 +33,14 @@ impl<R: Read> IndexedBcfReader<R> {
 
     pub fn query<C>(
         &mut self,
-        at: &GenomeRange<C>,
+        at: &ContigRange<C>,
     ) -> io::Result<Query<noodles::bgzf::io::Reader<R>>>
     where
         R: Seek,
         C: AsRef<str>,
     {
         let reference_sequence_id =
-            resolve_region(self.header.string_maps().contigs(), at.name.as_ref())?;
+            resolve_region(self.header.string_maps().contigs(), at.contig.as_ref())?;
         let chunks = self
             .index
             .query(reference_sequence_id, at.try_into().unwrap())?;
@@ -49,7 +49,7 @@ impl<R: Read> IndexedBcfReader<R> {
             &self.header,
             self.reader.get_mut(),
             chunks,
-            at.name.as_ref().as_bytes().to_vec(),
+            at.contig.as_ref().as_bytes().to_vec(),
             at.at.clone(),
         ))
     }

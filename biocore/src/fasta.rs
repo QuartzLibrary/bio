@@ -12,7 +12,7 @@ use noodles::fasta::{
 
 use crate::{
     genome::InMemoryGenome,
-    location::{ContigPosition, GenomeRange},
+    location::{ContigPosition, ContigRange},
     sequence::{AsciiChar, Sequence},
 };
 
@@ -36,7 +36,7 @@ impl<R: BufRead> IndexedFastaReader<R> {
         self.query(&loc.clone().into())
     }
 
-    pub fn query<B, C>(&mut self, at: &GenomeRange<C>) -> io::Result<Sequence<B>>
+    pub fn query<B, C>(&mut self, at: &ContigRange<C>) -> io::Result<Sequence<B>>
     where
         R: Seek,
         B: AsciiChar,

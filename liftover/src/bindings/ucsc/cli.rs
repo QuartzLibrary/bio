@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, fs::File, io::Write, path::Path};
 
-use biocore::location::{ContigPosition, GenomeRange};
+use biocore::location::{ContigPosition, ContigRange};
 
 use super::{FailureReason, PositionFailureReason, UcscLiftoverSettings};
 
@@ -14,7 +14,7 @@ pub async fn liftover_human_snps(
         &locations
             .iter()
             .cloned()
-            .map(GenomeRange::from)
+            .map(ContigRange::from)
             .collect::<Vec<_>>(),
         chain_file.as_ref(),
         liftover_command,
@@ -36,7 +36,7 @@ pub async fn liftover_snps(
         &locations
             .iter()
             .cloned()
-            .map(GenomeRange::from)
+            .map(ContigRange::from)
             .collect::<Vec<_>>(),
         chain_file,
         liftover_command,
@@ -50,20 +50,20 @@ pub async fn liftover_snps(
 }
 
 pub async fn liftover_human(
-    locs: &[GenomeRange],
+    locs: &[ContigRange],
     chain_file: impl AsRef<Path>,
     liftover_command: impl AsRef<OsStr>,
     settings: UcscLiftoverSettings,
-) -> std::io::Result<Vec<Result<Vec<GenomeRange>, FailureReason>>> {
+) -> std::io::Result<Vec<Result<Vec<ContigRange>, FailureReason>>> {
     liftover(locs, chain_file, liftover_command, settings).await
 }
 
 pub async fn liftover(
-    locations: &[GenomeRange],
+    locations: &[ContigRange],
     chain_file: impl AsRef<Path>,
     liftover_command: impl AsRef<OsStr>,
     settings: UcscLiftoverSettings,
-) -> std::io::Result<Vec<Result<Vec<GenomeRange>, FailureReason>>> {
+) -> std::io::Result<Vec<Result<Vec<ContigRange>, FailureReason>>> {
     let input = tempfile::Builder::new().tempfile()?;
     let output = tempfile::Builder::new().tempfile()?;
     let unmapped = tempfile::Builder::new().tempfile()?;
@@ -71,7 +71,7 @@ pub async fn liftover(
     {
         let mut writer = File::create(input.path())?;
         for loc in locations {
-            writeln!(writer, "{} {} {}", loc.name, loc.at.start, loc.at.end)?;
+            writeln!(writer, "{} {} {}", loc.contig, loc.at.start, loc.at.end)?;
         }
     }
 

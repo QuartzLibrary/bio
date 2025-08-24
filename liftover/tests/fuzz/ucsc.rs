@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use biocore::location::{ContigPosition, GenomeRange};
+use biocore::location::{ContigPosition, ContigRange};
 
 use liftover::{
     bindings::{self, ucsc::UcscLiftoverSettings},
@@ -122,8 +122,8 @@ pub async fn run_snps(
 }
 pub async fn run_ranges(
     liftover_path: impl AsRef<Path>,
-    ranges: &[GenomeRange],
-) -> Vec<Vec<GenomeRange>> {
+    ranges: &[ContigRange],
+) -> Vec<Vec<ContigRange>> {
     bindings::ucsc::cli::liftover_human(
         ranges,
         liftover_path,
@@ -154,8 +154,8 @@ pub async fn run_snps_web(
 pub async fn run_ranges_web(
     from: UcscHG,
     to: UcscHG,
-    ranges: &[GenomeRange],
-) -> Vec<Vec<GenomeRange>> {
+    ranges: &[ContigRange],
+) -> Vec<Vec<ContigRange>> {
     let client = reqwest::Client::new();
 
     bindings::ucsc::web::liftover_human(&client, from, ranges, to, UcscLiftoverSettings::loose())
@@ -170,10 +170,10 @@ pub async fn run_ranges_web(
 pub mod cache {
     use std::path::PathBuf;
 
-    use biocore::location::{ContigPosition, GenomeRange};
+    use biocore::location::{ContigPosition, ContigRange};
     use utile::{cache::FsCacheEntry, resource::RawResourceExt};
 
-    pub fn get(prefix: &str, key: &str) -> (Vec<Vec<ContigPosition>>, Vec<Vec<GenomeRange>>) {
+    pub fn get(prefix: &str, key: &str) -> (Vec<Vec<ContigPosition>>, Vec<Vec<ContigRange>>) {
         (
             snp_testpoints_ucsc_target(prefix, key)
                 .read_json_lines()
@@ -189,7 +189,7 @@ pub mod cache {
     }
     pub fn store(
         snps_internal: Vec<Vec<ContigPosition>>,
-        ranges_internal: Vec<Vec<GenomeRange>>,
+        ranges_internal: Vec<Vec<ContigRange>>,
         prefix: &str,
         key: &str,
     ) {
@@ -202,7 +202,7 @@ pub mod cache {
     }
     pub fn assert(
         snps_internal: Vec<Vec<ContigPosition>>,
-        ranges_internal: Vec<Vec<GenomeRange>>,
+        ranges_internal: Vec<Vec<ContigRange>>,
         prefix: &str,
         key: &str,
     ) {

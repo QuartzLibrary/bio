@@ -513,12 +513,12 @@ mod tests {
         let from = liftover
             .chains
             .iter()
-            .map(|c| &c.header.q.v.name)
+            .map(|c| &c.header.q.v.contig)
             .collect::<BTreeSet<_>>();
         let to = liftover
             .chains
             .iter()
-            .map(|c| &c.header.t.v.name)
+            .map(|c| &c.header.t.v.contig)
             .collect::<BTreeSet<_>>();
         println!("\n{from:?}\n\n{to:?}");
     }

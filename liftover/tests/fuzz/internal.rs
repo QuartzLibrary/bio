@@ -1,4 +1,4 @@
-use biocore::location::{ContigPosition, GenomeRange};
+use biocore::location::{ContigPosition, ContigRange};
 
 use liftover::{
     sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
@@ -129,7 +129,7 @@ pub fn run_snps(liftover: &LiftoverIndexed, snps: Vec<ContigPosition>) -> Vec<Ve
         })
         .collect()
 }
-pub fn run_ranges(liftover: &LiftoverIndexed, ranges: Vec<GenomeRange>) -> Vec<Vec<GenomeRange>> {
+pub fn run_ranges(liftover: &LiftoverIndexed, ranges: Vec<ContigRange>) -> Vec<Vec<ContigRange>> {
     ranges
         .clone()
         .into_iter()
@@ -152,7 +152,7 @@ pub fn run_snps_slow(liftover: &Liftover, snps: Vec<ContigPosition>) -> Vec<Vec<
         })
         .collect()
 }
-pub fn run_ranges_slow(liftover: &Liftover, ranges: Vec<GenomeRange>) -> Vec<Vec<GenomeRange>> {
+pub fn run_ranges_slow(liftover: &Liftover, ranges: Vec<ContigRange>) -> Vec<Vec<ContigRange>> {
     ranges
         .clone()
         .into_iter()
@@ -169,12 +169,12 @@ pub fn run_ranges_slow(liftover: &Liftover, ranges: Vec<GenomeRange>) -> Vec<Vec
 pub mod cache {
     use std::path::PathBuf;
 
-    use biocore::location::{ContigPosition, GenomeRange};
+    use biocore::location::{ContigPosition, ContigRange};
     use utile::{cache::FsCacheEntry, resource::RawResourceExt};
 
     pub fn store(
         snps_internal: Vec<Vec<ContigPosition>>,
-        ranges_internal: Vec<Vec<GenomeRange>>,
+        ranges_internal: Vec<Vec<ContigRange>>,
         prefix: &str,
         key: &str,
     ) {
@@ -187,7 +187,7 @@ pub mod cache {
     }
     pub fn assert(
         snps_internal: Vec<Vec<ContigPosition>>,
-        ranges_internal: Vec<Vec<GenomeRange>>,
+        ranges_internal: Vec<Vec<ContigRange>>,
         prefix: &str,
         key: &str,
     ) {
@@ -204,7 +204,7 @@ pub mod cache {
         }
 
         let ranges_target: Vec<_> = range_testpoints_internal_target(prefix, key)
-            .read_json_lines::<Vec<GenomeRange>>()
+            .read_json_lines::<Vec<ContigRange>>()
             .unwrap()
             .map(|r| r.unwrap())
             .collect();

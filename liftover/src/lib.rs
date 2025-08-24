@@ -16,7 +16,7 @@ use biocore::{
     genome::{ArcContig, Contig},
     location::{
         orientation::{SequenceOrientation, WithOrientation},
-        ContigPosition, GenomeRange,
+        ContigPosition, ContigRange,
     },
 };
 
@@ -47,7 +47,7 @@ pub struct ChainHeader<From, To> {
     /// chain ID
     pub id: u32,
 }
-pub type ChainRange<C> = WithOrientation<GenomeRange<C>>;
+pub type ChainRange<C> = WithOrientation<ContigRange<C>>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AlignmentBlock {
     /// the size of the ungapped alignment
@@ -126,20 +126,20 @@ where
     }
     pub fn map_range<C: AsRef<str>>(
         &self,
-        range: GenomeRange<C>,
-    ) -> impl Iterator<Item = GenomeRange<To>> + use<'_, From, To, C>
+        range: ContigRange<C>,
+    ) -> impl Iterator<Item = ContigRange<To>> + use<'_, From, To, C>
     where
         From: Clone,
     {
-        let Some(internal) = self.find_input_contig(&range.name) else {
-            log::warn!("[Liftover] Unknown contig: {}", range.name.as_ref());
+        let Some(internal) = self.find_input_contig(&range.contig) else {
+            log::warn!("[Liftover] Unknown contig: {}", range.contig.as_ref());
             return None.into_iter().flatten();
         };
 
         let range = WithOrientation {
             orientation: SequenceOrientation::Forward,
-            v: GenomeRange {
-                name: internal.clone(),
+            v: ContigRange {
+                contig: internal.clone(),
                 at: range.at,
             },
         };
@@ -160,8 +160,8 @@ where
     }
     pub fn map_range_raw(
         &self,
-        range: WithOrientation<GenomeRange<From>>,
-    ) -> impl Iterator<Item = WithOrientation<GenomeRange<To>>> + use<'_, From, To> {
+        range: WithOrientation<ContigRange<From>>,
+    ) -> impl Iterator<Item = WithOrientation<ContigRange<To>>> + use<'_, From, To> {
         self.chains
             .iter()
             .flat_map(move |c| c.map_range_raw(&range))
@@ -198,7 +198,7 @@ where
                     let new = WithOrientation {
                         orientation: self.header.q.orientation,
                         v: ContigPosition {
-                            contig: self.header.q.v.name.clone(),
+                            contig: self.header.q.v.contig.clone(),
                             at: q_start + (at - t_start),
                         },
                     };
@@ -226,8 +226,8 @@ where
     }
     pub fn map_range_raw(
         &self,
-        range: &WithOrientation<GenomeRange<From>>,
-    ) -> impl Iterator<Item = WithOrientation<GenomeRange<To>>> + use<'_, From, To> {
+        range: &WithOrientation<ContigRange<From>>,
+    ) -> impl Iterator<Item = WithOrientation<ContigRange<To>>> + use<'_, From, To> {
         let mut range = range.as_ref_contig();
         let initially_flipped = range.orientation != self.header.t.orientation;
         range.set_orientation(self.header.t.orientation);
@@ -252,8 +252,8 @@ where
                     let shift = intersected.start - t_start;
                     r = Some(WithOrientation {
                         orientation: self.header.q.orientation,
-                        v: GenomeRange {
-                            name: self.header.q.v.name.clone(),
+                        v: ContigRange {
+                            contig: self.header.q.v.contig.clone(),
                             at: (q_start + shift)..(q_start + shift + intersected.range_len()),
                         },
                     });
@@ -352,15 +352,15 @@ impl<From, To> Chain<From, To> {
             (
                 WithOrientation {
                     orientation: self.header.t.orientation,
-                    v: GenomeRange {
-                        name: self.header.t.v.name.clone(),
+                    v: ContigRange {
+                        contig: self.header.t.v.contig.clone(),
                         at: t_fragment,
                     },
                 },
                 WithOrientation {
                     orientation: self.header.q.orientation,
-                    v: GenomeRange {
-                        name: self.header.q.v.name.clone(),
+                    v: ContigRange {
+                        contig: self.header.q.v.contig.clone(),
                         at: q_fragment,
                     },
                 },
@@ -398,7 +398,7 @@ impl<From, To> LiftoverIndexed<From, To> {
                 to = to.flip_orientation();
             }
 
-            let chr = chromosomes.entry(from.v.name.clone()).or_default();
+            let chr = chromosomes.entry(from.v.contig.clone()).or_default();
 
             chr.push(LiftoverIndexedEntry {
                 range: from.v.at,
@@ -406,7 +406,7 @@ impl<From, To> LiftoverIndexed<From, To> {
                 data: to,
             });
 
-            contigs.insert(from.v.name.as_ref().to_owned(), from.v.name.clone());
+            contigs.insert(from.v.contig.as_ref().to_owned(), from.v.contig.clone());
         }
 
         for entries in chromosomes.values_mut() {
@@ -466,20 +466,20 @@ where
     }
     pub fn map_range<C: AsRef<str>>(
         &self,
-        range: GenomeRange<C>,
-    ) -> impl Iterator<Item = GenomeRange<To>> + use<'_, From, To, C>
+        range: ContigRange<C>,
+    ) -> impl Iterator<Item = ContigRange<To>> + use<'_, From, To, C>
     where
         From: Clone,
     {
-        let Some(internal) = self.find_input_contig(&range.name) else {
-            log::warn!("[Liftover] Unknown contig: {}", range.name.as_ref());
+        let Some(internal) = self.find_input_contig(&range.contig) else {
+            log::warn!("[Liftover] Unknown contig: {}", range.contig.as_ref());
             return None.into_iter().flatten();
         };
 
         let range = WithOrientation {
             orientation: SequenceOrientation::Forward,
-            v: GenomeRange {
-                name: internal.clone(),
+            v: ContigRange {
+                contig: internal.clone(),
                 at: range.at,
             },
         };
@@ -530,7 +530,7 @@ where
             let new = WithOrientation {
                 orientation: r.data.orientation,
                 v: ContigPosition {
-                    contig: r.data.v.name.clone(),
+                    contig: r.data.v.contig.clone(),
                     at: r.data.v.at.start + shift,
                 },
             };
@@ -546,9 +546,9 @@ where
     }
     pub fn map_range_raw(
         &self,
-        from: &WithOrientation<GenomeRange<From>>,
-    ) -> impl Iterator<Item = WithOrientation<GenomeRange<To>>> + use<'_, From, To> {
-        let Some(ranges) = self.chromosomes.get(&from.v.name) else {
+        from: &WithOrientation<ContigRange<From>>,
+    ) -> impl Iterator<Item = WithOrientation<ContigRange<To>>> + use<'_, From, To> {
+        let Some(ranges) = self.chromosomes.get(&from.v.contig) else {
             return None.into_iter().flatten();
         };
 
@@ -582,8 +582,8 @@ where
             let shift = intersected.start - r.range.start;
             let new = WithOrientation {
                 orientation: r.data.orientation,
-                v: GenomeRange {
-                    name: r.data.v.name.clone(),
+                v: ContigRange {
+                    contig: r.data.v.contig.clone(),
                     at: (r.data.v.at.start + shift)
                         ..(r.data.v.at.start + shift + intersected.range_len()),
                 },
@@ -654,13 +654,13 @@ mod boilerplate {
                 f,
                 "chain {} {} {} {} {} {} {} {} {} {} {} {}",
                 self.score,
-                self.t.v.name.as_ref(),
-                self.t.v.name.size(),
+                self.t.v.contig.as_ref(),
+                self.t.v.contig.size(),
                 o(self.t.orientation),
                 self.t.v.at.start,
                 self.t.v.at.end,
-                self.q.v.name.as_ref(),
-                self.q.v.name.size(),
+                self.q.v.contig.as_ref(),
+                self.q.v.contig.size(),
                 o(self.q.orientation),
                 self.q.v.at.start,
                 self.q.v.at.end,

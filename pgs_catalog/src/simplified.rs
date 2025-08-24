@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use biocore::{
     dna::DnaSequence,
-    location::{ContigPosition, GenomeRange},
+    location::{ContigPosition, ContigRange},
 };
 
 use crate::{Allele, HarmonizedSource, HarmonizedStudyAssociation, ImputationMethod};
@@ -226,12 +226,12 @@ impl<Contig> SimplifiedHarmonizedStudyAssociation<Contig> {
             at: self.pos - 1,
         }
     }
-    pub fn at_range(&self) -> GenomeRange<Contig>
+    pub fn at_range(&self) -> ContigRange<Contig>
     where
         Contig: Clone,
     {
-        GenomeRange {
-            name: self.chr.clone(),
+        ContigRange {
+            contig: self.chr.clone(),
             at: self.pos - 1..(self.pos - 1 + u64::try_from(self.effect_allele.len()).unwrap()),
         }
     }

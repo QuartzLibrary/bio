@@ -6,7 +6,7 @@ use std::{
 use noodles::csi::BinningIndex;
 use utile::range::RangeExt;
 
-use crate::location::GenomeRange;
+use crate::location::ContigRange;
 
 pub struct IndexedVcfReader<R> {
     header: noodles::vcf::Header,
@@ -31,15 +31,15 @@ impl<R: Read> IndexedVcfReader<R> {
 
     pub fn query<C>(
         &mut self,
-        at: &GenomeRange<C>,
+        at: &ContigRange<C>,
     ) -> io::Result<Query<noodles::bgzf::io::Reader<R>>>
     where
         R: Seek,
         C: AsRef<str>,
     {
-        let reference_sequence_name = at.name.as_ref().as_bytes().to_vec();
+        let reference_sequence_name = at.contig.as_ref().as_bytes().to_vec();
 
-        let reference_sequence_id = resolve_region(&self.index, at.name.as_ref())?;
+        let reference_sequence_id = resolve_region(&self.index, at.contig.as_ref())?;
         let chunks = self
             .index
             .query(reference_sequence_id, at.try_into().unwrap())?;
@@ -54,15 +54,15 @@ impl<R: Read> IndexedVcfReader<R> {
 
     pub fn query_raw<C>(
         &mut self,
-        at: &GenomeRange<C>,
+        at: &ContigRange<C>,
     ) -> io::Result<QueryRaw<noodles::bgzf::io::Reader<R>>>
     where
         R: Seek,
         C: AsRef<str>,
     {
-        let reference_sequence_name = at.name.as_ref().as_bytes().to_vec();
+        let reference_sequence_name = at.contig.as_ref().as_bytes().to_vec();
 
-        let reference_sequence_id = resolve_region(&self.index, at.name.as_ref())?;
+        let reference_sequence_id = resolve_region(&self.index, at.contig.as_ref())?;
         let chunks = self
             .index
             .query(reference_sequence_id, at.try_into().unwrap())?;

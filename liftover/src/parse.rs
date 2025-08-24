@@ -15,7 +15,7 @@ use utile::{
 };
 
 use super::{
-    AlignmentBlock, Chain, ChainHeader, ChainRange, GenomeRange, Liftover, SequenceOrientation,
+    AlignmentBlock, Chain, ChainHeader, ChainRange, ContigRange, Liftover, SequenceOrientation,
 };
 
 impl Liftover<ArcContig, ArcContig> {
@@ -202,7 +202,7 @@ fn read_chain_side(
 
     Ok(WithOrientation {
         orientation,
-        v: GenomeRange { name: contig, at },
+        v: ContigRange { contig, at },
     })
 }
 

@@ -29,11 +29,11 @@ impl<Contig> ContigPosition<Contig> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct GenomeRange<Contig = String> {
-    pub name: Contig,
+pub struct ContigRange<Contig = String> {
+    pub contig: Contig,
     pub at: Range<u64>,
 }
-impl<Contig> GenomeRange<Contig> {
+impl<Contig> ContigRange<Contig> {
     pub fn len(&self) -> u64 {
         let &Range { start, end } = &self.at;
         end.saturating_sub(start)
@@ -45,25 +45,25 @@ impl<Contig> GenomeRange<Contig> {
     where
         Contig: PartialEq,
     {
-        self.name == loc.contig && self.at.contains(&loc.at)
+        self.contig == loc.contig && self.at.contains(&loc.at)
     }
     pub fn contains_range(&self, range: &Self) -> bool
     where
         Contig: PartialEq,
     {
-        self.name == range.name && self.at.contains_range(&range.at)
+        self.contig == range.contig && self.at.contains_range(&range.at)
     }
 
     pub fn intersection(self, b: &Self) -> Option<Self>
     where
         Contig: PartialEq,
     {
-        if self.name != b.name {
+        if self.contig != b.contig {
             return None;
         }
 
         Some(Self {
-            name: self.name,
+            contig: self.contig,
             at: self.at.intersection(b.at.clone()),
         })
     }
@@ -71,57 +71,57 @@ impl<Contig> GenomeRange<Contig> {
     where
         Contig: PartialEq,
     {
-        self.name == b.name && self.at.overlaps(&b.at)
+        self.contig == b.contig && self.at.overlaps(&b.at)
     }
 
     pub fn map_contig<NewContig>(
         self,
         f: impl FnOnce(Contig) -> NewContig,
-    ) -> GenomeRange<NewContig> {
-        GenomeRange {
-            name: f(self.name),
+    ) -> ContigRange<NewContig> {
+        ContigRange {
+            contig: f(self.contig),
             at: self.at,
         }
     }
 
-    pub fn as_ref_contig(&self) -> GenomeRange<&Contig> {
-        GenomeRange {
-            name: &self.name,
+    pub fn as_ref_contig(&self) -> ContigRange<&Contig> {
+        ContigRange {
+            contig: &self.contig,
             at: self.at.clone(),
         }
     }
 }
-impl<Contig> PartialOrd for GenomeRange<Contig>
+impl<Contig> PartialOrd for ContigRange<Contig>
 where
     Contig: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let Self { name: _, at: _ } = self; // Exhaustiveness check
+        let Self { contig: _, at: _ } = self; // Exhaustiveness check
 
         Some(
-            PartialOrd::partial_cmp(&self.name, &other.name)?
+            PartialOrd::partial_cmp(&self.contig, &other.contig)?
                 .then_with(|| Ord::cmp(&self.at.start, &other.at.start))
                 .then_with(|| Ord::cmp(&self.at.end, &other.at.end)),
         )
     }
 }
-impl<Contig> Ord for GenomeRange<Contig>
+impl<Contig> Ord for ContigRange<Contig>
 where
     Contig: Ord,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let Self { name: _, at: _ } = self; // Exhaustiveness check
+        let Self { contig: _, at: _ } = self; // Exhaustiveness check
 
-        Ord::cmp(&self.name, &other.name)
+        Ord::cmp(&self.contig, &other.contig)
             .then_with(|| Ord::cmp(&self.at.start, &other.at.start))
             .then_with(|| Ord::cmp(&self.at.end, &other.at.end))
     }
 }
 
-impl<Contig> From<ContigPosition<Contig>> for GenomeRange<Contig> {
+impl<Contig> From<ContigPosition<Contig>> for ContigRange<Contig> {
     fn from(loc: ContigPosition<Contig>) -> Self {
         Self {
-            name: loc.contig,
+            contig: loc.contig,
             at: loc.at..(loc.at + 1),
         }
     }
@@ -129,16 +129,16 @@ impl<Contig> From<ContigPosition<Contig>> for GenomeRange<Contig> {
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("Expected a single base location, but found a range {from:?}.")]
 pub struct LocationConversionError<Contig> {
-    pub from: GenomeRange<Contig>,
+    pub from: ContigRange<Contig>,
 }
-impl<Contig> TryFrom<GenomeRange<Contig>> for ContigPosition<Contig> {
+impl<Contig> TryFrom<ContigRange<Contig>> for ContigPosition<Contig> {
     type Error = LocationConversionError<Contig>;
-    fn try_from(range: GenomeRange<Contig>) -> Result<Self, Self::Error> {
+    fn try_from(range: ContigRange<Contig>) -> Result<Self, Self::Error> {
         if range.at.start + 1 != range.at.end {
             return Err(LocationConversionError { from: range });
         }
         Ok(Self {
-            contig: range.name,
+            contig: range.contig,
             at: range.at.start,
         })
     }
@@ -149,7 +149,7 @@ pub mod orientation {
 
     use crate::genome::Contig;
 
-    use super::{ContigPosition, GenomeRange};
+    use super::{ContigPosition, ContigRange};
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[derive(Serialize, Deserialize)]
@@ -252,15 +252,15 @@ pub mod orientation {
         }
     }
 
-    impl<C> WithOrientation<GenomeRange<C>>
+    impl<C> WithOrientation<ContigRange<C>>
     where
         C: Contig,
     {
         pub fn set_orientation(&mut self, orientation: SequenceOrientation) {
-            self.set_orientation_with(orientation, self.v.name.size());
+            self.set_orientation_with(orientation, self.v.contig.size());
         }
         pub fn flip_orientation(self) -> Self {
-            let size = self.v.name.size();
+            let size = self.v.contig.size();
             self.flip_orientation_with(size)
         }
 
@@ -268,30 +268,30 @@ pub mod orientation {
         where
             C: PartialEq,
         {
-            self.contains_with(loc, self.v.name.size())
+            self.contains_with(loc, self.v.contig.size())
         }
         pub fn contains_range(&self, range: &Self) -> bool
         where
             C: PartialEq,
         {
-            self.contains_range_with(range, self.v.name.size())
+            self.contains_range_with(range, self.v.contig.size())
         }
 
         pub fn intersection(self, b: &Self) -> Option<Self>
         where
             C: PartialEq,
         {
-            let size = self.v.name.size();
+            let size = self.v.contig.size();
             self.intersection_with(b, size)
         }
         pub fn overlaps(&self, b: &Self) -> bool
         where
             C: PartialEq,
         {
-            self.overlaps_with(b, self.v.name.size())
+            self.overlaps_with(b, self.v.contig.size())
         }
     }
-    impl<C> WithOrientation<GenomeRange<C>> {
+    impl<C> WithOrientation<ContigRange<C>> {
         pub fn set_orientation_with(&mut self, orientation: SequenceOrientation, size: u64) {
             if self.orientation != orientation {
                 if size == 0 {
@@ -315,8 +315,8 @@ pub mod orientation {
 
             Self {
                 orientation: self.orientation.flip(),
-                v: GenomeRange {
-                    name: self.v.name,
+                v: ContigRange {
+                    contig: self.v.contig,
                     at: (size - self.v.at.end)..(size - self.v.at.start),
                 },
             }
@@ -348,7 +348,7 @@ pub mod orientation {
         where
             C: PartialEq,
         {
-            if self.v.name != b.v.name {
+            if self.v.contig != b.v.contig {
                 return None;
             }
 
@@ -356,12 +356,12 @@ pub mod orientation {
 
             b.set_orientation_with(self.orientation, size);
 
-            let GenomeRange { name: _, at } = self.as_ref_contig().v.intersection(&b.v)?;
+            let ContigRange { contig: _, at } = self.as_ref_contig().v.intersection(&b.v)?;
 
             Some(Self {
                 orientation: self.orientation,
-                v: GenomeRange {
-                    name: self.v.name,
+                v: ContigRange {
+                    contig: self.v.contig,
                     at,
                 },
             })
@@ -375,7 +375,7 @@ pub mod orientation {
             self.v.as_ref_contig().overlaps(&b.v)
         }
 
-        pub fn as_ref_contig(&self) -> WithOrientation<GenomeRange<&C>> {
+        pub fn as_ref_contig(&self) -> WithOrientation<ContigRange<&C>> {
             WithOrientation {
                 orientation: self.orientation,
                 v: self.v.as_ref_contig(),
@@ -389,7 +389,7 @@ mod noodles {
 
     use noodles::core::{region::Interval, Position, Region};
 
-    use super::{ContigPosition, GenomeRange};
+    use super::{ContigPosition, ContigRange};
 
     impl<T: fmt::Display> fmt::Display for ContigPosition<T> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -398,14 +398,14 @@ mod noodles {
             write!(f, "{contig}@{at}")
         }
     }
-    impl<T: fmt::Display> fmt::Display for GenomeRange<T> {
+    impl<T: fmt::Display> fmt::Display for ContigRange<T> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let Self {
-                name,
+                contig,
                 at: Range { start, end },
             } = self;
 
-            write!(f, "{name}@{start}..{end}")
+            write!(f, "{contig}@{start}..{end}")
         }
     }
 
@@ -419,13 +419,13 @@ mod noodles {
         InvalidRange,
     }
 
-    impl<C> TryFrom<GenomeRange<C>> for Region
+    impl<C> TryFrom<ContigRange<C>> for Region
     where
         C: AsRef<str>,
     {
         type Error = GenomeLocationConversionError;
 
-        fn try_from(GenomeRange { name, at }: GenomeRange<C>) -> Result<Self, Self::Error> {
+        fn try_from(ContigRange { contig, at }: ContigRange<C>) -> Result<Self, Self::Error> {
             if at.is_empty() {
                 return Err(GenomeLocationConversionError::EmptyRange);
             }
@@ -437,7 +437,7 @@ mod noodles {
 
             let start = Position::new(at.start + 1).unwrap();
             let end = Position::new((at.end + 1) - 1).unwrap();
-            Ok(Region::new(name.as_ref(), Interval::from(start..=end)))
+            Ok(Region::new(contig.as_ref(), Interval::from(start..=end)))
         }
     }
     impl<C> TryFrom<ContigPosition<C>> for Region
@@ -456,23 +456,23 @@ mod noodles {
         }
     }
 
-    impl<C> TryFrom<GenomeRange<C>> for Interval
+    impl<C> TryFrom<ContigRange<C>> for Interval
     where
         C: AsRef<str>,
     {
         type Error = GenomeLocationConversionError;
 
-        fn try_from(value: GenomeRange<C>) -> Result<Self, Self::Error> {
+        fn try_from(value: ContigRange<C>) -> Result<Self, Self::Error> {
             (&value).try_into()
         }
     }
-    impl<C> TryFrom<&GenomeRange<C>> for Interval
+    impl<C> TryFrom<&ContigRange<C>> for Interval
     where
         C: AsRef<str>,
     {
         type Error = GenomeLocationConversionError;
 
-        fn try_from(GenomeRange { name: _, at }: &GenomeRange<C>) -> Result<Self, Self::Error> {
+        fn try_from(ContigRange { contig: _, at }: &ContigRange<C>) -> Result<Self, Self::Error> {
             if at.is_empty() {
                 return Err(GenomeLocationConversionError::EmptyRange);
             }

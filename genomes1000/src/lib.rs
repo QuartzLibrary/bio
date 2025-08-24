@@ -18,7 +18,7 @@ use std::{cmp::Ordering, collections::BTreeMap, io};
 
 use biocore::{
     dna::{DnaBase, DnaSequence},
-    location::{ContigPosition, GenomeRange},
+    location::{ContigPosition, ContigRange},
     vcf::IndexedVcfReader,
 };
 use utile::{
@@ -342,10 +342,10 @@ impl Genomes1000Fs {
     }
     pub fn query(
         &mut self,
-        at: &GenomeRange<GRCh38Contig>,
+        at: &ContigRange<GRCh38Contig>,
     ) -> io::Result<impl Iterator<Item = io::Result<Record<Genotype>>> + use<'_>> {
-        let entry_c = if at.name.is_core() {
-            at.name
+        let entry_c = if at.contig.is_core() {
+            at.contig
         } else {
             GRCh38Contig::MT
         };
@@ -369,7 +369,7 @@ impl Genomes1000Fs {
     }
     pub fn query_simplified(
         &mut self,
-        at: &GenomeRange<GRCh38Contig>,
+        at: &ContigRange<GRCh38Contig>,
     ) -> io::Result<impl Iterator<Item = SimplifiedRecord> + use<'_>> {
         Ok(self
             .query(at)?

@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, io, ops::Index, sync::Arc};
 
 use crate::{
     dna::DnaBase,
-    location::{ContigPosition, GenomeRange},
+    location::{ContigPosition, ContigRange},
     sequence::{Sequence, SequenceSlice},
 };
 
@@ -106,9 +106,9 @@ impl<C: Ord, B> InMemoryGenome<C, B> {
             .get(usize::try_from(pos.at).unwrap())
             .cloned()
     }
-    pub fn get_range(&self, range: &GenomeRange<C>) -> Option<&SequenceSlice<B>> {
+    pub fn get_range(&self, range: &ContigRange<C>) -> Option<&SequenceSlice<B>> {
         let at = usize::try_from(range.at.start).unwrap()..usize::try_from(range.at.end).unwrap();
-        self.contigs.get(&range.name)?.get_range(at)
+        self.contigs.get(&range.contig)?.get_range(at)
     }
 
     pub fn contigs(&self) -> impl Iterator<Item = &C> {
@@ -137,12 +137,12 @@ impl<C: Ord, B> Index<ContigPosition<C>> for InMemoryGenome<C, B> {
         &self[&index.contig][at]
     }
 }
-impl<C: Ord, B> Index<GenomeRange<C>> for InMemoryGenome<C, B> {
+impl<C: Ord, B> Index<ContigRange<C>> for InMemoryGenome<C, B> {
     type Output = SequenceSlice<B>;
     #[track_caller]
-    fn index(&self, index: GenomeRange<C>) -> &Self::Output {
+    fn index(&self, index: ContigRange<C>) -> &Self::Output {
         let at = usize::try_from(index.at.start).unwrap()..usize::try_from(index.at.end).unwrap();
-        &self[&index.name][at]
+        &self[&index.contig][at]
     }
 }
 

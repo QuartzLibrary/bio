@@ -3,7 +3,7 @@ use std::ops::Range;
 use regex::{Regex, RegexBuilder};
 use reqwest::Client;
 
-use biocore::location::{ContigPosition, GenomeRange};
+use biocore::location::{ContigPosition, ContigRange};
 
 use crate::sources::UcscHG;
 
@@ -27,7 +27,7 @@ pub async fn liftover_human_snps(
         &locations
             .iter()
             .cloned()
-            .map(GenomeRange::from)
+            .map(ContigRange::from)
             .collect::<Vec<_>>(),
         "Human",
         to_db.name(),
@@ -60,7 +60,7 @@ pub async fn liftover_snps(
         &locations
             .iter()
             .cloned()
-            .map(GenomeRange::from)
+            .map(ContigRange::from)
             .collect::<Vec<_>>(),
         to_org,
         to_db,
@@ -78,12 +78,12 @@ pub async fn liftover_human(
 
     from_db: UcscHG,
 
-    locs: &[GenomeRange],
+    locs: &[ContigRange],
 
     to_db: UcscHG,
 
     settings: UcscLiftoverSettings,
-) -> std::io::Result<Vec<Result<Vec<GenomeRange>, FailureReason>>> {
+) -> std::io::Result<Vec<Result<Vec<ContigRange>, FailureReason>>> {
     liftover(
         client,
         "Human",
@@ -102,13 +102,13 @@ pub async fn liftover(
     from_org: &str,
     from_db: &str,
 
-    locations: &[GenomeRange],
+    locations: &[ContigRange],
 
     to_org: &str,
     to_db: &str,
 
     settings: UcscLiftoverSettings,
-) -> std::io::Result<Vec<Result<Vec<GenomeRange>, FailureReason>>> {
+) -> std::io::Result<Vec<Result<Vec<ContigRange>, FailureReason>>> {
     // TODO: try and simplify to use normal form handlers.
 
     let id: u128 = rand::random();
@@ -215,7 +215,7 @@ async fn get_rsid(client: &Client) -> std::io::Result<String> {
 fn build_payload(
     from_org: &str,
     from_db: &str,
-    locations: &[GenomeRange],
+    locations: &[ContigRange],
     to_org: &str,
     to_db: &str,
     settings: UcscLiftoverSettings,
@@ -223,12 +223,12 @@ fn build_payload(
 ) -> String {
     let locations = {
         let mut l = String::new();
-        for GenomeRange {
-            name,
+        for ContigRange {
+            contig,
             at: Range { start, end },
         } in locations
         {
-            l.push_str(&format!("{name} {start} {end}\n"));
+            l.push_str(&format!("{contig} {start} {end}\n"));
         }
 
         l
