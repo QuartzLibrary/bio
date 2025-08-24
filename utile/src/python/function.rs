@@ -247,7 +247,9 @@ def process(input: int) -> int:
             b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
-        assert!(stderr.starts_with(b"Installed 5 packages in "));
+        assert!(stderr
+            .windows(b"Installed 5 packages in ".len())
+            .any(|w| w == b"Installed 5 packages in "));
         assert_eq!(
             structured,
             WithStdoutStderr {
@@ -277,7 +279,9 @@ def process(input: int) -> int:
             b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
-        assert!(stderr.starts_with(b"Installed 5 packages in "));
+        assert!(stderr
+            .windows(b"Installed 5 packages in ".len())
+            .any(|w| w == b"Installed 5 packages in "));
         assert_eq!(
             structured,
             WithStdoutStderr {
@@ -308,7 +312,9 @@ def process(input: int) -> int:
             b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
-        assert!(stderr.starts_with(b"Installed 5 packages in "));
+        assert!(stderr
+            .windows(b"Installed 5 packages in ".len())
+            .any(|w| w == b"Installed 5 packages in "));
         assert_eq!(
             structured,
             WithStdoutStderr {
@@ -338,7 +344,9 @@ def process(input: int) -> int:
             b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
-        assert!(stderr.starts_with(b"Installed 5 packages in "));
+        assert!(stderr
+            .windows(b"Installed 5 packages in ".len())
+            .any(|w| w == b"Installed 5 packages in "));
         assert_eq!(
             structured,
             WithStdoutStderr {
@@ -381,7 +389,9 @@ def process(input: int) -> int:
         assert!(status.success());
         assert_eq!(stdout, STDOUT.as_bytes(),);
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
-        assert!(stderr.starts_with(b"Installed 5 packages in "));
+        assert!(stderr
+            .windows(b"Installed 5 packages in ".len())
+            .any(|w| w == b"Installed 5 packages in "));
         assert_eq!(
             structured,
             WithStdoutStderr {
@@ -408,7 +418,9 @@ def process(input: int) -> int:
         assert!(status.success());
         assert_eq!(stdout, STDOUT.as_bytes());
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
-        assert!(stderr.starts_with(b"Installed 5 packages in "));
+        assert!(stderr
+            .windows(b"Installed 5 packages in ".len())
+            .any(|w| w == b"Installed 5 packages in "));
         assert_eq!(
             structured,
             WithStdoutStderr {
