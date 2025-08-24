@@ -54,6 +54,9 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Checkout
         uses: actions/checkout@v4
