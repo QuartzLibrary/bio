@@ -150,35 +150,30 @@ impl AsciiChar for DnaBase {
     }
 
     type DecodeError = DnaDecodeError;
-    fn decode(bases: Vec<u8>) -> Result<DnaSequence, Self::DecodeError>
+    fn decode(mut bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>
     where
         Self: Sized,
     {
-        decode(bases)
-    }
-}
-fn decode(mut bases: Vec<u8>) -> Result<DnaSequence, DnaDecodeError> {
-    for (at, b) in bases.iter_mut().enumerate() {
-        match *b {
-            b'A' | b'C' | b'G' | b'T' | b'a' | b'c' | b'g' | b't' => {}
-            byte => {
+        for (at, b) in bases.iter_mut().enumerate() {
+            if Self::from_byte_strict(*b).is_none() {
                 return Err(DnaDecodeError::InvalidSequence {
                     at,
-                    byte,
+                    byte: *b,
                     len: bases.len(),
-                })
+                });
             }
-        };
+        }
+        bases.make_ascii_uppercase();
+        Ok(Sequence::new(
+            bases
+                .into_iter()
+                .map(Self::from_byte_strict)
+                .map(Option::unwrap)
+                .collect(),
+        ))
     }
-    bases.make_ascii_uppercase();
-    Ok(DnaSequence::new(
-        bases
-            .into_iter()
-            .map(DnaBase::from_byte_strict)
-            .map(Option::unwrap)
-            .collect(),
-    ))
 }
+
 impl Complement for DnaBase {
     fn complement(self) -> Self {
         match self {
@@ -231,15 +226,11 @@ impl FromStr for DnaBase {
     type Err = DnaDecodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "A" | "a" => Ok(Self::A),
-            "C" | "c" => Ok(Self::C),
-            "G" | "g" => Ok(Self::G),
-            "T" | "t" => Ok(Self::T),
-            _ if s.len() == 1 => Err(DnaDecodeError::InvalidBaseChar {
-                from: s.chars().next().unwrap(),
-            }),
-            _ => Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() }),
+        if s.len() != 1 {
+            Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() })
+        } else {
+            let char = s.chars().next().unwrap();
+            Self::from_char(char).ok_or(DnaDecodeError::InvalidChar { from: char })
         }
     }
 }
@@ -322,34 +313,28 @@ impl AsciiChar for MaybeDnaBase {
     }
 
     type DecodeError = DnaDecodeError;
-    fn decode(bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>
+    fn decode(mut bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>
     where
         Self: Sized,
     {
-        decode_maybe(bases)
-    }
-}
-fn decode_maybe(mut bases: Vec<u8>) -> Result<Sequence<MaybeDnaBase>, DnaDecodeError> {
-    for (at, b) in bases.iter_mut().enumerate() {
-        match *b {
-            b'A' | b'C' | b'G' | b'T' | b'N' | b'a' | b'c' | b'g' | b't' | b'n' => {}
-            byte => {
+        for (at, b) in bases.iter_mut().enumerate() {
+            if Self::from_byte_strict(*b).is_none() {
                 return Err(DnaDecodeError::InvalidSequence {
                     at,
-                    byte,
+                    byte: *b,
                     len: bases.len(),
-                })
+                });
             }
-        };
+        }
+        bases.make_ascii_uppercase();
+        Ok(Sequence::new(
+            bases
+                .into_iter()
+                .map(Self::from_byte_strict)
+                .map(Option::unwrap)
+                .collect(),
+        ))
     }
-    bases.make_ascii_uppercase();
-    Ok(Sequence::new(
-        bases
-            .into_iter()
-            .map(MaybeDnaBase::from_byte_strict)
-            .map(Option::unwrap)
-            .collect(),
-    ))
 }
 impl Complement for MaybeDnaBase {
     fn complement(self) -> Self {
@@ -372,16 +357,11 @@ impl FromStr for MaybeDnaBase {
     type Err = DnaDecodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "A" | "a" => Ok(Self::A),
-            "C" | "c" => Ok(Self::C),
-            "G" | "g" => Ok(Self::G),
-            "T" | "t" => Ok(Self::T),
-            "N" | "n" => Ok(Self::N),
-            _ if s.len() == 1 => Err(DnaDecodeError::InvalidBaseChar {
-                from: s.chars().next().unwrap(),
-            }),
-            _ => Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() }),
+        if s.len() != 1 {
+            Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() })
+        } else {
+            let char = s.chars().next().unwrap();
+            Self::from_char(char).ok_or(DnaDecodeError::InvalidChar { from: char })
         }
     }
 }
@@ -463,34 +443,28 @@ impl AsciiChar for AmbiguousDnaBase {
     }
 
     type DecodeError = DnaDecodeError;
-    fn decode(bases: Vec<u8>) -> Result<AmbiguousDnaSequence, Self::DecodeError>
+    fn decode(mut bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>
     where
         Self: Sized,
     {
-        decode_ambiguous(bases)
-    }
-}
-fn decode_ambiguous(mut bases: Vec<u8>) -> Result<AmbiguousDnaSequence, DnaDecodeError> {
-    for (at, b) in bases.iter_mut().enumerate() {
-        match *b {
-            b'A' | b'C' | b'G' | b'T' | b'N' | b'a' | b'c' | b'g' | b't' | b'n' => {}
-            byte => {
+        for (at, b) in bases.iter_mut().enumerate() {
+            if Self::from_byte_strict(*b).is_none() {
                 return Err(DnaDecodeError::InvalidSequence {
                     at,
-                    byte,
+                    byte: *b,
                     len: bases.len(),
-                })
+                });
             }
-        };
+        }
+        bases.make_ascii_uppercase();
+        Ok(Sequence::new(
+            bases
+                .into_iter()
+                .map(Self::from_byte_strict)
+                .map(Option::unwrap)
+                .collect(),
+        ))
     }
-    bases.make_ascii_uppercase();
-    Ok(AmbiguousDnaSequence::new(
-        bases
-            .into_iter()
-            .map(AmbiguousDnaBase::from_byte_strict)
-            .map(Option::unwrap)
-            .collect(),
-    ))
 }
 impl Complement for AmbiguousDnaBase {
     fn complement(self) -> Self {
@@ -513,16 +487,11 @@ impl FromStr for AmbiguousDnaBase {
     type Err = DnaDecodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "A" | "a" => Ok(Self::A),
-            "C" | "c" => Ok(Self::C),
-            "G" | "g" => Ok(Self::G),
-            "T" | "t" => Ok(Self::T),
-            "N" | "n" => Ok(Self::N),
-            _ if s.len() == 1 => Err(DnaDecodeError::InvalidBaseChar {
-                from: s.chars().next().unwrap(),
-            }),
-            _ => Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() }),
+        if s.len() != 1 {
+            Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() })
+        } else {
+            let char = s.chars().next().unwrap();
+            Self::from_char(char).ok_or(DnaDecodeError::InvalidChar { from: char })
         }
     }
 }
@@ -641,11 +610,27 @@ impl AsciiChar for IupacDnaBase {
     }
 
     type DecodeError = DnaDecodeError;
-    fn decode(bases: Vec<u8>) -> Result<IupacDnaSequence, Self::DecodeError>
+    fn decode(mut bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>
     where
         Self: Sized,
     {
-        decode_iupac(bases)
+        for (at, b) in bases.iter_mut().enumerate() {
+            if Self::from_byte_strict(*b).is_none() {
+                return Err(DnaDecodeError::InvalidSequence {
+                    at,
+                    byte: *b,
+                    len: bases.len(),
+                });
+            }
+        }
+        bases.make_ascii_uppercase();
+        Ok(Sequence::new(
+            bases
+                .into_iter()
+                .map(Self::from_byte_strict)
+                .map(Option::unwrap)
+                .collect(),
+        ))
     }
 }
 impl Complement for IupacDnaBase {
@@ -670,31 +655,6 @@ impl Complement for IupacDnaBase {
     }
 }
 
-fn decode_iupac(mut bases: Vec<u8>) -> Result<IupacDnaSequence, DnaDecodeError> {
-    for (at, b) in bases.iter_mut().enumerate() {
-        match *b {
-            b'A' | b'C' | b'G' | b'T' | b'R' | b'Y' | b'S' | b'W' | b'K' | b'M' | b'B' | b'D'
-            | b'H' | b'V' | b'N' | b'a' | b'c' | b'g' | b't' | b'r' | b'y' | b's' | b'w' | b'k'
-            | b'm' | b'b' | b'd' | b'h' | b'v' | b'n' => {}
-            _ => {
-                return Err(DnaDecodeError::InvalidSequence {
-                    at,
-                    byte: *b,
-                    len: bases.len(),
-                })
-            }
-        };
-    }
-    bases.make_ascii_uppercase();
-    Ok(IupacDnaSequence::new(
-        bases
-            .into_iter()
-            .map(IupacDnaBase::from_byte_strict)
-            .map(Option::unwrap)
-            .collect(),
-    ))
-}
-
 impl std::fmt::Display for IupacDnaBase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_char())
@@ -705,26 +665,11 @@ impl FromStr for IupacDnaBase {
     type Err = DnaDecodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_ascii_uppercase().as_str() {
-            "A" => Ok(Self::A),
-            "C" => Ok(Self::C),
-            "G" => Ok(Self::G),
-            "T" => Ok(Self::T),
-            "R" => Ok(Self::R),
-            "Y" => Ok(Self::Y),
-            "S" => Ok(Self::S),
-            "W" => Ok(Self::W),
-            "K" => Ok(Self::K),
-            "M" => Ok(Self::M),
-            "B" => Ok(Self::B),
-            "D" => Ok(Self::D),
-            "H" => Ok(Self::H),
-            "V" => Ok(Self::V),
-            "N" => Ok(Self::N),
-            _ if s.len() == 1 => Err(DnaDecodeError::InvalidBaseChar {
-                from: s.chars().next().unwrap(),
-            }),
-            _ => Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() }),
+        if s.len() != 1 {
+            Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() })
+        } else {
+            let char = s.chars().next().unwrap();
+            Self::from_char(char).ok_or(DnaDecodeError::InvalidChar { from: char })
         }
     }
 }
@@ -734,10 +679,10 @@ pub enum DnaDecodeError {
     #[error("Expected a single DNA base, got: {from}")]
     InvalidInputLength { from: String },
     #[error("Invalid DNA base: {from}")]
-    InvalidBaseByte { from: u8 },
+    InvalidByte { from: u8 },
     #[error("Invalid DNA base: {from}")]
-    InvalidBaseChar { from: char },
-    #[error("Invalid DNA sequence: {byte:?} at {at}/{len} (invalid byte: '{:?}')", std::str::from_utf8(&[*byte]))]
+    InvalidChar { from: char },
+    #[error("Invalid DNA sequence: {byte:?} at {at}/{len} (invalid byte: {:?})", std::str::from_utf8(&[*byte]))]
     InvalidSequence { at: usize, byte: u8, len: usize },
 }
 impl From<DnaDecodeError> for std::io::Error {
