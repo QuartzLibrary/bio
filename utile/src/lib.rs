@@ -12,6 +12,7 @@ pub mod fs;
 pub mod io;
 pub mod iter;
 pub mod jsonl;
+pub mod num;
 pub mod plot;
 pub mod python;
 pub mod range;
