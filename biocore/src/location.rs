@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{fmt, ops::Range};
 
 use serde::{Deserialize, Serialize};
 use utile::range::RangeExt;
@@ -26,6 +26,21 @@ impl<Contig> ContigPosition<Contig> {
             at: self.at,
         }
     }
+
+    pub fn into_range_to(self, other: &Self) -> ContigRange<Contig>
+    where
+        Contig: PartialEq + fmt::Debug,
+    {
+        assert_eq!(self.contig, other.contig);
+        ContigRange {
+            contig: self.contig,
+            at: self.at..other.at,
+        }
+    }
+
+    pub fn usize_pos(&self) -> usize {
+        usize::try_from(self.at).unwrap()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -41,6 +56,24 @@ impl<Contig> ContigRange<Contig> {
     pub fn is_empty(&self) -> bool {
         self.at.is_empty()
     }
+
+    pub fn into_start(self) -> ContigPosition<Contig> {
+        ContigPosition {
+            contig: self.contig,
+            at: self.at.start,
+        }
+    }
+    pub fn into_end(self) -> ContigPosition<Contig> {
+        ContigPosition {
+            contig: self.contig,
+            at: self.at.end,
+        }
+    }
+
+    pub fn usize_range(&self) -> Range<usize> {
+        usize::try_from(self.at.start).unwrap()..usize::try_from(self.at.end).unwrap()
+    }
+
     pub fn contains(&self, loc: &ContigPosition<Contig>) -> bool
     where
         Contig: PartialEq,
@@ -380,6 +413,62 @@ pub mod orientation {
                 orientation: self.orientation,
                 v: self.v.as_ref_contig(),
             }
+        }
+    }
+}
+
+mod math {
+    use std::ops::{Add, AddAssign, Sub, SubAssign};
+
+    use crate::genome::Contig;
+
+    use super::*;
+
+    impl<C: Contig> ContigPosition<C> {
+        pub fn checked_add(self, rhs: u64) -> Option<Self> {
+            if self.contig.size() <= self.at + rhs {
+                None
+            } else {
+                Some(Self {
+                    contig: self.contig,
+                    at: self.at + rhs,
+                })
+            }
+        }
+    }
+    impl<C: Contig> Add<u64> for ContigPosition<C> {
+        type Output = Self;
+
+        fn add(self, rhs: u64) -> Self::Output {
+            self.checked_add(rhs).unwrap()
+        }
+    }
+    impl<C: Contig> AddAssign<u64> for ContigPosition<C> {
+        fn add_assign(&mut self, rhs: u64) {
+            assert!(self.at + rhs <= self.contig.size());
+            self.at += rhs;
+        }
+    }
+
+    impl<C> ContigPosition<C> {
+        pub fn checked_sub(self, rhs: u64) -> Option<Self> {
+            Some(Self {
+                contig: self.contig,
+                at: self.at.checked_sub(rhs)?,
+            })
+        }
+    }
+    impl<C> Sub<u64> for ContigPosition<C> {
+        type Output = Self;
+
+        fn sub(self, rhs: u64) -> Self::Output {
+            self.checked_sub(rhs).unwrap()
+        }
+    }
+    impl<C> SubAssign<u64> for ContigPosition<C> {
+        fn sub_assign(&mut self, rhs: u64) {
+            assert!(self.at >= rhs);
+            self.at -= rhs;
         }
     }
 }

@@ -10,7 +10,10 @@ use std::{
 
 use ref_cast::RefCast;
 
-use crate::dna::Complement;
+use crate::{
+    dna::Complement,
+    location::{ContigPosition, ContigRange},
+};
 
 /// A sequence of bases or proteins.
 /// If this is a DNA/RNA sequence, it's 5' -> 3' by convention.
@@ -47,6 +50,7 @@ impl<T> IndexMut<usize> for Sequence<T> {
         &mut self.bases[index]
     }
 }
+
 impl<T> Index<Range<usize>> for Sequence<T> {
     type Output = SequenceSlice<T>;
     #[track_caller]
@@ -112,6 +116,90 @@ impl<T> IndexMut<RangeFull> for Sequence<T> {
         SequenceSlice::ref_cast_mut(&mut self.bases[index])
     }
 }
+
+impl<T, C> Index<ContigPosition<C>> for Sequence<T> {
+    type Output = T;
+    #[track_caller]
+    fn index(&self, index: ContigPosition<C>) -> &Self::Output {
+        &self.bases[index.usize_pos()]
+    }
+}
+impl<T, C> IndexMut<ContigPosition<C>> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: ContigPosition<C>) -> &mut Self::Output {
+        &mut self.bases[index.usize_pos()]
+    }
+}
+
+impl<T, C> Index<Range<ContigPosition<C>>> for Sequence<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: Range<ContigPosition<C>>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index.start.usize_pos()..index.end.usize_pos()])
+    }
+}
+impl<T, C> IndexMut<Range<ContigPosition<C>>> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: Range<ContigPosition<C>>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index.start.usize_pos()..index.end.usize_pos()])
+    }
+}
+impl<T, C> Index<RangeInclusive<ContigPosition<C>>> for Sequence<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeInclusive<ContigPosition<C>>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index.start().usize_pos()..=index.end().usize_pos()])
+    }
+}
+impl<T, C> IndexMut<RangeInclusive<ContigPosition<C>>> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeInclusive<ContigPosition<C>>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(
+            &mut self.bases[index.start().usize_pos()..=index.end().usize_pos()],
+        )
+    }
+}
+impl<T, C> Index<RangeFrom<ContigPosition<C>>> for Sequence<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeFrom<ContigPosition<C>>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index.start.usize_pos()..])
+    }
+}
+impl<T, C> IndexMut<RangeFrom<ContigPosition<C>>> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeFrom<ContigPosition<C>>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index.start.usize_pos()..])
+    }
+}
+impl<T, C> Index<RangeTo<ContigPosition<C>>> for Sequence<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeTo<ContigPosition<C>>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[..index.end.usize_pos()])
+    }
+}
+impl<T, C> IndexMut<RangeTo<ContigPosition<C>>> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeTo<ContigPosition<C>>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[..index.end.usize_pos()])
+    }
+}
+
+impl<T, C> Index<ContigRange<C>> for Sequence<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: ContigRange<C>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index.usize_range()])
+    }
+}
+impl<T, C> IndexMut<ContigRange<C>> for Sequence<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: ContigRange<C>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index.usize_range()])
+    }
+}
+
 impl<T> Borrow<SequenceSlice<T>> for Sequence<T> {
     fn borrow(&self) -> &SequenceSlice<T> {
         SequenceSlice::ref_cast(&self.bases)
