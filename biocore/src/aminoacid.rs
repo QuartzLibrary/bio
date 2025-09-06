@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{ascii, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use utile::value::enumerable::Enumerable;
@@ -203,6 +203,9 @@ impl From<AminoAcid> for u8 {
 }
 
 impl AsciiChar for AminoAcid {
+    fn single_encode(self) -> ascii::Char {
+        ascii::Char::from_u8(self.to_byte()).unwrap()
+    }
     fn encode(bases: &[Self]) -> String
     where
         Self: Sized,

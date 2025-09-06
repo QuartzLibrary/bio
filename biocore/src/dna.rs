@@ -1,5 +1,5 @@
 use core::str;
-use std::str::FromStr;
+use std::{ascii, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use utile::value::enumerable::Enumerable;
@@ -27,17 +27,6 @@ pub enum DnaBase {
     C = b'C',
     G = b'G',
     T = b'T',
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(Serialize, Deserialize)]
-#[repr(u8)]
-pub enum MaybeDnaBase {
-    A = b'A',
-    C = b'C',
-    G = b'G',
-    T = b'T',
-    N = b'N',
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -111,20 +100,10 @@ impl DnaBase {
     }
 
     pub fn to_char(&self) -> char {
-        match self {
-            Self::A => 'A',
-            Self::C => 'C',
-            Self::G => 'G',
-            Self::T => 'T',
-        }
+        *self as u8 as char
     }
     pub fn to_byte(&self) -> u8 {
-        match self {
-            Self::A => b'A',
-            Self::C => b'C',
-            Self::G => b'G',
-            Self::T => b'T',
-        }
+        *self as u8
     }
 
     pub fn iter() -> impl Iterator<Item = Self> {
@@ -150,6 +129,10 @@ impl Enumerable for DnaBase {
     const N: u128 = 4;
 }
 impl AsciiChar for DnaBase {
+    fn single_encode(self) -> ascii::Char {
+        ascii::Char::from_u8(self.to_byte()).unwrap()
+    }
+
     fn encode(bases: &[Self]) -> String
     where
         Self: Sized,
@@ -243,137 +226,6 @@ impl FromStr for DnaBase {
     }
 }
 
-// MaybeDnaBase
-
-impl MaybeDnaBase {
-    pub fn from_char(c: char) -> Option<Self> {
-        Self::from_char_strict(c.to_ascii_uppercase())
-    }
-    pub fn from_byte(b: u8) -> Option<Self> {
-        Self::from_byte_strict(b.to_ascii_uppercase())
-    }
-
-    pub fn from_char_strict(c: char) -> Option<Self> {
-        match c {
-            'A' => Some(Self::A),
-            'C' => Some(Self::C),
-            'G' => Some(Self::G),
-            'T' => Some(Self::T),
-            'N' => Some(Self::N),
-            _ => None,
-        }
-    }
-    pub fn from_byte_strict(b: u8) -> Option<Self> {
-        match b {
-            b'A' => Some(Self::A),
-            b'C' => Some(Self::C),
-            b'G' => Some(Self::G),
-            b'T' => Some(Self::T),
-            b'N' => Some(Self::N),
-            _ => None,
-        }
-    }
-
-    pub fn to_char(&self) -> char {
-        match self {
-            Self::A => 'A',
-            Self::C => 'C',
-            Self::G => 'G',
-            Self::T => 'T',
-            Self::N => 'N',
-        }
-    }
-    pub fn to_byte(&self) -> u8 {
-        match self {
-            Self::A => b'A',
-            Self::C => b'C',
-            Self::G => b'G',
-            Self::T => b'T',
-            Self::N => b'N',
-        }
-    }
-
-    // Check if the nucleotide is a purine (A or G)
-    pub fn is_purine(&self) -> bool {
-        matches!(self, Self::A | Self::G)
-    }
-
-    // Check if the nucleotide is a pyrimidine (C or T)
-    pub fn is_pyrimidine(&self) -> bool {
-        matches!(self, Self::C | Self::T)
-    }
-
-    pub fn is_ambiguous(&self) -> bool {
-        !matches!(self, Self::A | Self::C | Self::G | Self::T)
-    }
-}
-impl From<MaybeDnaBase> for u8 {
-    fn from(value: MaybeDnaBase) -> Self {
-        value.to_byte()
-    }
-}
-impl AsciiChar for MaybeDnaBase {
-    fn encode(bases: &[Self]) -> String
-    where
-        Self: Sized,
-    {
-        bases.iter().map(Self::to_char).collect()
-    }
-
-    type DecodeError = DnaDecodeError;
-    fn decode(mut bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>
-    where
-        Self: Sized,
-    {
-        for (at, b) in bases.iter_mut().enumerate() {
-            if Self::from_byte_strict(*b).is_none() {
-                return Err(DnaDecodeError::InvalidSequence {
-                    at,
-                    byte: *b,
-                    len: bases.len(),
-                });
-            }
-        }
-        bases.make_ascii_uppercase();
-        Ok(Sequence::new(
-            bases
-                .into_iter()
-                .map(Self::from_byte_strict)
-                .map(Option::unwrap)
-                .collect(),
-        ))
-    }
-}
-impl Complement for MaybeDnaBase {
-    fn complement(self) -> Self {
-        match self {
-            Self::A => Self::T,
-            Self::T => Self::A,
-            Self::C => Self::G,
-            Self::G => Self::C,
-            Self::N => Self::N,
-        }
-    }
-}
-
-impl std::fmt::Display for MaybeDnaBase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_char())
-    }
-}
-impl FromStr for MaybeDnaBase {
-    type Err = DnaDecodeError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() != 1 {
-            Err(DnaDecodeError::InvalidInputLength { from: s.to_owned() })
-        } else {
-            let char = s.chars().next().unwrap();
-            Self::from_char(char).ok_or(DnaDecodeError::InvalidChar { from: char })
-        }
-    }
-}
-
 // Ambiguous
 
 impl AmbiguousDnaBase {
@@ -406,22 +258,10 @@ impl AmbiguousDnaBase {
     }
 
     pub fn to_char(&self) -> char {
-        match self {
-            Self::A => 'A',
-            Self::C => 'C',
-            Self::G => 'G',
-            Self::T => 'T',
-            Self::N => 'N',
-        }
+        *self as u8 as char
     }
     pub fn to_byte(&self) -> u8 {
-        match self {
-            Self::A => b'A',
-            Self::C => b'C',
-            Self::G => b'G',
-            Self::T => b'T',
-            Self::N => b'N',
-        }
+        *self as u8
     }
 
     pub fn iter() -> impl Iterator<Item = Self> {
@@ -450,6 +290,10 @@ impl Enumerable for AmbiguousDnaBase {
     const N: u128 = 5;
 }
 impl AsciiChar for AmbiguousDnaBase {
+    fn single_encode(self) -> ascii::Char {
+        ascii::Char::from_u8(self.to_byte()).unwrap()
+    }
+
     fn encode(bases: &[Self]) -> String
     where
         Self: Sized,
@@ -563,42 +407,10 @@ impl IupacDnaBase {
     }
 
     pub fn to_char(&self) -> char {
-        match self {
-            Self::A => 'A',
-            Self::C => 'C',
-            Self::G => 'G',
-            Self::T => 'T',
-            Self::R => 'R',
-            Self::Y => 'Y',
-            Self::S => 'S',
-            Self::W => 'W',
-            Self::K => 'K',
-            Self::M => 'M',
-            Self::B => 'B',
-            Self::D => 'D',
-            Self::H => 'H',
-            Self::V => 'V',
-            Self::N => 'N',
-        }
+        *self as u8 as char
     }
     pub fn to_byte(&self) -> u8 {
-        match self {
-            Self::A => b'A',
-            Self::C => b'C',
-            Self::G => b'G',
-            Self::T => b'T',
-            Self::R => b'R',
-            Self::Y => b'Y',
-            Self::S => b'S',
-            Self::W => b'W',
-            Self::K => b'K',
-            Self::M => b'M',
-            Self::B => b'B',
-            Self::D => b'D',
-            Self::H => b'H',
-            Self::V => b'V',
-            Self::N => b'N',
-        }
+        *self as u8
     }
 
     pub fn iter() -> impl Iterator<Item = Self> {
@@ -641,6 +453,10 @@ impl Enumerable for IupacDnaBase {
     const N: u128 = 15;
 }
 impl AsciiChar for IupacDnaBase {
+    fn single_encode(self) -> ascii::Char {
+        ascii::Char::from_u8(self.to_byte()).unwrap()
+    }
+
     fn encode(bases: &[Self]) -> String
     where
         Self: Sized,
@@ -727,6 +543,178 @@ pub enum DnaDecodeError {
 impl From<DnaDecodeError> for std::io::Error {
     fn from(value: DnaDecodeError) -> Self {
         std::io::Error::new(std::io::ErrorKind::InvalidData, value)
+    }
+}
+
+pub mod pattern {
+    use crate::sequence::PatternChar;
+
+    use super::*;
+
+    impl PatternChar<DnaBase> for DnaBase {
+        fn matching(self) -> impl Iterator<Item = DnaBase> {
+            [self].into_iter()
+        }
+        fn matches(self, target: DnaBase) -> bool {
+            self == target
+        }
+    }
+    impl PatternChar<AmbiguousDnaBase> for AmbiguousDnaBase {
+        fn matching(self) -> impl Iterator<Item = AmbiguousDnaBase> {
+            [self].into_iter()
+        }
+        fn matches(self, target: AmbiguousDnaBase) -> bool {
+            self == target
+        }
+    }
+    impl PatternChar<IupacDnaBase> for IupacDnaBase {
+        fn matching(self) -> impl Iterator<Item = IupacDnaBase> {
+            [self].into_iter()
+        }
+        fn matches(self, target: IupacDnaBase) -> bool {
+            self == target
+        }
+    }
+
+    impl PatternChar<IupacDnaBase> for DnaBase {
+        fn matching(self) -> impl Iterator<Item = IupacDnaBase> {
+            [self.into()].into_iter()
+        }
+        fn matches(self, target: IupacDnaBase) -> bool {
+            IupacDnaBase::from(self) == target
+        }
+    }
+    impl PatternChar<AmbiguousDnaBase> for DnaBase {
+        fn matching(self) -> impl Iterator<Item = AmbiguousDnaBase> {
+            [self.into()].into_iter()
+        }
+        fn matches(self, target: AmbiguousDnaBase) -> bool {
+            AmbiguousDnaBase::from(self) == target
+        }
+    }
+
+    impl PatternChar<DnaBase> for IupacDnaBase {
+        fn matching(self) -> impl Iterator<Item = DnaBase> {
+            match self {
+                Self::A => [DnaBase::A].iter().copied(),
+                Self::C => [DnaBase::C].iter().copied(),
+                Self::G => [DnaBase::G].iter().copied(),
+                Self::T => [DnaBase::T].iter().copied(),
+                Self::R => [DnaBase::A, DnaBase::G].iter().copied(),
+                Self::Y => [DnaBase::C, DnaBase::T].iter().copied(),
+                Self::S => [DnaBase::G, DnaBase::C].iter().copied(),
+                Self::W => [DnaBase::A, DnaBase::T].iter().copied(),
+                Self::K => [DnaBase::G, DnaBase::T].iter().copied(),
+                Self::M => [DnaBase::A, DnaBase::C].iter().copied(),
+                Self::B => [DnaBase::C, DnaBase::T, DnaBase::G].iter().copied(),
+                Self::D => [DnaBase::A, DnaBase::T, DnaBase::G].iter().copied(),
+                Self::H => [DnaBase::A, DnaBase::C, DnaBase::T].iter().copied(),
+                Self::V => [DnaBase::A, DnaBase::C, DnaBase::G].iter().copied(),
+                Self::N => [DnaBase::A, DnaBase::C, DnaBase::G, DnaBase::T]
+                    .iter()
+                    .copied(),
+            }
+        }
+        fn matches(self, target: DnaBase) -> bool {
+            self.to_byte() == target.to_byte()
+                || match self {
+                    IupacDnaBase::A => target == DnaBase::A,
+                    IupacDnaBase::C => target == DnaBase::C,
+                    IupacDnaBase::G => target == DnaBase::G,
+                    IupacDnaBase::T => target == DnaBase::T,
+                    IupacDnaBase::R => target == DnaBase::A || target == DnaBase::G,
+                    IupacDnaBase::Y => target == DnaBase::C || target == DnaBase::T,
+                    IupacDnaBase::S => target == DnaBase::G || target == DnaBase::C,
+                    IupacDnaBase::W => target == DnaBase::A || target == DnaBase::T,
+                    IupacDnaBase::K => target == DnaBase::G || target == DnaBase::T,
+                    IupacDnaBase::M => target == DnaBase::A || target == DnaBase::C,
+                    IupacDnaBase::B => {
+                        target == DnaBase::C || target == DnaBase::T || target == DnaBase::G
+                    }
+                    IupacDnaBase::D => {
+                        target == DnaBase::A || target == DnaBase::T || target == DnaBase::G
+                    }
+                    IupacDnaBase::H => {
+                        target == DnaBase::A || target == DnaBase::C || target == DnaBase::T
+                    }
+                    IupacDnaBase::V => {
+                        target == DnaBase::A || target == DnaBase::C || target == DnaBase::G
+                    }
+                    IupacDnaBase::N => {
+                        target == DnaBase::A
+                            || target == DnaBase::C
+                            || target == DnaBase::G
+                            || target == DnaBase::T
+                    }
+                }
+        }
+    }
+    impl PatternChar<DnaBase> for AmbiguousDnaBase {
+        fn matching(self) -> impl Iterator<Item = DnaBase> {
+            match self {
+                Self::A => [DnaBase::A].iter().copied(),
+                Self::C => [DnaBase::C].iter().copied(),
+                Self::G => [DnaBase::G].iter().copied(),
+                Self::T => [DnaBase::T].iter().copied(),
+                Self::N => [DnaBase::A, DnaBase::C, DnaBase::G, DnaBase::T]
+                    .iter()
+                    .copied(),
+            }
+        }
+        fn matches(self, target: DnaBase) -> bool {
+            self.to_byte() == target.to_byte() || self == AmbiguousDnaBase::N
+        }
+    }
+
+    impl PatternChar<IupacDnaBase> for AmbiguousDnaBase {
+        fn matching(self) -> impl Iterator<Item = IupacDnaBase> {
+            match self {
+                Self::A => [IupacDnaBase::A].iter().copied(),
+                Self::C => [IupacDnaBase::C].iter().copied(),
+                Self::G => [IupacDnaBase::G].iter().copied(),
+                Self::T => [IupacDnaBase::T].iter().copied(),
+                Self::N => [
+                    IupacDnaBase::A,
+                    IupacDnaBase::C,
+                    IupacDnaBase::G,
+                    IupacDnaBase::T,
+                    IupacDnaBase::R,
+                    IupacDnaBase::Y,
+                    IupacDnaBase::S,
+                    IupacDnaBase::W,
+                    IupacDnaBase::K,
+                    IupacDnaBase::M,
+                    IupacDnaBase::B,
+                    IupacDnaBase::D,
+                    IupacDnaBase::H,
+                    IupacDnaBase::V,
+                    IupacDnaBase::N,
+                ]
+                .iter()
+                .copied(),
+            }
+        }
+    }
+}
+
+mod from {
+    use super::*;
+
+    impl From<DnaBase> for AmbiguousDnaBase {
+        fn from(value: DnaBase) -> Self {
+            AmbiguousDnaBase::from_char(value.to_char()).unwrap()
+        }
+    }
+    impl From<DnaBase> for IupacDnaBase {
+        fn from(value: DnaBase) -> Self {
+            IupacDnaBase::from_char(value.to_char()).unwrap()
+        }
+    }
+
+    impl From<AmbiguousDnaBase> for IupacDnaBase {
+        fn from(value: AmbiguousDnaBase) -> Self {
+            IupacDnaBase::from_char(value.to_char()).unwrap()
+        }
     }
 }
 

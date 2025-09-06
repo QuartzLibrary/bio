@@ -1,3 +1,4 @@
+#![feature(ascii_char)]
 #![feature(iterator_try_collect)]
 #![feature(map_try_insert)]
 

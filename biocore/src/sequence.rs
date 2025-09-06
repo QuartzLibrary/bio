@@ -519,6 +519,10 @@ impl<'a, T> IntoIterator for &'a SequenceSlice<T> {
     }
 }
 impl<T> SequenceSlice<T> {
+    pub fn new(bases: &[T]) -> &Self {
+        Self::ref_cast(bases)
+    }
+
     pub fn get(&self, index: usize) -> Option<&T> {
         self.bases.get(index)
     }
@@ -540,14 +544,66 @@ impl<T> SequenceSlice<T> {
     {
         self.into_iter().rev().cloned().map(T::complement).collect()
     }
+
+    pub fn matches<Target>(&self, target: &SequenceSlice<Target>) -> bool
+    where
+        T: PatternChar<Target> + Clone,
+        Target: PartialEq + Clone,
+    {
+        if self.len() != target.len() {
+            return false;
+        }
+
+        self.iter()
+            .zip(target.iter())
+            .all(|(a, b)| a.clone().matches(b.clone()))
+    }
+
+    pub fn compile_regex<Target>(&self) -> String
+    where
+        T: PatternChar<Target> + Clone,
+        Target: AsciiChar,
+    {
+        T::compile_regex(self.iter().cloned())
+    }
 }
 
 pub trait AsciiChar: Sized {
+    fn single_encode(self) -> std::ascii::Char;
+
     // TODO: return &str instead
     fn encode(bases: &[Self]) -> String;
 
     type DecodeError: Into<std::io::Error>;
     fn decode(bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>;
+}
+
+pub trait PatternChar<Target>: Sized {
+    /// For a given item, return all the target items that would match.
+    /// For example, `N` as a DNA base would match any of the other bases.
+    fn matching(self) -> impl Iterator<Item = Target>;
+
+    fn matches(self, target: Target) -> bool
+    where
+        Target: PartialEq,
+    {
+        self.matching().any(|m| m == target)
+    }
+
+    /// Compile a regex that matches the provided sequence.
+    /// For example you might compile `ATN` to match `[A][T][ACGT]`.
+    fn compile_regex(items: impl Iterator<Item = Self>) -> String
+    where
+        Target: AsciiChar,
+    {
+        items
+            .map(Self::matching)
+            .flat_map(|matching| {
+                let p = matching.map(|m| m.single_encode().to_char());
+                [].into_iter().chain(['[']).chain(p).chain([']'])
+            })
+            .collect()
+    }
 }
 
 impl<T: AsciiChar> serde::Serialize for Sequence<T> {
