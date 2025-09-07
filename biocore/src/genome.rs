@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io, ops::Index, sync::Arc};
+use std::{collections::BTreeMap, fmt, io, ops::Index, sync::Arc};
 
 use crate::{
     dna::DnaBase,
@@ -6,7 +6,7 @@ use crate::{
     sequence::{Sequence, SequenceSlice},
 };
 
-pub trait Contig: AsRef<str> + PartialEq + Eq {
+pub trait Contig: AsRef<str> + PartialEq + Eq + fmt::Debug {
     fn size(&self) -> u64;
 }
 impl<C> Contig for &C
