@@ -471,6 +471,56 @@ mod math {
             self.at -= rhs;
         }
     }
+
+    impl<C: Contig> ContigRange<C> {
+        pub fn checked_add(self, rhs: u64) -> Option<Self> {
+            if self.contig.size() <= self.at.end + rhs {
+                None
+            } else {
+                Some(Self {
+                    contig: self.contig,
+                    at: self.at.start + rhs..self.at.end + rhs,
+                })
+            }
+        }
+    }
+    impl<C: Contig> Add<u64> for ContigRange<C> {
+        type Output = Self;
+
+        fn add(self, rhs: u64) -> Self::Output {
+            self.checked_add(rhs).unwrap()
+        }
+    }
+    impl<C: Contig> AddAssign<u64> for ContigRange<C> {
+        fn add_assign(&mut self, rhs: u64) {
+            assert!(self.at.end + rhs <= self.contig.size());
+            self.at.start += rhs;
+            self.at.end += rhs;
+        }
+    }
+
+    impl<C> ContigRange<C> {
+        pub fn checked_sub(self, rhs: u64) -> Option<Self> {
+            Some(Self {
+                contig: self.contig,
+                at: self.at.start.checked_sub(rhs)?..self.at.end.checked_sub(rhs)?,
+            })
+        }
+    }
+    impl<C> Sub<u64> for ContigRange<C> {
+        type Output = Self;
+
+        fn sub(self, rhs: u64) -> Self::Output {
+            self.checked_sub(rhs).unwrap()
+        }
+    }
+    impl<C> SubAssign<u64> for ContigRange<C> {
+        fn sub_assign(&mut self, rhs: u64) {
+            assert!(self.at.start >= rhs);
+            self.at.start -= rhs;
+            self.at.end -= rhs;
+        }
+    }
 }
 
 mod noodles {
