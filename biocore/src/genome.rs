@@ -1,8 +1,13 @@
 use std::{collections::BTreeMap, fmt, io, ops::Index, sync::Arc};
 
+use utile::range::RangeExt;
+
 use crate::{
     dna::DnaBase,
-    location::{ContigPosition, ContigRange},
+    location::{
+        orientation::{SequenceOrientation, WithOrientation},
+        ContigPosition, ContigRange,
+    },
     sequence::{Sequence, SequenceSlice},
 };
 
@@ -155,5 +160,131 @@ pub struct ContigSizeError {
 impl From<ContigSizeError> for io::Error {
     fn from(e: ContigSizeError) -> Self {
         io::Error::new(io::ErrorKind::InvalidData, e)
+    }
+}
+
+/// A normal contig, but with helpers to translate to the coordinates before/after an indel.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EditedContig<C> {
+    original: C,
+    name: Arc<str>,
+    remove: ContigRange<C>,
+    insert: u64,
+}
+impl<C: Contig> Contig for EditedContig<C> {
+    fn size(&self) -> u64 {
+        self.original.size() - self.remove.len() + self.insert
+    }
+}
+impl<C> AsRef<str> for EditedContig<C> {
+    fn as_ref(&self) -> &str {
+        self.name.as_ref()
+    }
+}
+impl<C: Contig> EditedContig<C> {
+    pub fn new(contig: C, remove: ContigRange<C>, insert: u64) -> Self {
+        let name = format!(
+            "{} (D{}..{}I{})",
+            contig.as_ref(),
+            remove.at.start,
+            remove.at.end,
+            insert
+        )
+        .into();
+        Self {
+            original: contig,
+            name,
+            remove,
+            insert,
+        }
+    }
+    /// Takes a range on the original contig and returns the equivalent range on the edited contig.
+    pub fn liftover(
+        self,
+        mut original: WithOrientation<ContigPosition<C>>,
+    ) -> Option<WithOrientation<ContigPosition<Self>>> {
+        let orientation = original.orientation;
+
+        original.set_orientation(SequenceOrientation::Forward);
+
+        let new = self.liftover_(original.v)?;
+
+        let mut new = WithOrientation {
+            orientation: SequenceOrientation::Forward,
+            v: new,
+        };
+
+        new.set_orientation(orientation);
+
+        Some(new)
+    }
+    fn liftover_(self, p: ContigPosition<C>) -> Option<ContigPosition<Self>> {
+        if p.contig != self.original {
+            log::warn!(
+                "Contig mismatch. Expected {:?}, got {:?}.",
+                self.original,
+                p.contig
+            );
+            return None;
+        }
+        let at = if self.remove.contains(&p) {
+            // In the deleted region.
+            log::warn!("Attempted to lift {p:?} over {self:?} but it is in the deleted region.");
+            return None;
+        } else if p.at < self.remove.at.start {
+            // The range starts before the affected range, so we just return the original range.
+            p.at
+        } else {
+            // The range starts after the affected range, so we adjust both the start and the end.
+            (p - self.remove.len() + self.insert).at
+        };
+
+        Some(ContigPosition { contig: self, at })
+    }
+    /// Takes a range on the original contig and returns the equivalent range on the edited contig.
+    pub fn liftover_range(
+        self,
+        mut original: WithOrientation<ContigRange<C>>,
+    ) -> Option<WithOrientation<ContigRange<Self>>> {
+        let orientation = original.orientation;
+
+        original.set_orientation(SequenceOrientation::Forward);
+
+        let new = self.liftover_range_(original.v)?;
+
+        let mut new = WithOrientation {
+            orientation: SequenceOrientation::Forward,
+            v: new,
+        };
+
+        new.set_orientation(orientation);
+
+        Some(new)
+    }
+    fn liftover_range_(self, r: ContigRange<C>) -> Option<ContigRange<Self>> {
+        if r.contig != self.original {
+            log::warn!(
+                "Contig mismatch. Expected {:?}, got {:?}.",
+                self.original,
+                r.contig
+            );
+            return None;
+        }
+        let at = if r.contains_range(&self.remove) {
+            // The range fully contains the affected range, we just adjust the end.
+            r.at.start..(r.at.end - self.remove.len() + self.insert)
+        } else if !r.at.clone().intersection(self.remove.at.clone()).is_empty() {
+            // There is a non-empty overlap, do not liftover.
+            log::warn!("Attempted to lift {r:?} over {self:?} but there is a non-empty overlap.");
+            return None;
+        } else if r.at.start < self.remove.at.start {
+            // The range starts before the affected range, so we just return the original range.
+            r.at
+        } else {
+            // The range starts after the affected range, so we adjust both the start and the end.
+            (r - self.remove.len() + self.insert).at
+        };
+
+        Some(ContigRange { contig: self, at })
     }
 }
