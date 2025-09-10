@@ -116,12 +116,32 @@ impl<Contig> ContigRange<Contig> {
             at: self.at,
         }
     }
+    pub fn map_range(self, f: impl FnOnce(Range<u64>) -> Range<u64>) -> Self {
+        Self {
+            contig: self.contig,
+            at: f(self.at),
+        }
+    }
 
     pub fn as_ref_contig(&self) -> ContigRange<&Contig> {
         ContigRange {
             contig: &self.contig,
             at: self.at.clone(),
         }
+    }
+
+    pub fn iter_positions(&self) -> impl Iterator<Item = ContigPosition<Contig>>
+    where
+        Contig: Clone,
+    {
+        let ContigRange {
+            contig,
+            at: Range { start, end },
+        } = self.clone();
+        (start..end).map(move |at| ContigPosition {
+            contig: contig.clone(),
+            at,
+        })
     }
 }
 impl<Contig> PartialOrd for ContigRange<Contig>
@@ -322,6 +342,17 @@ pub mod orientation {
             C: PartialEq,
         {
             self.overlaps_with(b, self.v.contig.size())
+        }
+
+        pub fn iter_positions(&self) -> impl Iterator<Item = WithOrientation<ContigPosition<C>>>
+        where
+            C: Clone,
+        {
+            let orientation = self.orientation;
+            self.v.iter_positions().map(move |pos| WithOrientation {
+                orientation,
+                v: pos,
+            })
         }
     }
     impl<C> WithOrientation<ContigRange<C>> {
