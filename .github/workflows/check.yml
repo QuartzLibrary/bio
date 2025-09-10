@@ -37,6 +37,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Check project (WASM)
+        # Note lack of --all-targets here because tests and examples are not wasm compatible
         run: cargo clippy --workspace --all-features --target wasm32-unknown-unknown -- -D warnings
 
   test:
