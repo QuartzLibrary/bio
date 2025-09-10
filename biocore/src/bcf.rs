@@ -34,7 +34,7 @@ impl<R: Read> IndexedBcfReader<R> {
     pub fn query<C>(
         &mut self,
         at: &ContigRange<C>,
-    ) -> io::Result<Query<noodles::bgzf::io::Reader<R>>>
+    ) -> io::Result<Query<'_, noodles::bgzf::io::Reader<R>>>
     where
         R: Seek,
         C: AsRef<str>,

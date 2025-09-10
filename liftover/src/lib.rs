@@ -1,4 +1,3 @@
-#![feature(strict_overflow_ops)]
 #![feature(iterator_try_collect)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(btree_set_entry)]
@@ -15,8 +14,8 @@ use utile::range::{RangeExt, RangeLen};
 use biocore::{
     genome::{ArcContig, Contig},
     location::{
-        orientation::{SequenceOrientation, WithOrientation},
         ContigPosition, ContigRange,
+        orientation::{SequenceOrientation, WithOrientation},
     },
 };
 

@@ -1,7 +1,6 @@
 #![feature(never_type)]
 #![feature(ascii_char)]
 #![feature(iterator_try_collect)]
-#![feature(let_chains)]
 
 mod genotype;
 mod info;

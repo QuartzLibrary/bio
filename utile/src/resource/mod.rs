@@ -13,7 +13,7 @@ use std::{
     pin::pin,
 };
 
-use futures::{stream, Stream};
+use futures::{Stream, stream};
 use serde::de::DeserializeOwned;
 use serde_json::StreamDeserializer;
 use tokio::io::AsyncReadExt;
@@ -99,13 +99,13 @@ pub trait RawResourceExt: RawResource + Sized {
     }
 
     async fn read_vec_async(&self) -> io::Result<Vec<u8>> {
-        let mut reader = ResourceRef::new(self).read_async().await?;
+        let reader = ResourceRef::new(self).read_async().await?;
         let mut data = Vec::new();
         pin!(reader).read_to_end(&mut data).await?;
         Ok(data)
     }
     async fn read_string_async(&self) -> io::Result<String> {
-        let mut reader = ResourceRef::new(self).read_async().await?;
+        let reader = ResourceRef::new(self).read_async().await?;
         let mut data = String::new();
         pin!(reader).read_to_string(&mut data).await?;
         Ok(data)

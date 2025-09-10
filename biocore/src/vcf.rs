@@ -32,7 +32,7 @@ impl<R: Read> IndexedVcfReader<R> {
     pub fn query<C>(
         &mut self,
         at: &ContigRange<C>,
-    ) -> io::Result<Query<noodles::bgzf::io::Reader<R>>>
+    ) -> io::Result<Query<'_, noodles::bgzf::io::Reader<R>>>
     where
         R: Seek,
         C: AsRef<str>,
@@ -55,7 +55,7 @@ impl<R: Read> IndexedVcfReader<R> {
     pub fn query_raw<C>(
         &mut self,
         at: &ContigRange<C>,
-    ) -> io::Result<QueryRaw<noodles::bgzf::io::Reader<R>>>
+    ) -> io::Result<QueryRaw<'_, noodles::bgzf::io::Reader<R>>>
     where
         R: Seek,
         C: AsRef<str>,

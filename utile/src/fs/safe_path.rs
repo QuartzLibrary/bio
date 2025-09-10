@@ -157,12 +157,11 @@ fn from_safe_path(path: &Path) -> Option<String> {
 fn decode_component(c: &str) -> String {
     let mut c = c.replace("%END", "");
 
-    if let Some(s) = c.strip_prefix('%') {
-        if RESERVED_NAMES_WINDOWS.contains(&s.to_uppercase().as_str())
-            || RESERVED_NAMES_UNIX.contains(&s.to_uppercase().as_str())
-        {
-            c = s.to_owned();
-        }
+    if let Some(s) = c.strip_prefix('%')
+        && (RESERVED_NAMES_WINDOWS.contains(&s.to_uppercase().as_str())
+            || RESERVED_NAMES_UNIX.contains(&s.to_uppercase().as_str()))
+    {
+        c = s.to_owned();
     }
 
     c
@@ -170,7 +169,7 @@ fn decode_component(c: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use rand::{rngs::SmallRng, seq::IndexedRandom, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng, rngs::SmallRng, seq::IndexedRandom};
 
     use super::*;
 

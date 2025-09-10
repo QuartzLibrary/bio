@@ -1,5 +1,4 @@
 #![feature(iterator_try_collect)]
-#![feature(strict_overflow_ops)]
 
 #[path = "fuzz/internal.rs"]
 mod internal;
@@ -17,8 +16,8 @@ use utile::{
 };
 
 use liftover::{
-    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
     Liftover,
+    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
 };
 
 const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
@@ -86,12 +85,14 @@ fn check_against_ucsc() -> anyhow::Result<()> {
             assert_eq!(internal, ucsc);
         }
         assert!(is_subset_of(internal, ucsc));
-        assert!(ucsc
-            .iter()
-            .all(|u| internal.iter().any(|i| i.at.start == u.at.start)));
-        assert!(ucsc
-            .iter()
-            .all(|u| internal.iter().any(|i| i.at.end == u.at.end)));
+        assert!(
+            ucsc.iter()
+                .all(|u| internal.iter().any(|i| i.at.start == u.at.start))
+        );
+        assert!(
+            ucsc.iter()
+                .all(|u| internal.iter().any(|i| i.at.end == u.at.end))
+        );
     }
 
     for (from, to) in UcscHG::valid_pairs() {
