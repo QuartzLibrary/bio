@@ -130,7 +130,7 @@ impl<Contig> ContigRange<Contig> {
         }
     }
 
-    pub fn iter_positions(&self) -> impl Iterator<Item = ContigPosition<Contig>>
+    pub fn iter_positions(&self) -> impl Iterator<Item = ContigPosition<Contig>> + use<Contig>
     where
         Contig: Clone,
     {
@@ -344,7 +344,7 @@ pub mod orientation {
             self.overlaps_with(b, self.v.contig.size())
         }
 
-        pub fn iter_positions(&self) -> impl Iterator<Item = WithOrientation<ContigPosition<C>>>
+        pub fn iter_positions(&self) -> impl Iterator<Item = WithOrientation<ContigPosition<C>>> + use<C>
         where
             C: Clone,
         {

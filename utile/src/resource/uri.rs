@@ -64,7 +64,7 @@ impl UrlResource {
     pub async fn read_retry_async(
         &self,
         retries: u64,
-    ) -> std::io::Result<impl tokio::io::AsyncRead> {
+    ) -> std::io::Result<impl tokio::io::AsyncRead + use<>> {
         for i in 0.. {
             match self.read_async().await {
                 Ok(ok) => return Ok(ok),
@@ -243,7 +243,7 @@ pub mod ftp {
             Ok(ftp.size(path).await.is_ok())
         }
 
-        pub fn get(&self) -> suppaftp::FtpResult<impl std::io::Read> {
+        pub fn get(&self) -> suppaftp::FtpResult<impl std::io::Read + use<>> {
             let mut ftp = self.connect()?;
 
             let path = self.0.path();
@@ -251,7 +251,7 @@ pub mod ftp {
 
             Ok(reader)
         }
-        pub async fn get_async(&self) -> suppaftp::FtpResult<impl tokio::io::AsyncRead> {
+        pub async fn get_async(&self) -> suppaftp::FtpResult<impl tokio::io::AsyncRead + use<>> {
             let mut ftp = self.connect_async().await?;
             let path = self.0.path();
             // TODO: we should clean-up the connection after the stream is done.
@@ -261,7 +261,7 @@ pub mod ftp {
         pub async fn get_retry_async(
             &self,
             retries: u64,
-        ) -> suppaftp::FtpResult<impl tokio::io::AsyncRead> {
+        ) -> suppaftp::FtpResult<impl tokio::io::AsyncRead + use<>> {
             for i in 0.. {
                 match self.get_async().await {
                     Ok(ok) => return Ok(ok),
