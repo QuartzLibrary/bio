@@ -412,6 +412,90 @@ impl<T> IndexMut<RangeFull> for SequenceSlice<T> {
         SequenceSlice::ref_cast_mut(&mut self.bases[index])
     }
 }
+
+impl<T, C> Index<ContigPosition<C>> for SequenceSlice<T> {
+    type Output = T;
+    #[track_caller]
+    fn index(&self, index: ContigPosition<C>) -> &Self::Output {
+        &self.bases[index.usize_pos()]
+    }
+}
+impl<T, C> IndexMut<ContigPosition<C>> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: ContigPosition<C>) -> &mut Self::Output {
+        &mut self.bases[index.usize_pos()]
+    }
+}
+
+impl<T, C> Index<Range<ContigPosition<C>>> for SequenceSlice<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: Range<ContigPosition<C>>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index.start.usize_pos()..index.end.usize_pos()])
+    }
+}
+impl<T, C> IndexMut<Range<ContigPosition<C>>> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: Range<ContigPosition<C>>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index.start.usize_pos()..index.end.usize_pos()])
+    }
+}
+impl<T, C> Index<RangeInclusive<ContigPosition<C>>> for SequenceSlice<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeInclusive<ContigPosition<C>>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index.start().usize_pos()..=index.end().usize_pos()])
+    }
+}
+impl<T, C> IndexMut<RangeInclusive<ContigPosition<C>>> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeInclusive<ContigPosition<C>>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(
+            &mut self.bases[index.start().usize_pos()..=index.end().usize_pos()],
+        )
+    }
+}
+impl<T, C> Index<RangeFrom<ContigPosition<C>>> for SequenceSlice<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeFrom<ContigPosition<C>>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index.start.usize_pos()..])
+    }
+}
+impl<T, C> IndexMut<RangeFrom<ContigPosition<C>>> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeFrom<ContigPosition<C>>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index.start.usize_pos()..])
+    }
+}
+impl<T, C> Index<RangeTo<ContigPosition<C>>> for SequenceSlice<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: RangeTo<ContigPosition<C>>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[..index.end.usize_pos()])
+    }
+}
+impl<T, C> IndexMut<RangeTo<ContigPosition<C>>> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: RangeTo<ContigPosition<C>>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[..index.end.usize_pos()])
+    }
+}
+
+impl<T, C> Index<ContigRange<C>> for SequenceSlice<T> {
+    type Output = SequenceSlice<T>;
+    #[track_caller]
+    fn index(&self, index: ContigRange<C>) -> &Self::Output {
+        SequenceSlice::ref_cast(&self.bases[index.usize_range()])
+    }
+}
+impl<T, C> IndexMut<ContigRange<C>> for SequenceSlice<T> {
+    #[track_caller]
+    fn index_mut(&mut self, index: ContigRange<C>) -> &mut Self::Output {
+        SequenceSlice::ref_cast_mut(&mut self.bases[index.usize_range()])
+    }
+}
+
 impl<T: Clone> ToOwned for SequenceSlice<T> {
     type Owned = Sequence<T>;
     fn to_owned(&self) -> Self::Owned {
