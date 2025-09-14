@@ -18,5 +18,6 @@ pub mod python;
 pub mod range;
 pub mod resource;
 pub mod serde_ext;
+pub mod task;
 pub mod time;
 pub mod wsl;
