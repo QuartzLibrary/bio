@@ -427,3 +427,212 @@ pub mod counting_set {
         }
     }
 }
+
+pub mod complete_map {
+    use serde::{Deserialize, Serialize};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        hash::Hash,
+        ops::{Index, IndexMut},
+    };
+
+    use crate::value::enumerable::Enumerable;
+
+    /// A map with the guarantee that every possible key is present.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(transparent)]
+    #[serde(bound(deserialize = "K: Deserialize<'de> + Hash + Eq, V: Deserialize<'de>"))]
+    pub struct CompleteHashMap<K, V>(HashMap<K, V>);
+    impl<K, V> CompleteHashMap<K, V> {
+        pub fn new(iter: HashMap<K, V>) -> Self
+        where
+            K: Enumerable + Hash + Eq,
+        {
+            let map = HashMap::from_iter(iter);
+            assert_eq!(map.len() as u128, K::N);
+            Self(map)
+        }
+        pub fn try_new(iter: HashMap<K, V>) -> Option<Self>
+        where
+            K: Enumerable + Hash + Eq,
+        {
+            let map = HashMap::from_iter(iter);
+            if map.len() as u128 == K::N {
+                Some(Self(map))
+            } else {
+                None
+            }
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.0.is_empty()
+        }
+        pub fn len(&self) -> usize {
+            self.0.len()
+        }
+
+        pub fn get<Q>(&self, key: &Q) -> &V
+        where
+            K: std::borrow::Borrow<Q> + Hash + Eq,
+            Q: Hash + Eq + ?Sized,
+        {
+            self.0.get(std::borrow::Borrow::borrow(key)).unwrap()
+        }
+        pub fn get_mut<Q>(&mut self, key: &Q) -> &mut V
+        where
+            K: std::borrow::Borrow<Q> + Hash + Eq,
+            Q: Hash + Eq + ?Sized,
+        {
+            self.0.get_mut(std::borrow::Borrow::borrow(key)).unwrap()
+        }
+
+        pub fn iter(&self) -> <&HashMap<K, V> as IntoIterator>::IntoIter {
+            self.0.iter()
+        }
+
+        pub fn clear(&mut self) {
+            self.0.clear();
+        }
+    }
+    impl<K, V> IntoIterator for CompleteHashMap<K, V>
+    where
+        K: Hash + Eq,
+    {
+        type Item = (K, V);
+        type IntoIter = std::collections::hash_map::IntoIter<K, V>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.into_iter()
+        }
+    }
+    impl<'a, K, V> IntoIterator for &'a CompleteHashMap<K, V>
+    where
+        K: Hash + Eq,
+    {
+        type Item = (&'a K, &'a V);
+        type IntoIter = std::collections::hash_map::Iter<'a, K, V>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.iter()
+        }
+    }
+    impl<K, Q, V> Index<&Q> for CompleteHashMap<K, V>
+    where
+        K: std::borrow::Borrow<Q> + Hash + Eq,
+        Q: Hash + Eq + ?Sized,
+    {
+        type Output = V;
+
+        fn index(&self, key: &Q) -> &V {
+            self.get(key)
+        }
+    }
+    impl<K, Q, V> IndexMut<&Q> for CompleteHashMap<K, V>
+    where
+        K: std::borrow::Borrow<Q> + Hash + Eq,
+        Q: Hash + Eq + ?Sized,
+    {
+        fn index_mut(&mut self, key: &Q) -> &mut V {
+            self.get_mut(key)
+        }
+    }
+
+    /// A map with the guarantee that every possible key is present.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(transparent)]
+    #[serde(bound(deserialize = "K: Deserialize<'de> + Ord, V: Deserialize<'de>"))]
+    pub struct CompleteBTreeMap<K, V>(BTreeMap<K, V>);
+    impl<K, V> CompleteBTreeMap<K, V> {
+        pub fn new(iter: BTreeMap<K, V>) -> Self
+        where
+            K: Enumerable + Ord,
+        {
+            let map = BTreeMap::from_iter(iter);
+            assert_eq!(map.len() as u128, K::N);
+            Self(map)
+        }
+        pub fn try_new(iter: BTreeMap<K, V>) -> Option<Self>
+        where
+            K: Enumerable + Ord,
+        {
+            let map = BTreeMap::from_iter(iter);
+            if map.len() as u128 == K::N {
+                Some(Self(map))
+            } else {
+                None
+            }
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.0.is_empty()
+        }
+        pub fn len(&self) -> usize {
+            self.0.len()
+        }
+
+        pub fn get<Q>(&self, key: &Q) -> &V
+        where
+            K: std::borrow::Borrow<Q> + Ord,
+            Q: Ord + ?Sized,
+        {
+            self.0.get(std::borrow::Borrow::borrow(key)).unwrap()
+        }
+        pub fn get_mut<Q>(&mut self, key: &Q) -> &mut V
+        where
+            K: std::borrow::Borrow<Q> + Ord,
+            Q: Ord + ?Sized,
+        {
+            self.0.get_mut(std::borrow::Borrow::borrow(key)).unwrap()
+        }
+
+        pub fn iter(&self) -> <&BTreeMap<K, V> as IntoIterator>::IntoIter {
+            self.0.iter()
+        }
+
+        pub fn clear(&mut self) {
+            self.0.clear();
+        }
+    }
+    impl<K, V> IntoIterator for CompleteBTreeMap<K, V>
+    where
+        K: Ord,
+    {
+        type Item = (K, V);
+        type IntoIter = std::collections::btree_map::IntoIter<K, V>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.into_iter()
+        }
+    }
+    impl<'a, K, V> IntoIterator for &'a CompleteBTreeMap<K, V>
+    where
+        K: Ord,
+    {
+        type Item = (&'a K, &'a V);
+        type IntoIter = std::collections::btree_map::Iter<'a, K, V>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            self.0.iter()
+        }
+    }
+    impl<K, Q, V> Index<&Q> for CompleteBTreeMap<K, V>
+    where
+        K: std::borrow::Borrow<Q> + Ord,
+        Q: Ord + ?Sized,
+    {
+        type Output = V;
+
+        fn index(&self, key: &Q) -> &V {
+            self.get(key)
+        }
+    }
+    impl<K, Q, V> IndexMut<&Q> for CompleteBTreeMap<K, V>
+    where
+        K: std::borrow::Borrow<Q> + Ord,
+        Q: Ord + ?Sized,
+    {
+        fn index_mut(&mut self, key: &Q) -> &mut V {
+            self.get_mut(key)
+        }
+    }
+}
