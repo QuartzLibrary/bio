@@ -2,6 +2,7 @@ use core::str;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+use utile::value::enumerable::Enumerable;
 
 use crate::sequence::{AsciiChar, Sequence, SequenceSlice};
 
@@ -126,6 +127,10 @@ impl DnaBase {
         }
     }
 
+    pub fn iter() -> impl Iterator<Item = Self> {
+        [Self::A, Self::C, Self::G, Self::T].into_iter()
+    }
+
     // Check if the nucleotide is a purine (A or G)
     pub fn is_purine(&self) -> bool {
         matches!(self, Self::A | Self::G)
@@ -140,6 +145,9 @@ impl From<DnaBase> for u8 {
     fn from(value: DnaBase) -> Self {
         value.to_byte()
     }
+}
+impl Enumerable for DnaBase {
+    const N: u128 = 4;
 }
 impl AsciiChar for DnaBase {
     fn encode(bases: &[Self]) -> String
@@ -416,6 +424,10 @@ impl AmbiguousDnaBase {
         }
     }
 
+    pub fn iter() -> impl Iterator<Item = Self> {
+        [Self::A, Self::C, Self::G, Self::T, Self::N].into_iter()
+    }
+
     // Check if the nucleotide is a purine (A or G)
     pub fn is_purine(&self) -> bool {
         matches!(self, Self::A | Self::G)
@@ -433,6 +445,9 @@ impl From<AmbiguousDnaBase> for u8 {
     fn from(value: AmbiguousDnaBase) -> Self {
         value.to_byte()
     }
+}
+impl Enumerable for AmbiguousDnaBase {
+    const N: u128 = 5;
 }
 impl AsciiChar for AmbiguousDnaBase {
     fn encode(bases: &[Self]) -> String
@@ -586,6 +601,27 @@ impl IupacDnaBase {
         }
     }
 
+    pub fn iter() -> impl Iterator<Item = Self> {
+        [
+            Self::A,
+            Self::C,
+            Self::G,
+            Self::T,
+            Self::R,
+            Self::Y,
+            Self::S,
+            Self::W,
+            Self::K,
+            Self::M,
+            Self::B,
+            Self::D,
+            Self::H,
+            Self::V,
+            Self::N,
+        ]
+        .into_iter()
+    }
+
     pub fn is_purine(&self) -> bool {
         matches!(self, Self::A | Self::G | Self::R)
     }
@@ -600,6 +636,9 @@ impl From<IupacDnaBase> for u8 {
     fn from(value: IupacDnaBase) -> Self {
         value.to_byte()
     }
+}
+impl Enumerable for IupacDnaBase {
+    const N: u128 = 15;
 }
 impl AsciiChar for IupacDnaBase {
     fn encode(bases: &[Self]) -> String
@@ -714,5 +753,23 @@ mod eq {
         fn eq(&self, other: &DnaBase) -> bool {
             *self as u8 == *other as u8
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn counts() {
+        assert_eq!(DnaBase::iter().count() as u128, <DnaBase as Enumerable>::N);
+        assert_eq!(
+            AmbiguousDnaBase::iter().count() as u128,
+            <AmbiguousDnaBase as Enumerable>::N
+        );
+        assert_eq!(
+            IupacDnaBase::iter().count() as u128,
+            <IupacDnaBase as Enumerable>::N
+        );
     }
 }

@@ -20,4 +20,5 @@ pub mod resource;
 pub mod serde_ext;
 pub mod task;
 pub mod time;
+pub mod value;
 pub mod wsl;
