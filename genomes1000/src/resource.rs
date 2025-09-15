@@ -138,11 +138,15 @@ impl Genomes1000Resource {
 
     fn high_coverage_genotypes_chr_vcf(chr: usize) -> Self {
         assert!((1..=22).contains(&chr));
-        Self::new(format!("{CHR_BASE}/1kGP_high_coverage_Illumina.chr{chr}.filtered.SNV_INDEL_SV_phased_panel.vcf.gz"))
+        Self::new(format!(
+            "{CHR_BASE}/1kGP_high_coverage_Illumina.chr{chr}.filtered.SNV_INDEL_SV_phased_panel.vcf.gz"
+        ))
     }
     fn high_coverage_genotypes_chr_vcf_index(chr: usize) -> Self {
         assert!((1..=22).contains(&chr));
-        Self::new(format!("{CHR_BASE}/1kGP_high_coverage_Illumina.chr{chr}.filtered.SNV_INDEL_SV_phased_panel.vcf.gz.tbi"))
+        Self::new(format!(
+            "{CHR_BASE}/1kGP_high_coverage_Illumina.chr{chr}.filtered.SNV_INDEL_SV_phased_panel.vcf.gz.tbi"
+        ))
     }
 
     pub fn url(&self) -> Url {
@@ -303,11 +307,15 @@ mod old {
 
         fn old_phase_3_chr_vcf(chr: usize) -> Self {
             assert!((1..=22).contains(&chr));
-            Self::new(format!("{CHR_BASE}/ALL.chr{chr}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz"))
+            Self::new(format!(
+                "{CHR_BASE}/ALL.chr{chr}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz"
+            ))
         }
         fn old_phase_3_chr_vcf_index(chr: usize) -> Self {
             assert!((1..=22).contains(&chr));
-            Self::new(format!("{CHR_BASE}/ALL.chr{chr}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz.tbi"))
+            Self::new(format!(
+                "{CHR_BASE}/ALL.chr{chr}.phase3_shapeit2_mvncall_integrated_v5b.20130502.genotypes.vcf.gz.tbi"
+            ))
         }
     }
 }

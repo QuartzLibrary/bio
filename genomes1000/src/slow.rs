@@ -3,7 +3,7 @@ use utile::resource::{RawResource, RawResourceExt};
 
 use crate::resource::Genomes1000Resource;
 
-use super::{parse, AltGenotype, GRCh38Contig};
+use super::{AltGenotype, GRCh38Contig, parse};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SerdeRecord {
@@ -64,7 +64,7 @@ mod string_sequence {
     use core::fmt;
     use std::{fmt::Write, str::FromStr};
 
-    use serde::{de::Error, Deserialize};
+    use serde::{Deserialize, de::Error};
 
     const SEPARATOR: char = ',';
 

@@ -1,7 +1,7 @@
 use std::{fmt, io::BufRead, path::Path, str::FromStr};
 
 use hyperx::header::{ContentDisposition, DispositionParam, DispositionType, Header};
-use reqwest::header::{HeaderMap, CONTENT_DISPOSITION, CONTENT_LENGTH};
+use reqwest::header::{CONTENT_DISPOSITION, CONTENT_LENGTH, HeaderMap};
 
 pub mod read_ext {
     use std::{

@@ -344,7 +344,9 @@ pub mod orientation {
             self.overlaps_with(b, self.v.contig.size())
         }
 
-        pub fn iter_positions(&self) -> impl Iterator<Item = WithOrientation<ContigPosition<C>>> + use<C>
+        pub fn iter_positions(
+            &self,
+        ) -> impl Iterator<Item = WithOrientation<ContigPosition<C>>> + use<C>
         where
             C: Clone,
         {
@@ -557,7 +559,7 @@ mod math {
 mod noodles {
     use std::{fmt, ops::Range};
 
-    use noodles::core::{region::Interval, Position, Region};
+    use noodles::core::{Position, Region, region::Interval};
 
     use super::{ContigPosition, ContigRange};
 

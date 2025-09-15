@@ -1,7 +1,7 @@
 pub mod cli;
 pub mod web;
 
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};

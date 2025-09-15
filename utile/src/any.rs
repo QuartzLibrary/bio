@@ -5,11 +5,7 @@ pub trait AnyMap: Sized {
         f(self)
     }
     fn any_map_if(self, if_: bool, f: impl FnOnce(Self) -> Self) -> Self {
-        if if_ {
-            f(self)
-        } else {
-            self
-        }
+        if if_ { f(self) } else { self }
     }
 }
 

@@ -4,11 +4,11 @@ use std::{
 };
 
 use ordered_float::NotNan;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tar::Archive;
 
 use ids::{
-    pgs::{pgp::PgpId, ppm::PpmId, pss::PssId, PgsId},
+    pgs::{PgsId, pgp::PgpId, ppm::PpmId, pss::PssId},
     pubmed::PubmedId,
 };
 use url::Url;
@@ -514,9 +514,9 @@ mod pgs_bool {
             where
                 E: serde::de::Error,
             {
-                match v{
+                match v {
                     "True" | "TRUE" => Ok(true),
-                    "False" |"FALSE" => Ok(false),
+                    "False" | "FALSE" => Ok(false),
                     "" => unreachable!(),
                     _ => Err(serde::de::Error::custom(format!(
                         "invalid boolean value. Expected 'True'/'TRUE' or 'False'/'FALSE', found '{v}'."

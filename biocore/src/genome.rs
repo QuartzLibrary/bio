@@ -5,8 +5,8 @@ use utile::range::RangeExt;
 use crate::{
     dna::DnaBase,
     location::{
-        orientation::{SequenceOrientation, WithOrientation},
         ContigPosition, ContigRange,
+        orientation::{SequenceOrientation, WithOrientation},
     },
     sequence::{Sequence, SequenceSlice},
 };

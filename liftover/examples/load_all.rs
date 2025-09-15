@@ -1,6 +1,6 @@
 use liftover::{
-    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
     Liftover,
+    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
 };
 use utile::resource::RawResourceExt;
 

@@ -6,7 +6,7 @@ use std::{
 };
 
 use noodles::fasta::{
-    io::{reader::Records, Reader},
+    io::{Reader, reader::Records},
     record::Definition,
 };
 

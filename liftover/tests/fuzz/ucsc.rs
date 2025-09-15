@@ -3,9 +3,9 @@ use std::path::Path;
 use biocore::location::{ContigPosition, ContigRange};
 
 use liftover::{
+    Liftover,
     bindings::{self, ucsc::UcscLiftoverSettings},
     sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
-    Liftover,
 };
 use utile::resource::{RawResource, RawResourceExt};
 

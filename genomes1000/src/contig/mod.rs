@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use serde::{de::Unexpected, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Unexpected};
 use utile::io::FromUtf8Bytes;
 
 use biocore::genome::Contig;

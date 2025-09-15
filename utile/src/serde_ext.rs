@@ -5,8 +5,8 @@ use std::{
 };
 
 use serde::{
-    de::{EnumAccess, SeqAccess, Unexpected, VariantAccess, Visitor},
     Deserializer,
+    de::{EnumAccess, SeqAccess, Unexpected, VariantAccess, Visitor},
 };
 use serde_with::formats::{CommaSeparator, SemicolonSeparator, SpaceSeparator};
 

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use ids::pgs::PgsId;
-use pgs_catalog::{metadata::Metadata, Allele, GenomeBuild, HarmonizedStudy, Study};
+use pgs_catalog::{Allele, GenomeBuild, HarmonizedStudy, Study, metadata::Metadata};
 
 #[tokio::main]
 async fn main() {

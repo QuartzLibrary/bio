@@ -182,7 +182,7 @@ range_len!(isize);
 mod tests {
     use std::collections::HashSet;
 
-    use rand::{rngs::SmallRng, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng, rngs::SmallRng};
 
     use crate::range::RangeExt;
 

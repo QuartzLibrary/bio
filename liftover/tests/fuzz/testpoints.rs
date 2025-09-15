@@ -1,4 +1,4 @@
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::{collections::BTreeMap, ops::Range};
 
 use biocore::{
@@ -8,8 +8,8 @@ use biocore::{
 use utile::resource::{RawResource, RawResourceExt};
 
 use liftover::{
-    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
     Chain, Liftover,
+    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
 };
 
 /// Generates and caches the testpoints.

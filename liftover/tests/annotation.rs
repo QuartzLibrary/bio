@@ -21,8 +21,21 @@ fn annotate_chain() {
             // Parse the chain header
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() == 13 {
-                let [_chain, _score, _t_name, _t_size, _t_strand, t_start, _t_end, _q_name, _q_size, _q_strand, q_start, _q_end, _id] =
-                    parts[..]
+                let [
+                    _chain,
+                    _score,
+                    _t_name,
+                    _t_size,
+                    _t_strand,
+                    t_start,
+                    _t_end,
+                    _q_name,
+                    _q_size,
+                    _q_strand,
+                    q_start,
+                    _q_end,
+                    _id,
+                ] = parts[..]
                 else {
                     panic!("Unexpected header format");
                 };

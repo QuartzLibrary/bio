@@ -197,8 +197,8 @@ pub struct GwasCatalogAssociation {
     // v1.0.2.1 (none)
 }
 impl GwasCatalogAssociation {
-    pub async fn get_latest(
-    ) -> Result<impl Iterator<Item = Result<Self, csv::Error>>, std::io::Error> {
+    pub async fn get_latest()
+    -> Result<impl Iterator<Item = Result<Self, csv::Error>>, std::io::Error> {
         let resource = GwasCatalogResource::get_latest_associations()
             .await?
             .log_progress()
@@ -368,8 +368,8 @@ pub struct GwasCatalogStudy {
     pub summary_stats_location: String,
 }
 impl GwasCatalogStudy {
-    pub async fn get_latest(
-    ) -> Result<impl Iterator<Item = Result<Self, csv::Error>>, std::io::Error> {
+    pub async fn get_latest()
+    -> Result<impl Iterator<Item = Result<Self, csv::Error>>, std::io::Error> {
         let resource = GwasCatalogResource::get_latest_studies()
             .await?
             .log_progress()
@@ -445,8 +445,8 @@ pub struct GwasCatalogAncestry {
     pub sample_description: String,
 }
 impl GwasCatalogAncestry {
-    pub async fn get_latest(
-    ) -> Result<impl Iterator<Item = Result<Self, csv::Error>>, std::io::Error> {
+    pub async fn get_latest()
+    -> Result<impl Iterator<Item = Result<Self, csv::Error>>, std::io::Error> {
         let resource = GwasCatalogResource::get_latest_ancestries()
             .await?
             .log_progress()

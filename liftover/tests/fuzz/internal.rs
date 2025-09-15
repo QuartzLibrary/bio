@@ -1,8 +1,8 @@
 use biocore::location::{ContigPosition, ContigRange};
 
 use liftover::{
-    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
     Liftover, LiftoverIndexed,
+    sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
 };
 use utile::resource::{RawResource, RawResourceExt};
 
