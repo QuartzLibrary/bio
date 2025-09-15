@@ -33,7 +33,7 @@ impl PythonMap {
 
         {
             let mut temp = std::fs::File::create(script_path.clone())?;
-            temp.write_all(function.stream_script().script().as_bytes())?;
+            temp.write_all(function.stream_script()?.script().as_bytes())?;
             temp.flush()?;
         }
 
@@ -115,8 +115,8 @@ async fn wait_for_marker(reader: impl AsyncBufRead, marker: &str) -> io::Result<
     }
 }
 impl PythonFunction {
-    fn stream_script(&self) -> PythonScript {
-        let (output, parse_input) = self.output_and_parse_input();
+    fn stream_script(&self) -> io::Result<PythonScript> {
+        let (output, parse_input) = self.output_and_parse_input()?;
 
         let function = &self.function;
 
@@ -179,11 +179,11 @@ if __name__ == "__main__":
 "##
         );
 
-        PythonScript {
+        Ok(PythonScript {
             python_version: self.python_version.clone(),
             dependencies: self.deps(),
             content,
-        }
+        })
     }
 }
 

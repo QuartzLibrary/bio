@@ -27,7 +27,7 @@ pub type PyFnOutput<T> = (WithStdoutStderr<Result<T, String>>, Output);
 #[cfg(not(target_arch = "wasm32"))]
 impl PythonFunction {
     pub async fn run(&self, input: impl AsRef<[u8]>) -> io::Result<PyFnOutput<Value>> {
-        let output = self.script().run(input).await?;
+        let output = self.script()?.run(input).await?;
         let structured: MaybeWithStdoutStderr<Value> = serde_json::from_slice(&output.stdout)?;
         let structured = structured.unpack()?;
         Ok((structured, output))
@@ -38,7 +38,7 @@ impl PythonFunction {
         Out: DeserializeOwned + fmt::Debug,
     {
         let output = self
-            .script()
+            .script()?
             .run(&serde_json::to_vec(&input).unwrap())
             .await?;
         let value: MaybeWithStdoutStderr<Out> = serde_json::from_slice(&output.stdout).unwrap();
@@ -47,7 +47,7 @@ impl PythonFunction {
     }
 
     pub fn run_blocking(&self, input: impl AsRef<[u8]>) -> io::Result<PyFnOutput<Value>> {
-        let output = self.script().run_blocking(input)?;
+        let output = self.script()?.run_blocking(input)?;
         let structured: MaybeWithStdoutStderr<Value> = serde_json::from_slice(&output.stdout)?;
         let structured = structured.unpack()?;
         Ok((structured, output))
@@ -57,7 +57,7 @@ impl PythonFunction {
         In: Serialize,
         Out: DeserializeOwned + fmt::Debug,
     {
-        let output = self.script().run_blocking(&serde_json::to_vec(&input)?)?;
+        let output = self.script()?.run_blocking(&serde_json::to_vec(&input)?)?;
         let value: MaybeWithStdoutStderr<Out> = serde_json::from_slice(&output.stdout)?;
         let value = value.unpack()?;
         Ok((value, output))
@@ -69,8 +69,8 @@ impl PythonFunction {
 }
 #[cfg(not(target_arch = "wasm32"))]
 impl PythonFunction {
-    fn script(&self) -> PythonScript {
-        let (output, parse_input) = self.output_and_parse_input();
+    fn script(&self) -> io::Result<PythonScript> {
+        let (output, parse_input) = self.output_and_parse_input()?;
 
         let function = &self.function;
 
@@ -127,11 +127,11 @@ if __name__ == "__main__":
 "##
         );
 
-        PythonScript {
+        Ok(PythonScript {
             python_version: self.python_version.clone(),
             dependencies: self.deps(),
             content,
-        }
+        })
     }
 }
 #[cfg(not(target_arch = "wasm32"))]
@@ -143,7 +143,7 @@ impl PythonFunction {
         }
         deps
     }
-    pub(super) fn output_and_parse_input(&self) -> (&str, String) {
+    pub(super) fn output_and_parse_input(&self) -> io::Result<(&str, String)> {
         static FN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             let var = "[a-zA-Z0-9_-]+";
             let type_ = "[a-zA-Z0-9\\[\\]_-]+";
@@ -155,7 +155,12 @@ impl PythonFunction {
 
         let capture = {
             let mut captures = FN_REGEX.captures_iter(&self.function);
-            let capture = captures.next().unwrap();
+            let Some(capture) = captures.next() else {
+                return Err(io::Error::other(format!(
+                    "# No matches for the `process` function:\n{}",
+                    self.function
+                )));
+            };
             assert!(captures.next().is_none());
             capture
         };
@@ -173,7 +178,7 @@ impl PythonFunction {
             "json.loads(raw_input)".to_owned()
         };
 
-        (output, parse_input)
+        Ok((output, parse_input))
     }
 }
 
