@@ -10,6 +10,10 @@ use super::script::PythonScript;
 pub struct PythonFunction {
     pub python_version: String,
     pub dependencies: Vec<String>,
+    /// The function must be valid Python code and expose a `process` function
+    /// that takes a single argument and returns a single value.
+    ///
+    /// The input and output types must be typed and JSON serializable.
     pub function: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -142,7 +146,7 @@ impl PythonFunction {
     pub(super) fn output_and_parse_input(&self) -> (&str, String) {
         static FN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             let var = "[a-zA-Z0-9_-]+";
-            let type_ = "[a-zA-Z0-9_-]+";
+            let type_ = "[a-zA-Z0-9\\[\\]_-]+";
             Regex::new(&format!(
                 r"def\s+process\({var}\s*:\s*(?<input>{type_})\)\s*->\s*(?<output>{type_}):\s*\n",
             ))
