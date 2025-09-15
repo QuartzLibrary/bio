@@ -187,25 +187,118 @@ if __name__ == "__main__":
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+type TestValue = (Value, WithStdoutStderr<Result<Value, String>>);
+impl PythonMap {
+    pub fn test_values() -> Vec<(Self, Vec<TestValue>)> {
+        vec![Self::simple(), Self::dep(), Self::exception()]
+    }
 
-    const PYTHON_VERSION: &str = "==3.10";
-    const FUNCTION: &str = "
+    fn simple() -> (Self, Vec<TestValue>) {
+        const PYTHON_VERSION: &str = "==3.10";
+        const FUNCTION: &str = "
 def process(input: int) -> int:
     print(\"hello\")
     return input + 2
 ";
 
+        let values = vec![(
+            Value::Number(40.into()),
+            WithStdoutStderr {
+                value: Ok(Value::Number(42.into())),
+                stdout: "hello\n".to_string(),
+                stderr: "".to_string(),
+            },
+        )];
+
+        (
+            PythonFunction {
+                python_version: PYTHON_VERSION.to_string(),
+                dependencies: vec![],
+                function: FUNCTION.to_string(),
+            }
+            .into_map()
+            .unwrap(),
+            values,
+        )
+    }
+
+    fn dep() -> (Self, Vec<TestValue>) {
+        const PYTHON_VERSION: &str = "==3.10";
+        const FUNCTION: &str = "
+import numpy as np
+def process(x: int) -> list[int]:
+    return np.array(x).tolist()
+";
+
+        let values = vec![(
+            Value::Array(vec![Value::Number(40.into())]),
+            WithStdoutStderr {
+                value: Ok(Value::Array(vec![Value::Number(40.into())])),
+                stdout: "".to_string(),
+                stderr: "".to_string(),
+            },
+        )];
+
+        (
+            PythonFunction {
+                python_version: PYTHON_VERSION.to_string(),
+                dependencies: vec!["numpy".to_owned(), "pandas".to_owned()],
+                function: FUNCTION.to_string(),
+            }
+            .into_map()
+            .unwrap(),
+            values,
+        )
+    }
+
+    fn exception() -> (Self, Vec<TestValue>) {
+        const PYTHON_VERSION: &str = "==3.10";
+        const FUNCTION: &str = "
+def process(input: int) -> int:
+    print(\"hello\")
+    raise Exception('This is a test')
+";
+        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 53, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+
+        let values = vec![(
+            Value::Number(40.into()),
+            WithStdoutStderr {
+                value: Err(ERROR.to_string()),
+                stdout: "hello\n".to_string(),
+                stderr: "".to_string(),
+            },
+        )];
+
+        (
+            PythonFunction {
+                python_version: PYTHON_VERSION.to_string(),
+                dependencies: vec![],
+                function: FUNCTION.to_string(),
+            }
+            .into_map()
+            .unwrap(),
+            values,
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn basic() {
+        for (mut map, values) in PythonMap::test_values() {
+            for (input, expected) in values {
+                let structured = map.run(serde_json::to_vec(&input).unwrap()).await.unwrap();
+                assert_eq!(structured, expected);
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_map() {
-        let function = PythonFunction {
-            python_version: PYTHON_VERSION.to_string(),
-            dependencies: vec![],
-            function: FUNCTION.to_string(),
-        };
-        let mut map = function.into_map().unwrap();
+        let (mut map, _) = PythonMap::simple();
 
         let structured = map.run(b"40").await.unwrap();
         assert_eq!(
@@ -235,12 +328,7 @@ def process(input: int) -> int:
 
     #[tokio::test]
     async fn test_map_typed() {
-        let function = PythonFunction {
-            python_version: PYTHON_VERSION.to_string(),
-            dependencies: vec![],
-            function: FUNCTION.to_string(),
-        };
-        let mut map = function.into_map().unwrap();
+        let (mut map, _) = PythonMap::simple();
         let structured = map.run_typed::<_, i32>(40).await.unwrap();
         assert_eq!(
             structured,
@@ -271,23 +359,11 @@ def process(input: int) -> int:
 mod exception_tests {
     use super::*;
 
-    const PYTHON_VERSION: &str = "==3.10";
-    const FUNCTION: &str = "
-def process(input: int) -> int:
-    print(\"hello\")
-    raise Exception('This is a test')
-";
-
     const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 53, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
     #[tokio::test]
     async fn test_map_exception() {
-        let function = PythonFunction {
-            python_version: PYTHON_VERSION.to_string(),
-            dependencies: vec![],
-            function: FUNCTION.to_string(),
-        };
-        let mut map = function.into_map().unwrap();
+        let (mut map, _) = PythonMap::exception();
 
         let structured = map.run(b"40").await.unwrap();
         assert_eq!(

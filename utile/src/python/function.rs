@@ -216,24 +216,115 @@ impl<T: fmt::Debug> MaybeWithStdoutStderr<T> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+type TestValue = (Value, WithStdoutStderr<Result<Value, String>>);
+impl PythonFunction {
+    pub fn test_values() -> Vec<(Self, Vec<TestValue>)> {
+        vec![Self::simple(), Self::dep(), Self::exception()]
+    }
 
-    const PYTHON_VERSION: &str = "==3.10";
-    const FUNCTION: &str = "
+    fn simple() -> (Self, Vec<TestValue>) {
+        const PYTHON_VERSION: &str = "==3.10";
+        const FUNCTION: &str = "
 def process(input: int) -> int:
     print(\"hello\")
     return input + 2
 ";
 
+        let values = vec![(
+            Value::Number(40.into()),
+            WithStdoutStderr {
+                value: Ok(Value::Number(42.into())),
+                stdout: "hello\n".to_string(),
+                stderr: "".to_string(),
+            },
+        )];
+
+        (
+            Self {
+                python_version: PYTHON_VERSION.to_string(),
+                dependencies: vec![],
+                function: FUNCTION.to_string(),
+            },
+            values,
+        )
+    }
+
+    fn dep() -> (Self, Vec<TestValue>) {
+        const PYTHON_VERSION: &str = "==3.10";
+        const FUNCTION: &str = "
+import numpy as np
+def process(x: int) -> list[int]:
+    return np.array(x).tolist()
+";
+
+        let values = vec![(
+            Value::Array(vec![Value::Number(40.into())]),
+            WithStdoutStderr {
+                value: Ok(Value::Array(vec![Value::Number(40.into())])),
+                stdout: "".to_string(),
+                stderr: "".to_string(),
+            },
+        )];
+
+        (
+            Self {
+                python_version: PYTHON_VERSION.to_string(),
+                dependencies: vec!["numpy".to_owned(), "pandas".to_owned()],
+                function: FUNCTION.to_string(),
+            },
+            values,
+        )
+    }
+
+    fn exception() -> (Self, Vec<TestValue>) {
+        const PYTHON_VERSION: &str = "==3.10";
+        const FUNCTION: &str = "
+def process(input: int) -> int:
+    print(\"hello\")
+    raise Exception('This is a test')
+";
+        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 47, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+
+        let values = vec![(
+            Value::Number(40.into()),
+            WithStdoutStderr {
+                value: Err(ERROR.to_string()),
+                stdout: "hello\n".to_string(),
+                stderr: "".to_string(),
+            },
+        )];
+
+        (
+            Self {
+                python_version: PYTHON_VERSION.to_string(),
+                dependencies: vec![],
+                function: FUNCTION.to_string(),
+            },
+            values,
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn basic() {
+        for (function, values) in PythonFunction::test_values() {
+            for (input, expected) in values {
+                let (structured, _output) = function
+                    .run(serde_json::to_vec(&input).unwrap())
+                    .await
+                    .unwrap();
+                assert_eq!(structured, expected);
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_run_function() {
-        let function = PythonFunction {
-            python_version: PYTHON_VERSION.to_string(),
-            dependencies: vec![],
-            function: FUNCTION.to_string(),
-        };
+        let (function, _) = PythonFunction::simple();
         let (structured, output) = function.run(b"40").await.unwrap();
         println!("{output:?}");
         let Output {
@@ -263,11 +354,7 @@ def process(input: int) -> int:
     }
     #[test]
     fn test_run_function_blocking() {
-        let function = PythonFunction {
-            python_version: PYTHON_VERSION.to_string(),
-            dependencies: vec![],
-            function: FUNCTION.to_string(),
-        };
+        let (function, _) = PythonFunction::simple();
         let (structured, output) = function.run_blocking(b"40").unwrap();
         println!("{output:?}");
         let Output {
@@ -298,11 +385,7 @@ def process(input: int) -> int:
 
     #[tokio::test]
     async fn test_run_typed_function() {
-        let function = PythonFunction {
-            python_version: PYTHON_VERSION.to_string(),
-            dependencies: vec![],
-            function: FUNCTION.to_string(),
-        };
+        let (function, _) = PythonFunction::simple();
         let (structured, output) = function.run_typed::<_, i32>(40).await.unwrap();
         println!("{output:?}");
         let Output {
@@ -332,11 +415,7 @@ def process(input: int) -> int:
     }
     #[test]
     fn test_run_typed_function_blocking() {
-        let function = PythonFunction {
-            python_version: PYTHON_VERSION.to_string(),
-            dependencies: vec![],
-            function: FUNCTION.to_string(),
-        };
+        let (function, _) = PythonFunction::simple();
         let (structured, output) = function.run_typed_blocking::<_, i32>(40).unwrap();
         println!("{output:?}");
         let Output {
@@ -370,23 +449,12 @@ def process(input: int) -> int:
 mod exception_tests {
     use super::*;
 
-    const PYTHON_VERSION: &str = "==3.10";
-    const FUNCTION: &str = "
-def process(input: int) -> int:
-    print(\"hello\")
-    raise Exception('This is a test')
-";
-
     const STDOUT: &str = "{\"value\":null,\"error\":\"Traceback (most recent call last):\\n  File \\\"/temp_folder/script.py\\\", line 47, in main\\n    result = process(input)\\n  File \\\"/temp_folder/script.py\\\", line 19, in process\\n    raise Exception('This is a test')\\nException: This is a test\\n\",\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n";
     const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 47, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
     #[tokio::test]
     async fn test_run_function_exception() {
-        let function = PythonFunction {
-            python_version: PYTHON_VERSION.to_string(),
-            dependencies: vec![],
-            function: FUNCTION.to_string(),
-        };
+        let (function, _) = PythonFunction::exception();
         let (structured, output) = function.run(b"40").await.unwrap();
         println!("{output:?}");
         let Output {
@@ -413,11 +481,7 @@ def process(input: int) -> int:
     }
     #[test]
     fn test_run_function_exception_blocking() {
-        let function = PythonFunction {
-            python_version: PYTHON_VERSION.to_string(),
-            dependencies: vec![],
-            function: FUNCTION.to_string(),
-        };
+        let (function, _) = PythonFunction::exception();
         let (structured, output) = function.run_blocking(b"40").unwrap();
         println!("{output:?}");
         let Output {
