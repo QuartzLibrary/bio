@@ -63,8 +63,8 @@ impl PythonFunction {
         Ok((value, output))
     }
 
-    pub fn into_map(self) -> io::Result<super::map::PythonMap> {
-        super::map::PythonMap::new(&self)
+    pub async fn into_map(self) -> io::Result<super::map::PythonMap> {
+        super::map::PythonMap::new(&self).await
     }
 }
 #[cfg(not(target_arch = "wasm32"))]
@@ -75,18 +75,17 @@ impl PythonFunction {
         let function = &self.function;
 
         let content = format!(
-            r##"
-import sys
-import os
-import io
-import traceback
-import json
-from contextlib import redirect_stdout, redirect_stderr
-from pydantic import BaseModel
-
-{function}
+            r##"{function}
 
 def main():
+    import sys
+    import os
+    import io
+    import traceback
+    import json
+    from contextlib import redirect_stdout, redirect_stderr
+    from pydantic import BaseModel
+    
     class __InternalOutputModel(BaseModel):
         value: {output} | None
         error: str | None
@@ -231,7 +230,7 @@ impl PythonFunction {
         vec![Self::simple(), Self::dep(), Self::exception()]
     }
 
-    fn simple() -> (Self, Vec<TestValue>) {
+    pub(super) fn simple() -> (Self, Vec<TestValue>) {
         const PYTHON_VERSION: &str = "==3.10";
         const FUNCTION: &str = "
 def process(input: int) -> int:
@@ -258,7 +257,7 @@ def process(input: int) -> int:
         )
     }
 
-    fn dep() -> (Self, Vec<TestValue>) {
+    pub(super) fn dep() -> (Self, Vec<TestValue>) {
         const PYTHON_VERSION: &str = "==3.10";
         const FUNCTION: &str = "
 import numpy as np
@@ -285,14 +284,14 @@ def process(x: int) -> list[int]:
         )
     }
 
-    fn exception() -> (Self, Vec<TestValue>) {
+    pub(super) fn exception() -> (Self, Vec<TestValue>) {
         const PYTHON_VERSION: &str = "==3.10";
         const FUNCTION: &str = "
 def process(input: int) -> int:
     print(\"hello\")
     raise Exception('This is a test')
 ";
-        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 47, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 46, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
         let values = vec![(
             Value::Number(40.into()),
@@ -344,7 +343,9 @@ mod tests {
         assert!(status.success());
         assert_eq!(
             stdout,
-            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
+            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n",
+            "{:?}",
+            String::from_utf8_lossy(stdout)
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
@@ -374,7 +375,9 @@ mod tests {
         assert!(status.success());
         assert_eq!(
             stdout,
-            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
+            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n",
+            "{:?}",
+            String::from_utf8_lossy(stdout)
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
@@ -405,7 +408,9 @@ mod tests {
         assert!(status.success());
         assert_eq!(
             stdout,
-            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
+            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n",
+            "{:?}",
+            String::from_utf8_lossy(stdout)
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
@@ -435,7 +440,9 @@ mod tests {
         assert!(status.success());
         assert_eq!(
             stdout,
-            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
+            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n",
+            "{:?}",
+            String::from_utf8_lossy(stdout)
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
@@ -458,8 +465,8 @@ mod tests {
 mod exception_tests {
     use super::*;
 
-    const STDOUT: &str = "{\"value\":null,\"error\":\"Traceback (most recent call last):\\n  File \\\"/temp_folder/script.py\\\", line 47, in main\\n    result = process(input)\\n  File \\\"/temp_folder/script.py\\\", line 19, in process\\n    raise Exception('This is a test')\\nException: This is a test\\n\",\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n";
-    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 47, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+    const STDOUT: &str = "{\"value\":null,\"error\":\"Traceback (most recent call last):\\n  File \\\"/temp_folder/script.py\\\", line 46, in main\\n    result = process(input)\\n  File \\\"/temp_folder/script.py\\\", line 10, in process\\n    raise Exception('This is a test')\\nException: This is a test\\n\",\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n";
+    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 46, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
     #[tokio::test]
     async fn test_run_function_exception() {
@@ -472,7 +479,12 @@ mod exception_tests {
             stderr,
         } = &output;
         assert!(status.success());
-        assert_eq!(stdout, STDOUT.as_bytes(),);
+        assert_eq!(
+            stdout,
+            STDOUT.as_bytes(),
+            "{:?}",
+            String::from_utf8_lossy(stdout)
+        );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
             stderr
@@ -499,7 +511,12 @@ mod exception_tests {
             stderr,
         } = &output;
         assert!(status.success());
-        assert_eq!(stdout, STDOUT.as_bytes());
+        assert_eq!(
+            stdout,
+            STDOUT.as_bytes(),
+            "{:?}",
+            String::from_utf8_lossy(stdout)
+        );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
             stderr
