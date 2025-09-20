@@ -14,6 +14,7 @@ pub async fn sleep(duration: Duration) {
 
     #[cfg(target_family = "wasm")]
     {
+        // The usage of the channel makes this `Send` + `Sync`.
         let (send, recv) = futures::channel::oneshot::channel();
         wasm_bindgen_futures::spawn_local(async move {
             gloo_timers::future::sleep(duration).await;
