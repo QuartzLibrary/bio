@@ -3277,6 +3277,7 @@ dependencies = [
  "tokio-util",
  "url",
  "wasm-bindgen-futures",
+ "web-time",
 ]
 
 [[package]]
