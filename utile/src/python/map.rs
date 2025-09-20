@@ -5,10 +5,11 @@ use std::{
     process::Stdio,
 };
 
+use futures::FutureExt;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use tempfile::TempDir;
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWriteExt as _};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt as _};
 
 use super::{
     function::{MaybeWithStdoutStderr, PythonFunction, WithStdoutStderr},
@@ -20,21 +21,26 @@ const SCRIPT_START_MARKER: &str = "c5b70a4e-69e8-4af2-ae50-2c392e6e2132";
 #[derive(Debug)]
 pub struct PythonMap {
     _tempdir: TempDir,
+    #[expect(dead_code)]
     child: tokio::process::Child,
+    stdin: tokio::process::ChildStdin,
     stdout: tokio::io::BufReader<tokio::process::ChildStdout>,
+    #[expect(dead_code)]
     stderr: tokio::io::BufReader<tokio::process::ChildStderr>,
-    first: bool,
 }
 impl PythonMap {
-    pub(super) fn new(function: &PythonFunction) -> io::Result<Self> {
+    pub(super) async fn new(function: &PythonFunction) -> io::Result<Self> {
         let dir = tempfile::Builder::new().suffix("python_exec").tempdir()?;
 
         let script_path = dir.path().join("script.py");
 
         {
+            let script = function.stream_script()?.script();
             let mut temp = std::fs::File::create(script_path.clone())?;
-            temp.write_all(function.stream_script()?.script().as_bytes())?;
+            temp.write_all(script.as_bytes())?;
             temp.flush()?;
+
+            log::debug!("Running script:\n{script}");
         }
 
         let mut child = tokio::process::Command::new("uv")
@@ -45,21 +51,27 @@ impl PythonMap {
             .stderr(Stdio::piped())
             .spawn()?;
 
-        let stdout = tokio::io::BufReader::new(child.stdout.take().unwrap());
-        let stderr = tokio::io::BufReader::new(child.stderr.take().unwrap());
+        log::debug!("Script spawned.");
+
+        let stdin = child.stdin.take().unwrap();
+        let mut stdout = child.stdout.take().unwrap();
+        let mut stderr = child.stderr.take().unwrap();
+
+        wait_for_setup(&mut child, &mut stdout, &mut stderr).await?;
 
         Ok(Self {
             _tempdir: dir,
             child,
-            stdout,
-            stderr,
-            first: true,
+            stdin,
+            stdout: tokio::io::BufReader::new(stdout),
+            stderr: tokio::io::BufReader::new(stderr),
         })
     }
     pub async fn run(
         &mut self,
         input: impl AsRef<[u8]>,
     ) -> io::Result<WithStdoutStderr<Result<Value, String>>> {
+        log::debug!("Running function.");
         let output = self.raw_run(input).await?;
         let structured: MaybeWithStdoutStderr<Value> = serde_json::from_str(&output)?;
         structured.unpack()
@@ -72,6 +84,7 @@ impl PythonMap {
         In: Serialize,
         Out: DeserializeOwned + fmt::Debug,
     {
+        log::debug!("Running typed function.");
         let input = serde_json::to_vec(&input)?;
         let output = self.raw_run(input).await?;
         let value: MaybeWithStdoutStderr<Out> = serde_json::from_str(&output)?;
@@ -85,32 +98,135 @@ impl PythonMap {
             ))?
         }
 
-        if self.first {
-            self.first = false;
-            wait_for_marker(&mut self.stdout, SCRIPT_START_MARKER).await?;
-            wait_for_marker(&mut self.stderr, SCRIPT_START_MARKER).await?;
-        }
-
-        let stdin = self.child.stdin.as_mut().unwrap();
-        stdin.write_all(input.as_ref()).await?;
-        stdin.write_all(b"\n").await?;
-        stdin.flush().await?;
+        self.stdin.write_all(input.as_ref()).await?;
+        self.stdin.write_all(b"\n").await?;
+        self.stdin.flush().await?;
 
         let mut output = String::new();
-        self.stdout.read_line(&mut output).await?;
+        self.stdout.read_line(&mut output).await?; // TODO: catch exit
 
         Ok(output)
     }
 }
-async fn wait_for_marker(reader: impl AsyncBufRead, marker: &str) -> io::Result<()> {
+async fn wait_for_setup(
+    child: &mut tokio::process::Child,
+    mut stdout: &mut tokio::process::ChildStdout,
+    mut stderr: &mut tokio::process::ChildStderr,
+) -> io::Result<()> {
+    let mut stdout_buf = Vec::with_capacity(1_000);
+    let mut stderr_buf = Vec::with_capacity(1_000);
+
+    let result = {
+        let std_io = Box::pin(futures::future::join(
+            wait_for_marker("stdout", &mut stdout, &mut stdout_buf, SCRIPT_START_MARKER),
+            wait_for_marker("stderr", &mut stderr, &mut stderr_buf, SCRIPT_START_MARKER),
+        ));
+        let wait = pin!(child.wait());
+
+        match futures::future::select(std_io, wait).await {
+            futures::future::Either::Left(((out, err), wait)) => {
+                if let Some(wait) = wait.now_or_never() {
+                    log::warn!("Python process exited with code {wait:?}");
+                }
+                futures::future::Either::Left((out, err))
+            }
+            futures::future::Either::Right((wait, std_io)) => {
+                drop(std_io.now_or_never());
+                futures::future::Either::Right(wait)
+            }
+        }
+    };
+
+    let stdout_buf = String::from_utf8_lossy(&stdout_buf);
+    let stderr_buf = String::from_utf8_lossy(&stderr_buf);
+
+    match result {
+        futures::future::Either::Left((out, err)) => {
+            match (out, err) {
+                (Ok(()), Ok(())) => {
+                    log::trace!(
+                        "Python process started.\n\
+                        STDOUT:\n\
+                        {stdout_buf}\n\
+                        STDERR:\n\
+                        {stderr_buf}"
+                    );
+                }
+                (Err(e), Ok(())) => {
+                    Err(io::Error::other(format!(
+                        "Stdout error: {e:?}\n\
+                        STDOUT:\n\
+                        {stdout_buf}\n\
+                        STDERR:\n\
+                        {stderr_buf}"
+                    )))?;
+                }
+                (Ok(()), Err(e)) => {
+                    Err(io::Error::other(format!(
+                        "Stderr error: {e:?}\n\
+                        STDOUT:\n\
+                        {stdout_buf}\n\
+                        STDERR:\n\
+                        {stderr_buf}"
+                    )))?;
+                }
+                (Err(e), Err(e2)) => {
+                    Err(io::Error::other(format!(
+                        "Stdout error: {e:?}\n\
+                        Stderr error: {e2:?}\n\
+                        STDOUT:\n\
+                        {stdout_buf}\n\
+                        STDERR:\n\
+                        {stderr_buf}"
+                    )))?;
+                }
+            };
+        }
+        futures::future::Either::Right(wait) => {
+            let code = wait?;
+            Err(io::Error::other(format!(
+                "Python process unexpectedly exited with code {code}.\n\
+                STDOUT:\n\
+                {stdout_buf}\n\
+                STDERR:\n\
+                {stderr_buf}"
+            )))?;
+        }
+    };
+
+    Ok(())
+}
+
+async fn wait_for_marker(
+    kind: &str,
+    reader: impl AsyncRead,
+    data: &mut Vec<u8>,
+    marker: &str,
+) -> io::Result<()> {
+    fn check_marker(data: &[u8], marker: &str) -> bool {
+        data.split(|b| *b == b'\n')
+            .rev()
+            .take(2) // Ends in a newline
+            .any(|line| {
+                line.windows(marker.len())
+                    .any(|window| window == marker.as_bytes())
+            })
+    }
+
+    data.clear();
+
     let mut reader = pin!(reader);
 
-    let mut buf = String::new();
+    let mut buf = [0; 1_000];
     loop {
-        buf.clear();
-        reader.read_line(&mut buf).await?;
-        if buf.contains(marker) {
+        let read = reader.read(&mut buf).await?;
+        data.extend_from_slice(&buf[..read]);
+        if check_marker(data, marker) {
             return Ok(());
+        } else if read == 0 {
+            return Err(io::Error::other(format!(
+                "Reached EOF on {kind} before seeing start marker."
+            )));
         }
     }
 }
@@ -121,18 +237,17 @@ impl PythonFunction {
         let function = &self.function;
 
         let content = format!(
-            r##"
-import sys
-import os
-import io
-import traceback
-import json
-from contextlib import redirect_stdout, redirect_stderr
-from pydantic import BaseModel
-
-{function}
+            r##"{function}
 
 def main():
+    import sys
+    import os
+    import io
+    import traceback
+    import json
+    from contextlib import redirect_stdout, redirect_stderr
+    from pydantic import BaseModel
+
     class __InternalOutputModel(BaseModel):
         value: {output} | None
         error: str | None
@@ -189,96 +304,38 @@ if __name__ == "__main__":
 
 type TestValue = (Value, WithStdoutStderr<Result<Value, String>>);
 impl PythonMap {
-    pub fn test_values() -> Vec<(Self, Vec<TestValue>)> {
+    pub fn test_values() -> Vec<(PythonFunction, Vec<TestValue>)> {
         vec![Self::simple(), Self::dep(), Self::exception()]
     }
 
-    fn simple() -> (Self, Vec<TestValue>) {
-        const PYTHON_VERSION: &str = "==3.10";
-        const FUNCTION: &str = "
-def process(input: int) -> int:
-    print(\"hello\")
-    return input + 2
-";
-
-        let values = vec![(
-            Value::Number(40.into()),
-            WithStdoutStderr {
-                value: Ok(Value::Number(42.into())),
-                stdout: "hello\n".to_string(),
-                stderr: "".to_string(),
-            },
-        )];
-
-        (
-            PythonFunction {
-                python_version: PYTHON_VERSION.to_string(),
-                dependencies: vec![],
-                function: FUNCTION.to_string(),
-            }
-            .into_map()
-            .unwrap(),
-            values,
-        )
+    fn simple() -> (PythonFunction, Vec<TestValue>) {
+        PythonFunction::simple()
     }
 
-    fn dep() -> (Self, Vec<TestValue>) {
-        const PYTHON_VERSION: &str = "==3.10";
-        const FUNCTION: &str = "
-import numpy as np
-def process(x: int) -> list[int]:
-    return np.array(x).tolist()
-";
-
-        let values = vec![(
-            Value::Array(vec![Value::Number(40.into())]),
-            WithStdoutStderr {
-                value: Ok(Value::Array(vec![Value::Number(40.into())])),
-                stdout: "".to_string(),
-                stderr: "".to_string(),
-            },
-        )];
-
-        (
-            PythonFunction {
-                python_version: PYTHON_VERSION.to_string(),
-                dependencies: vec!["numpy".to_owned(), "pandas".to_owned()],
-                function: FUNCTION.to_string(),
-            }
-            .into_map()
-            .unwrap(),
-            values,
-        )
+    fn dep() -> (PythonFunction, Vec<TestValue>) {
+        PythonFunction::dep()
     }
 
-    fn exception() -> (Self, Vec<TestValue>) {
-        const PYTHON_VERSION: &str = "==3.10";
-        const FUNCTION: &str = "
-def process(input: int) -> int:
-    print(\"hello\")
-    raise Exception('This is a test')
-";
-        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 53, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+    fn exception() -> (PythonFunction, Vec<TestValue>) {
+        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 52, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
-        let values = vec![(
-            Value::Number(40.into()),
-            WithStdoutStderr {
-                value: Err(ERROR.to_string()),
-                stdout: "hello\n".to_string(),
-                stderr: "".to_string(),
-            },
-        )];
+        let (function, mut values) = PythonFunction::exception();
 
-        (
-            PythonFunction {
-                python_version: PYTHON_VERSION.to_string(),
-                dependencies: vec![],
-                function: FUNCTION.to_string(),
-            }
-            .into_map()
-            .unwrap(),
-            values,
-        )
+        for value in &mut values {
+            value.1.value = Err(ERROR.to_string());
+        }
+
+        (function, values)
+    }
+
+    #[cfg(test)]
+    fn invalid_function() -> (PythonFunction, Vec<TestValue>) {
+        PythonFunction::invalid_function()
+    }
+
+    #[cfg(test)]
+    fn invalid_import() -> (PythonFunction, Vec<TestValue>) {
+        PythonFunction::invalid_import()
     }
 }
 
@@ -288,7 +345,8 @@ mod tests {
 
     #[tokio::test]
     async fn basic() {
-        for (mut map, values) in PythonMap::test_values() {
+        for (map, values) in PythonMap::test_values() {
+            let mut map = map.into_map().await.unwrap();
             for (input, expected) in values {
                 let structured = map.run(serde_json::to_vec(&input).unwrap()).await.unwrap();
                 assert_eq!(structured, expected);
@@ -298,7 +356,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_map() {
-        let (mut map, _) = PythonMap::simple();
+        let (map, _) = PythonMap::simple();
+        let mut map = map.into_map().await.unwrap();
 
         let structured = map.run(b"40").await.unwrap();
         assert_eq!(
@@ -328,7 +387,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_map_typed() {
-        let (mut map, _) = PythonMap::simple();
+        let (map, _) = PythonMap::simple();
+        let mut map = map.into_map().await.unwrap();
+
         let structured = map.run_typed::<_, i32>(40).await.unwrap();
         assert_eq!(
             structured,
@@ -359,11 +420,12 @@ mod tests {
 mod exception_tests {
     use super::*;
 
-    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 53, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 52, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
     #[tokio::test]
     async fn test_map_exception() {
-        let (mut map, _) = PythonMap::exception();
+        let (map, _) = PythonMap::exception();
+        let mut map = map.into_map().await.unwrap();
 
         let structured = map.run(b"40").await.unwrap();
         assert_eq!(
@@ -389,5 +451,38 @@ mod exception_tests {
     #[ignore]
     fn test_map_blocking_exception() {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod invalid_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_map_invalid() {
+        let (map, _) = PythonMap::invalid_function();
+        match map.into_map().await {
+            Ok(output) => {
+                println!("{output:?}");
+                unreachable!()
+            }
+            Err(e) => {
+                println!("{e:?}")
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_map_invalid_import() {
+        let (map, _) = PythonMap::invalid_import();
+        match map.into_map().await {
+            Ok(output) => {
+                println!("{output:?}");
+                unreachable!()
+            }
+            Err(e) => {
+                println!("{e:?}")
+            }
+        }
     }
 }

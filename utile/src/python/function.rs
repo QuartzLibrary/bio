@@ -28,9 +28,7 @@ pub type PyFnOutput<T> = (WithStdoutStderr<Result<T, String>>, Output);
 impl PythonFunction {
     pub async fn run(&self, input: impl AsRef<[u8]>) -> io::Result<PyFnOutput<Value>> {
         let output = self.script()?.run(input).await?;
-        let structured: MaybeWithStdoutStderr<Value> = serde_json::from_slice(&output.stdout)?;
-        let structured = structured.unpack()?;
-        Ok((structured, output))
+        parse_and_unpack(output)
     }
     pub async fn run_typed<In, Out>(&self, input: In) -> io::Result<PyFnOutput<Out>>
     where
@@ -41,16 +39,12 @@ impl PythonFunction {
             .script()?
             .run(&serde_json::to_vec(&input).unwrap())
             .await?;
-        let value: MaybeWithStdoutStderr<Out> = serde_json::from_slice(&output.stdout).unwrap();
-        let value = value.unpack().unwrap();
-        Ok((value, output))
+        parse_and_unpack(output)
     }
 
     pub fn run_blocking(&self, input: impl AsRef<[u8]>) -> io::Result<PyFnOutput<Value>> {
         let output = self.script()?.run_blocking(input)?;
-        let structured: MaybeWithStdoutStderr<Value> = serde_json::from_slice(&output.stdout)?;
-        let structured = structured.unpack()?;
-        Ok((structured, output))
+        parse_and_unpack(output)
     }
     pub fn run_typed_blocking<In, Out>(&self, input: In) -> io::Result<PyFnOutput<Out>>
     where
@@ -58,13 +52,11 @@ impl PythonFunction {
         Out: DeserializeOwned + fmt::Debug,
     {
         let output = self.script()?.run_blocking(&serde_json::to_vec(&input)?)?;
-        let value: MaybeWithStdoutStderr<Out> = serde_json::from_slice(&output.stdout)?;
-        let value = value.unpack()?;
-        Ok((value, output))
+        parse_and_unpack(output)
     }
 
-    pub fn into_map(self) -> io::Result<super::map::PythonMap> {
-        super::map::PythonMap::new(&self)
+    pub async fn into_map(self) -> io::Result<super::map::PythonMap> {
+        super::map::PythonMap::new(&self).await
     }
 }
 #[cfg(not(target_arch = "wasm32"))]
@@ -75,18 +67,17 @@ impl PythonFunction {
         let function = &self.function;
 
         let content = format!(
-            r##"
-import sys
-import os
-import io
-import traceback
-import json
-from contextlib import redirect_stdout, redirect_stderr
-from pydantic import BaseModel
-
-{function}
+            r##"{function}
 
 def main():
+    import sys
+    import os
+    import io
+    import traceback
+    import json
+    from contextlib import redirect_stdout, redirect_stderr
+    from pydantic import BaseModel
+    
     class __InternalOutputModel(BaseModel):
         value: {output} | None
         error: str | None
@@ -183,6 +174,33 @@ impl PythonFunction {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn parse_and_unpack<T>(output: Output) -> io::Result<PyFnOutput<T>>
+where
+    T: DeserializeOwned + fmt::Debug,
+{
+    let value: MaybeWithStdoutStderr<T> = match serde_json::from_slice(&output.stdout) {
+        Ok(value) => value,
+        Err(e) => {
+            let Output {
+                status,
+                stdout,
+                stderr,
+            } = output;
+            let stdout = String::from_utf8_lossy(&stdout);
+            let stderr = String::from_utf8_lossy(&stderr);
+            return Err(io::Error::other(format!(
+                "Failed to parse output: {e:?}.\n\
+                Exit status: {status:?}.\n\
+                stdout:\n{stdout:?}.\n\
+                stderr:\n{stderr:?}.\n"
+            )));
+        }
+    };
+    let value = value.unpack()?;
+    Ok((value, output))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 /// Intermediate struct to parse the output of the Python script.
 #[derive(Debug, Deserialize)]
 pub(super) struct MaybeWithStdoutStderr<T> {
@@ -231,7 +249,7 @@ impl PythonFunction {
         vec![Self::simple(), Self::dep(), Self::exception()]
     }
 
-    fn simple() -> (Self, Vec<TestValue>) {
+    pub(super) fn simple() -> (Self, Vec<TestValue>) {
         const PYTHON_VERSION: &str = "==3.10";
         const FUNCTION: &str = "
 def process(input: int) -> int:
@@ -258,7 +276,7 @@ def process(input: int) -> int:
         )
     }
 
-    fn dep() -> (Self, Vec<TestValue>) {
+    pub(super) fn dep() -> (Self, Vec<TestValue>) {
         const PYTHON_VERSION: &str = "==3.10";
         const FUNCTION: &str = "
 import numpy as np
@@ -285,20 +303,77 @@ def process(x: int) -> list[int]:
         )
     }
 
-    fn exception() -> (Self, Vec<TestValue>) {
+    pub(super) fn exception() -> (Self, Vec<TestValue>) {
         const PYTHON_VERSION: &str = "==3.10";
         const FUNCTION: &str = "
 def process(input: int) -> int:
     print(\"hello\")
     raise Exception('This is a test')
 ";
-        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 47, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 46, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
         let values = vec![(
             Value::Number(40.into()),
             WithStdoutStderr {
                 value: Err(ERROR.to_string()),
                 stdout: "hello\n".to_string(),
+                stderr: "".to_string(),
+            },
+        )];
+
+        (
+            Self {
+                python_version: PYTHON_VERSION.to_string(),
+                dependencies: vec![],
+                function: FUNCTION.to_string(),
+            },
+            values,
+        )
+    }
+
+    #[cfg(test)]
+    pub(super) fn invalid_function() -> (Self, Vec<TestValue>) {
+        const PYTHON_VERSION: &str = "==3.10";
+        const FUNCTION: &str = "
+def pro cess(input: int) -> int:
+    print(\"hello\")
+    raise Exception('This is a test')
+";
+
+        let values = vec![(
+            Value::Number(40.into()),
+            WithStdoutStderr {
+                value: Err("".to_string()),
+                stdout: "".to_string(),
+                stderr: "".to_string(),
+            },
+        )];
+
+        (
+            Self {
+                python_version: PYTHON_VERSION.to_string(),
+                dependencies: vec![],
+                function: FUNCTION.to_string(),
+            },
+            values,
+        )
+    }
+
+    #[cfg(test)]
+    pub(super) fn invalid_import() -> (Self, Vec<TestValue>) {
+        const PYTHON_VERSION: &str = "==3.10";
+        const FUNCTION: &str = "
+import numpy as np # Fails
+
+def process(input: int) -> int:
+    return 42
+";
+
+        let values = vec![(
+            Value::Number(40.into()),
+            WithStdoutStderr {
+                value: Err("".to_string()),
+                stdout: "".to_string(),
                 stderr: "".to_string(),
             },
         )];
@@ -344,7 +419,9 @@ mod tests {
         assert!(status.success());
         assert_eq!(
             stdout,
-            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
+            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n",
+            "{:?}",
+            String::from_utf8_lossy(stdout)
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
@@ -374,7 +451,9 @@ mod tests {
         assert!(status.success());
         assert_eq!(
             stdout,
-            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
+            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n",
+            "{:?}",
+            String::from_utf8_lossy(stdout)
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
@@ -405,7 +484,9 @@ mod tests {
         assert!(status.success());
         assert_eq!(
             stdout,
-            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
+            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n",
+            "{:?}",
+            String::from_utf8_lossy(stdout)
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
@@ -435,7 +516,9 @@ mod tests {
         assert!(status.success());
         assert_eq!(
             stdout,
-            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n"
+            b"{\"value\":42,\"error\":null,\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n",
+            "{:?}",
+            String::from_utf8_lossy(stdout)
         );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
@@ -458,8 +541,8 @@ mod tests {
 mod exception_tests {
     use super::*;
 
-    const STDOUT: &str = "{\"value\":null,\"error\":\"Traceback (most recent call last):\\n  File \\\"/temp_folder/script.py\\\", line 47, in main\\n    result = process(input)\\n  File \\\"/temp_folder/script.py\\\", line 19, in process\\n    raise Exception('This is a test')\\nException: This is a test\\n\",\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n";
-    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 47, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 19, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+    const STDOUT: &str = "{\"value\":null,\"error\":\"Traceback (most recent call last):\\n  File \\\"/temp_folder/script.py\\\", line 46, in main\\n    result = process(input)\\n  File \\\"/temp_folder/script.py\\\", line 10, in process\\n    raise Exception('This is a test')\\nException: This is a test\\n\",\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n";
+    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 46, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
     #[tokio::test]
     async fn test_run_function_exception() {
@@ -472,7 +555,12 @@ mod exception_tests {
             stderr,
         } = &output;
         assert!(status.success());
-        assert_eq!(stdout, STDOUT.as_bytes(),);
+        assert_eq!(
+            stdout,
+            STDOUT.as_bytes(),
+            "{:?}",
+            String::from_utf8_lossy(stdout)
+        );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
             stderr
@@ -499,7 +587,12 @@ mod exception_tests {
             stderr,
         } = &output;
         assert!(status.success());
-        assert_eq!(stdout, STDOUT.as_bytes());
+        assert_eq!(
+            stdout,
+            STDOUT.as_bytes(),
+            "{:?}",
+            String::from_utf8_lossy(stdout)
+        );
         // assert_eq!(stderr, b"Installed 5 packages in 3ms\n");
         assert!(
             stderr
@@ -514,5 +607,40 @@ mod exception_tests {
                 stderr: "".to_string(),
             }
         );
+    }
+}
+
+#[cfg(test)]
+mod invalid_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_run_function_invalid() {
+        let (function, _) = PythonFunction::invalid_function();
+        match function.run(b"40").await {
+            Ok((structured, output)) => {
+                println!("{output:?}");
+                println!("{structured:?}");
+                unreachable!()
+            }
+            Err(e) => {
+                println!("{e:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn test_run_function_invalid_import() {
+        let (function, _) = PythonFunction::invalid_import();
+        match function.run_blocking(b"40") {
+            Ok((structured, output)) => {
+                println!("{output:?}");
+                println!("{structured:?}");
+                unreachable!()
+            }
+            Err(e) => {
+                println!("{e:?}")
+            }
+        }
     }
 }
