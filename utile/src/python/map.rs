@@ -30,6 +30,8 @@ pub struct PythonMap {
 }
 impl PythonMap {
     pub(super) async fn new(function: &PythonFunction) -> io::Result<Self> {
+        super::script::install_python(&function.python_version).await?;
+
         let dir = tempfile::Builder::new().suffix("python_exec").tempdir()?;
 
         let script_path = dir.path().join("script.py");

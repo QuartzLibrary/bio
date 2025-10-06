@@ -16,6 +16,8 @@ pub struct PythonScript {
 #[cfg(not(target_arch = "wasm32"))]
 impl PythonScript {
     pub async fn run(&self, input: impl AsRef<[u8]>) -> io::Result<Output> {
+        install_python(&self.python_version).await?;
+
         let dir = tempfile::Builder::new().suffix("python_exec").tempdir()?;
 
         let script_path = dir.path().join("script.py");
@@ -44,6 +46,8 @@ impl PythonScript {
         Ok(clean_output(output, dir.path()))
     }
     pub fn run_blocking(&self, input: impl AsRef<[u8]>) -> io::Result<Output> {
+        install_python_blocking(&self.python_version)?;
+
         let dir = tempfile::Builder::new().suffix("python_exec").tempdir()?;
 
         let script_path = dir.path().join("script.py");
@@ -108,6 +112,41 @@ fn clean_temp_path(data: Vec<u8>, path: &Path) -> Vec<u8> {
         .replace(data, "temp_folder")
         .into_owned()
         .into_bytes()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn install_python_blocking(version: &str) -> io::Result<()> {
+    let child = std::process::Command::new("uv")
+        .arg("python")
+        .arg("install")
+        .arg(version)
+        .spawn()?;
+    let output = child.wait_with_output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!(
+            "Failed to install Python {version}.\n{output:?}"
+        )))
+    }
+}
+
+// uv python install
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) async fn install_python(version: &str) -> io::Result<()> {
+    let child = tokio::process::Command::new("uv")
+        .arg("python")
+        .arg("install")
+        .arg(version)
+        .spawn()?;
+    let output = child.wait_with_output().await?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!(
+            "Failed to install Python {version}.\n{output:?}"
+        )))
+    }
 }
 
 #[cfg(test)]
