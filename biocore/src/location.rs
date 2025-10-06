@@ -10,6 +10,13 @@ pub struct ContigPosition<Contig = String> {
     pub at: u64,
 }
 impl<Contig> ContigPosition<Contig> {
+    pub fn range_to(self, to: u64) -> ContigRange<Contig> {
+        assert!(self.at <= to, "{} <= {}", self.at, to);
+        ContigRange {
+            contig: self.contig,
+            at: self.at..to,
+        }
+    }
     pub fn map_contig<NewContig>(
         self,
         f: impl FnOnce(Contig) -> NewContig,
@@ -277,6 +284,20 @@ pub mod orientation {
             let size = self.v.contig.size();
             self.flip_orientation_with(size)
         }
+
+        #[track_caller]
+        pub fn into_orientation(mut self, orientation: SequenceOrientation) -> Self {
+            self.set_orientation(orientation);
+            self
+        }
+        #[track_caller]
+        pub fn into_forward(self) -> Self {
+            self.into_orientation(SequenceOrientation::Forward)
+        }
+        #[track_caller]
+        pub fn into_reverse(self) -> Self {
+            self.into_orientation(SequenceOrientation::Reverse)
+        }
     }
     impl<C> WithOrientation<ContigPosition<C>> {
         #[track_caller]
@@ -315,6 +336,20 @@ pub mod orientation {
         pub fn flip_orientation(self) -> Self {
             let size = self.v.contig.size();
             self.flip_orientation_with(size)
+        }
+
+        #[track_caller]
+        pub fn into_orientation(mut self, orientation: SequenceOrientation) -> Self {
+            self.set_orientation(orientation);
+            self
+        }
+        #[track_caller]
+        pub fn into_forward(self) -> Self {
+            self.into_orientation(SequenceOrientation::Forward)
+        }
+        #[track_caller]
+        pub fn into_reverse(self) -> Self {
+            self.into_orientation(SequenceOrientation::Reverse)
         }
 
         pub fn contains(&self, loc: &WithOrientation<ContigPosition<C>>) -> bool
@@ -358,6 +393,19 @@ pub mod orientation {
         }
     }
     impl<C> WithOrientation<ContigRange<C>> {
+        pub fn into_start(self) -> WithOrientation<ContigPosition<C>> {
+            WithOrientation {
+                orientation: self.orientation,
+                v: self.v.into_start(),
+            }
+        }
+        pub fn into_end(self) -> WithOrientation<ContigPosition<C>> {
+            WithOrientation {
+                orientation: self.orientation,
+                v: self.v.into_end(),
+            }
+        }
+
         pub fn set_orientation_with(&mut self, orientation: SequenceOrientation, size: u64) {
             if self.orientation != orientation {
                 if size == 0 {
