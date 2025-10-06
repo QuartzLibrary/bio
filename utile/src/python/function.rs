@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use super::script::PythonScript;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PythonFunction {
     pub python_version: String,
     pub dependencies: Vec<String>,
@@ -16,7 +16,7 @@ pub struct PythonFunction {
     /// The input and output types must be typed and JSON serializable.
     pub function: String,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct WithStdoutStderr<T> {
     pub value: T,
     pub stdout: String,

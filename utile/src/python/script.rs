@@ -7,7 +7,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt as _;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PythonScript {
     pub python_version: String,
     pub dependencies: Vec<String>,
