@@ -811,3 +811,114 @@ pub mod as_vec {
         Ok(vec.into_iter().collect())
     }
 }
+
+pub mod arc_str {
+    use std::{
+        borrow::Cow,
+        cell::RefCell,
+        collections::hash_map::Entry,
+        ops::Deref,
+        sync::{Arc, LazyLock, Weak},
+    };
+
+    thread_local! {
+        static STATE: LazyLock<ahash::RandomState> = LazyLock::new(ahash::RandomState::new);
+        static POOL: RefCell<nohash_hasher::IntMap<u64, Vec<Weak<str>>>> = RefCell::new(nohash_hasher::IntMap::default());
+    }
+
+    pub fn clean_string_pool() {
+        POOL.with(|pool| {
+            pool.borrow_mut().retain(|_, v| {
+                v.retain(|w| w.strong_count() > 0);
+                !v.is_empty()
+            });
+        });
+    }
+
+    /// A string that is cheap to clone and avoids needing to enable the [serde]
+    /// feature for reference counted pointers.
+    ///
+    /// This is unaffected by one of the problems [serde] is protecting against (cycles),
+    /// and avoids memory blow-ups by keeping a thread local weak reference pool
+    /// if `POOL` is true.
+    ///
+    /// This is not perfect because it has a runtime cost and old [Weak] references are
+    /// leaked by default.
+    ///
+    /// Since this is meant to be used for values which are enumerable, it should be fine.
+    /// We'll see in practice if it becomes problematic.
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct SerdeArcStr<const POOL: bool = true>(Arc<str>);
+    impl<const POOL: bool> Default for SerdeArcStr<POOL> {
+        fn default() -> Self {
+            Self::new("")
+        }
+    }
+    impl<const POOL: bool> Deref for SerdeArcStr<POOL> {
+        type Target = str;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+    impl<const POOL: bool> SerdeArcStr<POOL> {
+        pub fn new(s: impl AsRef<str> + Into<Arc<str>>) -> Self {
+            if POOL { Self(new(s)) } else { Self(s.into()) }
+        }
+    }
+
+    impl<const POOL: bool> serde::Serialize for SerdeArcStr<POOL> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            serializer.serialize_str(&self.0)
+        }
+    }
+    impl<'de, const POOL: bool> serde::Deserialize<'de> for SerdeArcStr<POOL> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            // Avoids a needless String allocation
+            let s: Cow<'de, str> = serde::Deserialize::deserialize(deserializer)?;
+            Ok(Self::new(s))
+        }
+    }
+
+    fn hash_str(s: &str) -> u64 {
+        STATE.with(|state| state.hash_one(s))
+    }
+    fn new(s: impl AsRef<str> + Into<Arc<str>>) -> Arc<str> {
+        POOL.with(|pool| {
+            let mut pool = pool.borrow_mut();
+            let value = match pool.entry(hash_str(s.as_ref())) {
+                Entry::Occupied(mut bucket) => {
+                    bucket.get_mut().retain(|w| w.strong_count() > 0);
+
+                    if let Some(found) = bucket
+                        .get()
+                        .iter()
+                        .filter_map(|w| w.upgrade())
+                        .find(|a| &**a == s.as_ref())
+                    {
+                        return found;
+                    }
+
+                    bucket.into_mut()
+                }
+                Entry::Vacant(e) => e.insert(vec![]),
+            };
+            let arc: Arc<str> = s.into();
+            value.push(Arc::downgrade(&arc));
+            #[cfg(debug_assertions)]
+            if value.len() % 10 == 0 {
+                log::warn!("{} collisions in serde arc string pool", value.len());
+            }
+            #[cfg(debug_assertions)]
+            if pool.len() % 1_000 == 0 {
+                log::warn!("{} unique hashes in serde arc string pool", pool.len());
+            }
+            arc
+        })
+    }
+}

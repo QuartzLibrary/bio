@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt, io, ops::Index, sync::Arc};
 
-use utile::range::RangeExt;
+use utile::{range::RangeExt, serde_ext::arc_str::SerdeArcStr};
 
 use crate::{
     dna::DnaBase,
@@ -25,8 +26,9 @@ where
 
 /// A generic reference-counted contig that keeps track of its size.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
 pub struct ArcContig {
-    name: Arc<str>,
+    name: SerdeArcStr,
     size: u64,
 }
 impl AsRef<str> for ArcContig {
@@ -41,7 +43,10 @@ impl Contig for ArcContig {
 }
 impl ArcContig {
     pub fn new(name: Arc<str>, size: u64) -> Self {
-        Self { name, size }
+        Self {
+            name: SerdeArcStr::new(name),
+            size,
+        }
     }
     pub fn from_contig(c: impl Contig) -> Self {
         Self::new(c.as_ref().into(), c.size())
@@ -165,9 +170,10 @@ impl From<ContigSizeError> for io::Error {
 
 /// A normal contig, but with helpers to translate to the coordinates before/after an indel.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
 pub struct EditedContig<C> {
     original: C,
-    name: Arc<str>,
+    name: SerdeArcStr,
     remove: ContigRange<C>,
     insert: u64,
 }
@@ -189,11 +195,10 @@ impl<C: Contig> EditedContig<C> {
             remove.at.start,
             remove.at.end,
             insert
-        )
-        .into();
+        );
         Self {
             original: contig,
-            name,
+            name: SerdeArcStr::new(name),
             remove,
             insert,
         }
