@@ -15,6 +15,7 @@ pub struct PythonScript {
 }
 #[cfg(not(target_arch = "wasm32"))]
 impl PythonScript {
+    #[tracing::instrument(level = "debug", skip(input))]
     pub async fn run(&self, input: impl AsRef<[u8]>) -> io::Result<Output> {
         install_python(&self.python_version).await?;
 
@@ -45,6 +46,7 @@ impl PythonScript {
         let output = child.wait_with_output().await?;
         Ok(clean_output(output, dir.path()))
     }
+    #[tracing::instrument(level = "debug", skip(input))]
     pub fn run_blocking(&self, input: impl AsRef<[u8]>) -> io::Result<Output> {
         install_python_blocking(&self.python_version)?;
 
@@ -115,6 +117,7 @@ fn clean_temp_path(data: Vec<u8>, path: &Path) -> Vec<u8> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[tracing::instrument(level = "debug")]
 pub(super) fn install_python_blocking(version: &str) -> io::Result<()> {
     let child = std::process::Command::new("uv")
         .arg("python")
@@ -133,6 +136,7 @@ pub(super) fn install_python_blocking(version: &str) -> io::Result<()> {
 
 // uv python install
 #[cfg(not(target_arch = "wasm32"))]
+#[tracing::instrument(level = "debug")]
 pub(super) async fn install_python(version: &str) -> io::Result<()> {
     let child = tokio::process::Command::new("uv")
         .arg("python")

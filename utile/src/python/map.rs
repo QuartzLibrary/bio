@@ -29,6 +29,7 @@ pub struct PythonMap {
     stderr: tokio::io::BufReader<tokio::process::ChildStderr>,
 }
 impl PythonMap {
+    #[tracing::instrument(level = "debug")]
     pub(super) async fn new(function: &PythonFunction) -> io::Result<Self> {
         super::script::install_python(&function.python_version).await?;
 
@@ -69,6 +70,7 @@ impl PythonMap {
             stderr: tokio::io::BufReader::new(stderr),
         })
     }
+    #[tracing::instrument(level = "debug", skip(input))]
     pub async fn run(
         &mut self,
         input: impl AsRef<[u8]>,
@@ -78,6 +80,7 @@ impl PythonMap {
         let structured: MaybeWithStdoutStderr<Value> = serde_json::from_str(&output)?;
         structured.unpack()
     }
+    #[tracing::instrument(level = "debug", skip(input))]
     pub async fn run_typed<In, Out>(
         &mut self,
         input: In,
@@ -110,6 +113,7 @@ impl PythonMap {
         Ok(output)
     }
 }
+#[tracing::instrument(level = "debug", skip(child, stdout, stderr))]
 async fn wait_for_setup(
     child: &mut tokio::process::Child,
     mut stdout: &mut tokio::process::ChildStdout,
@@ -199,6 +203,7 @@ async fn wait_for_setup(
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip(reader, data))]
 async fn wait_for_marker(
     kind: &str,
     reader: impl AsyncRead,
