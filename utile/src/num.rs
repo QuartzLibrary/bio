@@ -19,6 +19,27 @@ where
     }
 }
 
+pub trait TryI64: Sized {
+    type Error: std::fmt::Debug;
+
+    fn try_i64(self) -> Result<i64, Self::Error>;
+    #[track_caller]
+    fn i64_unwrap(self) -> i64 {
+        self.try_i64().unwrap()
+    }
+}
+impl<T> TryI64 for T
+where
+    T: TryInto<i64>,
+    <Self as TryInto<i64>>::Error: std::fmt::Debug,
+{
+    type Error = <Self as TryInto<i64>>::Error;
+
+    fn try_i64(self) -> Result<i64, Self::Error> {
+        self.try_into()
+    }
+}
+
 pub trait TryUsize: Sized {
     type Error: std::fmt::Debug;
 
