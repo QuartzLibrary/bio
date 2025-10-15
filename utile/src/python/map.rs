@@ -76,6 +76,14 @@ impl PythonMap {
         input: impl AsRef<[u8]>,
     ) -> io::Result<WithStdoutStderr<Result<Value, String>>> {
         log::debug!("Running function.");
+
+        if input.as_ref().contains(&b'\n') {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Input contains newlines",
+            ))?
+        }
+
         let output = self.raw_run(input).await?;
         let structured: MaybeWithStdoutStderr<Value> = serde_json::from_str(&output)?;
         structured.unpack()
@@ -96,15 +104,9 @@ impl PythonMap {
         value.unpack()
     }
     async fn raw_run(&mut self, input: impl AsRef<[u8]>) -> io::Result<String> {
-        if input.as_ref().contains(&b'\n') {
-            Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Input contains newlines",
-            ))?
-        }
-
+        self.stdin.write_all(br#"{"input":"#).await?;
         self.stdin.write_all(input.as_ref()).await?;
-        self.stdin.write_all(b"\n").await?;
+        self.stdin.write_all(b"}\n").await?;
         self.stdin.flush().await?;
 
         let mut output = String::new();
@@ -239,7 +241,7 @@ async fn wait_for_marker(
 }
 impl PythonFunction {
     fn stream_script(&self) -> io::Result<PythonScript> {
-        let (output, parse_input) = self.output_and_parse_input()?;
+        let (input, output) = self.output_and_parse_input()?;
 
         let function = &self.function;
 
@@ -255,12 +257,15 @@ def main():
     from contextlib import redirect_stdout, redirect_stderr
     from pydantic import BaseModel
 
+    class __InternalInputModel(BaseModel):
+        input: {input}
+
     class __InternalOutputModel(BaseModel):
         value: {output} | None
         error: str | None
         stdout: str
         stderr: str
-    
+
     def clean_stacktrace(stacktrace: str) -> str:
         return stacktrace.replace(os.path.dirname(os.path.abspath(__file__)), "/temp_folder")
 
@@ -270,11 +275,18 @@ def main():
     for raw_input in sys.stdin:
         raw_input = raw_input.strip()
 
-        if not raw_input:
-            continue
-
         # Parse input
-        input = {parse_input}
+        try:
+            input = __InternalInputModel.model_validate_json(raw_input).input
+        except Exception:
+            output = __InternalOutputModel(
+                value=None,
+                error=str(traceback.format_exc()),
+                stdout="",
+                stderr=raw_input,
+            )
+            print(output.model_dump_json(), flush=True)
+            return
 
         # Run function with stdout protection
         stdout = io.StringIO()
@@ -289,12 +301,13 @@ def main():
             except Exception:
                 exception = traceback.format_exc()
 
-        print(__InternalOutputModel(
+        output = __InternalOutputModel(
             value=result,
             error=clean_stacktrace(str(exception)) if exception else None,
             stdout=stdout.getvalue(),
             stderr=stderr.getvalue(),
-        ).model_dump_json(), flush=True)
+        )
+        print(output.model_dump_json(), flush=True)
 
 if __name__ == "__main__":
     main()
@@ -324,7 +337,7 @@ impl PythonMap {
     }
 
     fn exception() -> (PythonFunction, Vec<TestValue>) {
-        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 52, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 62, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
         let (function, mut values) = PythonFunction::exception();
 
@@ -427,7 +440,7 @@ mod tests {
 mod exception_tests {
     use super::*;
 
-    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 52, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 62, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
     #[tokio::test]
     async fn test_map_exception() {

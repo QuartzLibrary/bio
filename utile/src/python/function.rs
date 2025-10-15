@@ -27,7 +27,9 @@ pub type PyFnOutput<T> = (WithStdoutStderr<Result<T, String>>, Output);
 #[cfg(not(target_arch = "wasm32"))]
 impl PythonFunction {
     pub async fn run(&self, input: impl AsRef<[u8]>) -> io::Result<PyFnOutput<Value>> {
-        let output = self.script()?.run(input).await?;
+        // TODO: better pass-through of input
+        let input = format!("{{\"input\":{}}}", str::from_utf8(input.as_ref()).unwrap());
+        let output = self.script()?.run(&input).await?;
         parse_and_unpack(output)
     }
     pub async fn run_typed<In, Out>(&self, input: In) -> io::Result<PyFnOutput<Out>>
@@ -35,14 +37,15 @@ impl PythonFunction {
         In: Serialize,
         Out: DeserializeOwned + fmt::Debug,
     {
-        let output = self
-            .script()?
-            .run(&serde_json::to_vec(&input).unwrap())
-            .await?;
+        // TODO: better pass-through of input
+        let input = format!("{{\"input\":{}}}", serde_json::to_string(&input)?);
+        let output = self.script()?.run(&input).await?;
         parse_and_unpack(output)
     }
 
     pub fn run_blocking(&self, input: impl AsRef<[u8]>) -> io::Result<PyFnOutput<Value>> {
+        // TODO: better pass-through of input
+        let input = format!("{{\"input\":{}}}", str::from_utf8(input.as_ref()).unwrap());
         let output = self.script()?.run_blocking(input)?;
         parse_and_unpack(output)
     }
@@ -51,7 +54,9 @@ impl PythonFunction {
         In: Serialize,
         Out: DeserializeOwned + fmt::Debug,
     {
-        let output = self.script()?.run_blocking(&serde_json::to_vec(&input)?)?;
+        // TODO: better pass-through of input
+        let input = format!("{{\"input\":{}}}", serde_json::to_string(&input)?);
+        let output = self.script()?.run_blocking(&input)?;
         parse_and_unpack(output)
     }
 
@@ -62,7 +67,7 @@ impl PythonFunction {
 #[cfg(not(target_arch = "wasm32"))]
 impl PythonFunction {
     fn script(&self) -> io::Result<PythonScript> {
-        let (output, parse_input) = self.output_and_parse_input()?;
+        let (input, output) = self.output_and_parse_input()?;
 
         let function = &self.function;
 
@@ -78,12 +83,15 @@ def main():
     from contextlib import redirect_stdout, redirect_stderr
     from pydantic import BaseModel
     
+    class __InternalInputModel(BaseModel):
+        input: {input}
+
     class __InternalOutputModel(BaseModel):
         value: {output} | None
         error: str | None
         stdout: str
         stderr: str
-    
+
     def clean_stacktrace(stacktrace: str) -> str:
         return stacktrace.replace(os.path.dirname(os.path.abspath(__file__)), "/temp_folder")
 
@@ -91,8 +99,18 @@ def main():
     raw_input = sys.stdin.read()
 
     # Parse input
-    input = {parse_input}
-      
+    try:
+        input = __InternalInputModel.model_validate_json(raw_input).input
+    except Exception:
+        output = __InternalOutputModel(
+            value=None,
+            error=str(traceback.format_exc()),
+            stdout="",
+            stderr=raw_input,
+        )
+        print(output.model_dump_json(), flush=True)
+        return
+
     # Run function with stdout protection
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -106,12 +124,13 @@ def main():
         except Exception:
             exception = traceback.format_exc()
 
-    print(__InternalOutputModel(
+    output = __InternalOutputModel(
         value=result,
         error=clean_stacktrace(str(exception)) if exception else None,
         stdout=stdout.getvalue(),
         stderr=stderr.getvalue(),
-    ).model_dump_json(), flush=True)
+    )
+    print(output.model_dump_json(), flush=True)
 
 if __name__ == "__main__":
     main()
@@ -134,7 +153,7 @@ impl PythonFunction {
         }
         deps
     }
-    pub(super) fn output_and_parse_input(&self) -> io::Result<(&str, String)> {
+    pub(super) fn output_and_parse_input(&self) -> io::Result<(&str, &str)> {
         static FN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             let var = "[a-zA-Z0-9_-]+";
             let type_ = "[a-zA-Z0-9\\[\\]_-]+";
@@ -159,17 +178,7 @@ impl PythonFunction {
         let input = capture.name("input").unwrap().as_str();
         let output = capture.name("output").unwrap().as_str();
 
-        let input_is_model = Regex::new(&format!("class\\s+{input}:"))
-            .unwrap()
-            .is_match(&self.function);
-
-        let parse_input = if input_is_model {
-            format!("{input}.model_validate_json(raw_input)")
-        } else {
-            "json.loads(raw_input)".to_owned()
-        };
-
-        Ok((output, parse_input))
+        Ok((input, output))
     }
 }
 
@@ -281,11 +290,11 @@ def process(input: int) -> int:
         const FUNCTION: &str = "
 import numpy as np
 def process(x: int) -> list[int]:
-    return np.array(x).tolist()
+    return np.array([x]).tolist()
 ";
 
         let values = vec![(
-            Value::Array(vec![Value::Number(40.into())]),
+            Value::Number(40.into()),
             WithStdoutStderr {
                 value: Ok(Value::Array(vec![Value::Number(40.into())])),
                 stdout: "".to_string(),
@@ -310,7 +319,7 @@ def process(input: int) -> int:
     print(\"hello\")
     raise Exception('This is a test')
 ";
-        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 46, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 59, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
         let values = vec![(
             Value::Number(40.into()),
@@ -541,8 +550,8 @@ mod tests {
 mod exception_tests {
     use super::*;
 
-    const STDOUT: &str = "{\"value\":null,\"error\":\"Traceback (most recent call last):\\n  File \\\"/temp_folder/script.py\\\", line 46, in main\\n    result = process(input)\\n  File \\\"/temp_folder/script.py\\\", line 10, in process\\n    raise Exception('This is a test')\\nException: This is a test\\n\",\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n";
-    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 46, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+    const STDOUT: &str = "{\"value\":null,\"error\":\"Traceback (most recent call last):\\n  File \\\"/temp_folder/script.py\\\", line 59, in main\\n    result = process(input)\\n  File \\\"/temp_folder/script.py\\\", line 10, in process\\n    raise Exception('This is a test')\\nException: This is a test\\n\",\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n";
+    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 59, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
 
     #[tokio::test]
     async fn test_run_function_exception() {
