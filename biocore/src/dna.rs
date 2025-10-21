@@ -49,6 +49,7 @@ pub enum IupacDnaBase {
     C = b'C',
     G = b'G',
     T = b'T',
+
     /// A or G (puRine)
     R = b'R',
     /// C or T (pYrimidine)
@@ -61,14 +62,20 @@ pub enum IupacDnaBase {
     K = b'K',
     /// A or C (aMino)
     M = b'M',
+
     /// C or G or T (not A)
+    /// Y/S/K
     B = b'B',
     /// A or G or T (not C)
+    /// R/W/K
     D = b'D',
     /// A or C or T (not G)
+    /// Y/W/M
     H = b'H',
     /// A or C or G (not T)
+    /// R/S/M
     V = b'V',
+
     N = b'N',
 }
 
@@ -280,6 +287,17 @@ impl AmbiguousDnaBase {
     pub fn is_ambiguous(self) -> bool {
         self == Self::N
     }
+
+    /// Returns all the variants that this base 'matches', excluding itself.
+    fn iter_more_specific(self) -> impl Iterator<Item = Self> {
+        use AmbiguousDnaBase::*;
+
+        match self {
+            A | C | G | T => [].iter(),
+            N => [A, C, G, T].iter(),
+        }
+        .copied()
+    }
 }
 impl From<AmbiguousDnaBase> for u8 {
     fn from(value: AmbiguousDnaBase) -> Self {
@@ -443,6 +461,30 @@ impl IupacDnaBase {
     pub fn is_ambiguous(self) -> bool {
         !matches!(self, Self::A | Self::C | Self::G | Self::T)
     }
+
+    /// Returns all the variants that this base 'matches', excluding itself.
+    fn iter_more_specific(self) -> impl Iterator<Item = Self> {
+        use IupacDnaBase::*;
+
+        match self {
+            A | C | G | T => [].iter(),
+
+            R => [A, G].iter(),
+            Y => [C, T].iter(),
+            S => [G, C].iter(),
+            W => [A, T].iter(),
+            K => [G, T].iter(),
+            M => [A, C].iter(),
+
+            B => [C, T, G, Y, S, K].iter(),
+            D => [A, T, G, R, W, K].iter(),
+            H => [A, C, T, Y, W, M].iter(),
+            V => [A, C, G, R, S, M].iter(),
+
+            N => [A, C, G, T, R, Y, S, W, K, M, B, D, H, V].iter(),
+        }
+        .copied()
+    }
 }
 impl From<IupacDnaBase> for u8 {
     fn from(value: IupacDnaBase) -> Self {
@@ -547,45 +589,39 @@ impl From<DnaDecodeError> for std::io::Error {
 }
 
 pub mod pattern {
-    use crate::sequence::PatternChar;
+    use crate::sequence::MatchesChar;
 
     use super::*;
 
-    impl PatternChar<DnaBase> for DnaBase {
-        fn matching(self) -> impl Iterator<Item = DnaBase> {
+    impl MatchesChar<DnaBase> for DnaBase {
+        fn iter_matching(self) -> impl Iterator<Item = DnaBase> {
             [self].into_iter()
         }
         fn matches(self, target: DnaBase) -> bool {
             self == target
         }
     }
-    impl PatternChar<AmbiguousDnaBase> for AmbiguousDnaBase {
-        fn matching(self) -> impl Iterator<Item = AmbiguousDnaBase> {
-            [self].into_iter()
-        }
-        fn matches(self, target: AmbiguousDnaBase) -> bool {
-            self == target
+    impl MatchesChar<AmbiguousDnaBase> for AmbiguousDnaBase {
+        fn iter_matching(self) -> impl Iterator<Item = AmbiguousDnaBase> {
+            self.iter_more_specific().chain([self])
         }
     }
-    impl PatternChar<IupacDnaBase> for IupacDnaBase {
-        fn matching(self) -> impl Iterator<Item = IupacDnaBase> {
-            [self].into_iter()
-        }
-        fn matches(self, target: IupacDnaBase) -> bool {
-            self == target
+    impl MatchesChar<IupacDnaBase> for IupacDnaBase {
+        fn iter_matching(self) -> impl Iterator<Item = IupacDnaBase> {
+            self.iter_more_specific().chain([self])
         }
     }
 
-    impl PatternChar<IupacDnaBase> for DnaBase {
-        fn matching(self) -> impl Iterator<Item = IupacDnaBase> {
+    impl MatchesChar<IupacDnaBase> for DnaBase {
+        fn iter_matching(self) -> impl Iterator<Item = IupacDnaBase> {
             [self.into()].into_iter()
         }
         fn matches(self, target: IupacDnaBase) -> bool {
             IupacDnaBase::from(self) == target
         }
     }
-    impl PatternChar<AmbiguousDnaBase> for DnaBase {
-        fn matching(self) -> impl Iterator<Item = AmbiguousDnaBase> {
+    impl MatchesChar<AmbiguousDnaBase> for DnaBase {
+        fn iter_matching(self) -> impl Iterator<Item = AmbiguousDnaBase> {
             [self.into()].into_iter()
         }
         fn matches(self, target: AmbiguousDnaBase) -> bool {
@@ -593,106 +629,56 @@ pub mod pattern {
         }
     }
 
-    impl PatternChar<DnaBase> for IupacDnaBase {
-        fn matching(self) -> impl Iterator<Item = DnaBase> {
+    impl MatchesChar<DnaBase> for IupacDnaBase {
+        fn iter_matching(self) -> impl Iterator<Item = DnaBase> {
             match self {
-                Self::A => [DnaBase::A].iter().copied(),
-                Self::C => [DnaBase::C].iter().copied(),
-                Self::G => [DnaBase::G].iter().copied(),
-                Self::T => [DnaBase::T].iter().copied(),
-                Self::R => [DnaBase::A, DnaBase::G].iter().copied(),
-                Self::Y => [DnaBase::C, DnaBase::T].iter().copied(),
-                Self::S => [DnaBase::G, DnaBase::C].iter().copied(),
-                Self::W => [DnaBase::A, DnaBase::T].iter().copied(),
-                Self::K => [DnaBase::G, DnaBase::T].iter().copied(),
-                Self::M => [DnaBase::A, DnaBase::C].iter().copied(),
-                Self::B => [DnaBase::C, DnaBase::T, DnaBase::G].iter().copied(),
-                Self::D => [DnaBase::A, DnaBase::T, DnaBase::G].iter().copied(),
-                Self::H => [DnaBase::A, DnaBase::C, DnaBase::T].iter().copied(),
-                Self::V => [DnaBase::A, DnaBase::C, DnaBase::G].iter().copied(),
-                Self::N => [DnaBase::A, DnaBase::C, DnaBase::G, DnaBase::T]
-                    .iter()
-                    .copied(),
+                Self::A => [DnaBase::A].iter(),
+                Self::C => [DnaBase::C].iter(),
+                Self::G => [DnaBase::G].iter(),
+                Self::T => [DnaBase::T].iter(),
+                Self::R => [DnaBase::A, DnaBase::G].iter(),
+                Self::Y => [DnaBase::C, DnaBase::T].iter(),
+                Self::S => [DnaBase::G, DnaBase::C].iter(),
+                Self::W => [DnaBase::A, DnaBase::T].iter(),
+                Self::K => [DnaBase::G, DnaBase::T].iter(),
+                Self::M => [DnaBase::A, DnaBase::C].iter(),
+                Self::B => [DnaBase::C, DnaBase::T, DnaBase::G].iter(),
+                Self::D => [DnaBase::A, DnaBase::T, DnaBase::G].iter(),
+                Self::H => [DnaBase::A, DnaBase::C, DnaBase::T].iter(),
+                Self::V => [DnaBase::A, DnaBase::C, DnaBase::G].iter(),
+                Self::N => [DnaBase::A, DnaBase::C, DnaBase::G, DnaBase::T].iter(),
             }
-        }
-        fn matches(self, target: DnaBase) -> bool {
-            self.to_byte() == target.to_byte()
-                || match self {
-                    IupacDnaBase::A => target == DnaBase::A,
-                    IupacDnaBase::C => target == DnaBase::C,
-                    IupacDnaBase::G => target == DnaBase::G,
-                    IupacDnaBase::T => target == DnaBase::T,
-                    IupacDnaBase::R => target == DnaBase::A || target == DnaBase::G,
-                    IupacDnaBase::Y => target == DnaBase::C || target == DnaBase::T,
-                    IupacDnaBase::S => target == DnaBase::G || target == DnaBase::C,
-                    IupacDnaBase::W => target == DnaBase::A || target == DnaBase::T,
-                    IupacDnaBase::K => target == DnaBase::G || target == DnaBase::T,
-                    IupacDnaBase::M => target == DnaBase::A || target == DnaBase::C,
-                    IupacDnaBase::B => {
-                        target == DnaBase::C || target == DnaBase::T || target == DnaBase::G
-                    }
-                    IupacDnaBase::D => {
-                        target == DnaBase::A || target == DnaBase::T || target == DnaBase::G
-                    }
-                    IupacDnaBase::H => {
-                        target == DnaBase::A || target == DnaBase::C || target == DnaBase::T
-                    }
-                    IupacDnaBase::V => {
-                        target == DnaBase::A || target == DnaBase::C || target == DnaBase::G
-                    }
-                    IupacDnaBase::N => {
-                        target == DnaBase::A
-                            || target == DnaBase::C
-                            || target == DnaBase::G
-                            || target == DnaBase::T
-                    }
-                }
+            .copied()
         }
     }
-    impl PatternChar<DnaBase> for AmbiguousDnaBase {
-        fn matching(self) -> impl Iterator<Item = DnaBase> {
+    impl MatchesChar<DnaBase> for AmbiguousDnaBase {
+        fn iter_matching(self) -> impl Iterator<Item = DnaBase> {
             match self {
-                Self::A => [DnaBase::A].iter().copied(),
-                Self::C => [DnaBase::C].iter().copied(),
-                Self::G => [DnaBase::G].iter().copied(),
-                Self::T => [DnaBase::T].iter().copied(),
-                Self::N => [DnaBase::A, DnaBase::C, DnaBase::G, DnaBase::T]
-                    .iter()
-                    .copied(),
+                Self::A => [DnaBase::A].iter(),
+                Self::C => [DnaBase::C].iter(),
+                Self::G => [DnaBase::G].iter(),
+                Self::T => [DnaBase::T].iter(),
+                Self::N => [DnaBase::A, DnaBase::C, DnaBase::G, DnaBase::T].iter(),
             }
+            .copied()
         }
         fn matches(self, target: DnaBase) -> bool {
             self.to_byte() == target.to_byte() || self == AmbiguousDnaBase::N
         }
     }
 
-    impl PatternChar<IupacDnaBase> for AmbiguousDnaBase {
-        fn matching(self) -> impl Iterator<Item = IupacDnaBase> {
-            match self {
-                Self::A => [IupacDnaBase::A].iter().copied(),
-                Self::C => [IupacDnaBase::C].iter().copied(),
-                Self::G => [IupacDnaBase::G].iter().copied(),
-                Self::T => [IupacDnaBase::T].iter().copied(),
-                Self::N => [
-                    IupacDnaBase::A,
-                    IupacDnaBase::C,
-                    IupacDnaBase::G,
-                    IupacDnaBase::T,
-                    IupacDnaBase::R,
-                    IupacDnaBase::Y,
-                    IupacDnaBase::S,
-                    IupacDnaBase::W,
-                    IupacDnaBase::K,
-                    IupacDnaBase::M,
-                    IupacDnaBase::B,
-                    IupacDnaBase::D,
-                    IupacDnaBase::H,
-                    IupacDnaBase::V,
-                    IupacDnaBase::N,
-                ]
-                .iter()
-                .copied(),
-            }
+    impl MatchesChar<IupacDnaBase> for AmbiguousDnaBase {
+        fn iter_matching(self) -> impl Iterator<Item = IupacDnaBase> {
+            let iupac = IupacDnaBase::from(self);
+            iupac.iter_more_specific().chain([iupac])
+        }
+    }
+    impl MatchesChar<AmbiguousDnaBase> for IupacDnaBase {
+        fn iter_matching(self) -> impl Iterator<Item = AmbiguousDnaBase> {
+            let any = (self == Self::N).then_some(AmbiguousDnaBase::N);
+            <IupacDnaBase as MatchesChar<DnaBase>>::iter_matching(self)
+                .map(AmbiguousDnaBase::from)
+                .chain(any)
         }
     }
 }
@@ -746,10 +732,13 @@ mod eq {
 
 #[cfg(test)]
 mod test {
+    use std::{collections::HashSet, fmt};
+
     use super::*;
+    use crate::sequence::MatchesChar;
 
     #[test]
-    fn counts() {
+    fn sanity_checks() {
         assert_eq!(DnaBase::iter().count() as u128, <DnaBase as Enumerable>::N);
         assert_eq!(
             AmbiguousDnaBase::iter().count() as u128,
@@ -759,5 +748,359 @@ mod test {
             IupacDnaBase::iter().count() as u128,
             <IupacDnaBase as Enumerable>::N
         );
+
+        assert_eq!(
+            DnaBase::iter().count(),
+            DnaBase::iter().collect::<HashSet<_>>().len()
+        );
+        assert_eq!(
+            AmbiguousDnaBase::iter().count(),
+            AmbiguousDnaBase::iter().collect::<HashSet<_>>().len()
+        );
+        assert_eq!(
+            IupacDnaBase::iter().count(),
+            IupacDnaBase::iter().collect::<HashSet<_>>().len()
+        );
+    }
+
+    #[test]
+    fn equivalence_checks() {
+        #[track_caller]
+        fn iter_matching_and_matches_equivalence<S, T>(a: S, b: T, is: Option<bool>)
+        where
+            S: MatchesChar<T> + fmt::Debug + Copy,
+            T: PartialEq + fmt::Debug + Copy,
+        {
+            let matches = <S as MatchesChar<T>>::matches(a, b);
+            let iter_matching = <S as MatchesChar<T>>::iter_matching(a).any(|m| m == b);
+            assert_eq!(matches, iter_matching, "{a:?}/{b:?}");
+            if let Some(is) = is {
+                assert_eq!(is, matches, "wrong match: {a:?}/{b:?}");
+            }
+        }
+
+        let bases = [
+            (DnaBase::A, 1, 1, 1),
+            (DnaBase::C, 1, 1, 1),
+            (DnaBase::G, 1, 1, 1),
+            (DnaBase::T, 1, 1, 1),
+        ];
+        assert_eq!(bases.len(), DnaBase::iter().count());
+        for (a, count, count_amb, count_iupac) in bases {
+            for b in DnaBase::iter() {
+                let strict = Some(a == b);
+                iter_matching_and_matches_equivalence(a, b, strict);
+            }
+            for b in AmbiguousDnaBase::iter() {
+                let strict = (a.to_byte() == b.to_byte()).then_some(true);
+                iter_matching_and_matches_equivalence(a, b, strict);
+            }
+            for b in IupacDnaBase::iter() {
+                let strict = (a.to_byte() == b.to_byte()).then_some(true);
+                iter_matching_and_matches_equivalence(a, b, strict);
+            }
+
+            assert_eq!(
+                <DnaBase as MatchesChar<DnaBase>>::iter_matching(a).count(),
+                count
+            );
+            assert_eq!(
+                <DnaBase as MatchesChar<AmbiguousDnaBase>>::iter_matching(a).count(),
+                count_amb
+            );
+            assert_eq!(
+                <DnaBase as MatchesChar<IupacDnaBase>>::iter_matching(a).count(),
+                count_iupac
+            );
+        }
+
+        let bases_amb = [
+            (AmbiguousDnaBase::A, 1, 1, 1),
+            (AmbiguousDnaBase::C, 1, 1, 1),
+            (AmbiguousDnaBase::G, 1, 1, 1),
+            (AmbiguousDnaBase::T, 1, 1, 1),
+            (AmbiguousDnaBase::N, 4, 5, 15),
+        ];
+        assert_eq!(bases_amb.len(), AmbiguousDnaBase::iter().count());
+        for (a, count, count_amb, count_iupac) in bases_amb {
+            for b in DnaBase::iter() {
+                let strict = (a.to_byte() == b.to_byte()).then_some(true);
+                iter_matching_and_matches_equivalence(a, b, strict);
+            }
+            for b in AmbiguousDnaBase::iter() {
+                let strict = (a.to_byte() == b.to_byte()).then_some(true);
+                iter_matching_and_matches_equivalence(a, b, strict);
+            }
+            for b in IupacDnaBase::iter() {
+                let strict = (a.to_byte() == b.to_byte()).then_some(true);
+                iter_matching_and_matches_equivalence(a, b, strict);
+            }
+
+            assert_eq!(
+                <AmbiguousDnaBase as MatchesChar<DnaBase>>::iter_matching(a).count(),
+                count
+            );
+            assert_eq!(
+                <AmbiguousDnaBase as MatchesChar<AmbiguousDnaBase>>::iter_matching(a).count(),
+                count_amb
+            );
+            assert_eq!(
+                <AmbiguousDnaBase as MatchesChar<IupacDnaBase>>::iter_matching(a).count(),
+                count_iupac
+            );
+        }
+
+        let bases_iupac = [
+            (IupacDnaBase::A, 1, 1, 1),
+            (IupacDnaBase::C, 1, 1, 1),
+            (IupacDnaBase::G, 1, 1, 1),
+            (IupacDnaBase::T, 1, 1, 1),
+            //
+            (IupacDnaBase::R, 2, 2, 3),
+            (IupacDnaBase::Y, 2, 2, 3),
+            (IupacDnaBase::S, 2, 2, 3),
+            (IupacDnaBase::W, 2, 2, 3),
+            (IupacDnaBase::K, 2, 2, 3),
+            (IupacDnaBase::M, 2, 2, 3),
+            //
+            (IupacDnaBase::B, 3, 3, 7),
+            (IupacDnaBase::D, 3, 3, 7),
+            (IupacDnaBase::H, 3, 3, 7),
+            (IupacDnaBase::V, 3, 3, 7),
+            //
+            (IupacDnaBase::N, 4, 5, 15),
+        ];
+        assert_eq!(bases_iupac.len(), IupacDnaBase::iter().count());
+        for (a, count, count_amb, count_iupac) in bases_iupac {
+            for b in DnaBase::iter() {
+                let strict = (a.to_byte() == b.to_byte()).then_some(true);
+                iter_matching_and_matches_equivalence(a, b, strict);
+            }
+            for b in AmbiguousDnaBase::iter() {
+                let strict = (a.to_byte() == b.to_byte()).then_some(true);
+                iter_matching_and_matches_equivalence(a, b, strict);
+            }
+            for b in IupacDnaBase::iter() {
+                let strict = (a.to_byte() == b.to_byte()).then_some(true);
+                iter_matching_and_matches_equivalence(a, b, strict);
+            }
+
+            assert_eq!(
+                <IupacDnaBase as MatchesChar<DnaBase>>::iter_matching(a).count(),
+                count
+            );
+            assert_eq!(
+                <IupacDnaBase as MatchesChar<AmbiguousDnaBase>>::iter_matching(a).count(),
+                count_amb
+            );
+            assert_eq!(
+                <IupacDnaBase as MatchesChar<IupacDnaBase>>::iter_matching(a).count(),
+                count_iupac
+            );
+        }
+    }
+
+    #[test]
+    fn check_is_exact_match() {
+        #[track_caller]
+        fn check_match<A, B>(a: &str, b: &str, is_match: bool)
+        where
+            A: AsciiChar + Clone + fmt::Debug,
+            B: AsciiChar + PartialEq + Clone + fmt::Debug,
+            A: MatchesChar<B>,
+        {
+            let a: Sequence<A> = a.parse().map_err(drop).unwrap();
+            let b: Sequence<B> = b.parse().map_err(drop).unwrap();
+            assert_eq!(a.is_exact_match(&b), is_match, "{a:?}/{b:?}");
+        }
+        let base_base = [
+            ("", "", true),
+            ("", "A", false),
+            ("A", "", false),
+            ("A", "A", true),
+            ("C", "C", true),
+            ("G", "G", true),
+            ("T", "T", true),
+            ("ACGT", "ACGT", true),
+            ("ACGT", "ACG", false),
+            ("ACG", "ACGT", false),
+            ("ACGT", "ACGA", false),
+            ("AT", "TA", false),
+        ];
+        for (a, b, is_match) in base_base {
+            check_match::<DnaBase, DnaBase>(a, b, is_match);
+        }
+
+        let base_amb = [
+            ("", "", true),
+            ("", "A", false),
+            ("A", "", false),
+            ("A", "A", true),
+            ("C", "C", true),
+            ("G", "G", true),
+            ("T", "T", true),
+            ("A", "N", false),
+            ("CC", "CC", true),
+            ("AC", "AN", false),
+        ];
+        for (a, b, is_match) in base_amb {
+            check_match::<DnaBase, AmbiguousDnaBase>(a, b, is_match);
+        }
+
+        let base_iupac = [
+            ("", "", true),
+            ("", "A", false),
+            ("A", "", false),
+            ("A", "A", true),
+            ("A", "R", false),
+            ("G", "R", false),
+            ("T", "W", false),
+            ("C", "Y", false),
+            ("AC", "AN", false),
+            ("CC", "CC", true),
+        ];
+        for (a, b, is_match) in base_iupac {
+            check_match::<DnaBase, IupacDnaBase>(a, b, is_match);
+        }
+
+        let amb_amb = [
+            ("", "", true),
+            ("", "N", false),
+            ("N", "", false),
+            ("A", "A", true),
+            ("A", "N", false),
+            ("N", "A", true),
+            ("N", "N", true),
+            ("N", "NN", false),
+            ("NN", "N", false),
+            ("NN", "AN", true),
+        ];
+        for (a, b, is_match) in amb_amb {
+            check_match::<AmbiguousDnaBase, AmbiguousDnaBase>(a, b, is_match);
+        }
+
+        let amb_iupac = [
+            ("", "", true),
+            ("", "A", false),
+            ("N", "", false),
+            ("A", "A", true),
+            ("A", "R", false),
+            ("N", "R", true),
+            ("N", "B", true),
+            ("N", "N", true),
+            ("N", "V", true),
+            ("C", "M", false),
+            ("AC", "AN", false),
+        ];
+        for (a, b, is_match) in amb_iupac {
+            check_match::<AmbiguousDnaBase, IupacDnaBase>(a, b, is_match);
+        }
+
+        let iupac_iupac = [
+            ("", "", true),
+            ("", "N", false),
+            ("N", "", false),
+            ("A", "A", true),
+            ("R", "A", true),
+            ("R", "G", true),
+            ("R", "R", true),
+            ("R", "Y", false),
+            ("B", "C", true),
+            ("B", "Y", true),
+            ("B", "R", false),
+            ("N", "R", true),
+            ("N", "B", true),
+            ("HV", "HV", true),
+            ("HV", "VH", false),
+            ("R", "RR", false),
+            ("RR", "R", false),
+        ];
+        for (a, b, is_match) in iupac_iupac {
+            check_match::<IupacDnaBase, IupacDnaBase>(a, b, is_match);
+        }
+    }
+
+    #[test]
+    fn regex_pattern() {
+        let base_base = [
+            ("", ""),
+            ("A", "[A]"),
+            ("AT", "[A][T]"),
+            ("ACGT", "[A][C][G][T]"),
+            ("TTTT", "[T][T][T][T]"),
+        ];
+        for (a, b) in base_base {
+            let a: Sequence<DnaBase> = a.parse().unwrap();
+            assert_eq!(a.compile_regex::<DnaBase>(), b, "{a:?}/{b:?}");
+        }
+
+        let amb_amb = [
+            ("", ""),
+            ("N", "[ACGTN]"),
+            ("AN", "[A][ACGTN]"),
+            ("NA", "[ACGTN][A]"),
+            ("NN", "[ACGTN][ACGTN]"),
+            ("ACGNTA", "[A][C][G][ACGTN][T][A]"),
+        ];
+        for (a, b) in amb_amb {
+            let a: Sequence<AmbiguousDnaBase> = a.parse().unwrap();
+            assert_eq!(a.compile_regex::<AmbiguousDnaBase>(), b, "{a:?}/{b:?}");
+        }
+
+        let iupac_base = [
+            ("", ""),
+            ("A", "[A]"),
+            ("C", "[C]"),
+            ("G", "[G]"),
+            ("T", "[T]"),
+            ("R", "[AG]"),
+            ("Y", "[CT]"),
+            ("S", "[GC]"),
+            ("W", "[AT]"),
+            ("K", "[GT]"),
+            ("M", "[AC]"),
+            ("B", "[CTG]"),
+            ("D", "[ATG]"),
+            ("H", "[ACT]"),
+            ("V", "[ACG]"),
+            ("N", "[ACGT]"),
+            ("AR", "[A][AG]"),
+            ("RA", "[AG][A]"),
+            ("RNY", "[AG][ACGT][CT]"),
+            ("BHV", "[CTG][ACT][ACG]"),
+            ("NN", "[ACGT][ACGT]"),
+            ("RS", "[AG][GC]"),
+            ("MK", "[AC][GT]"),
+            ("SW", "[GC][AT]"),
+            ("BDHVN", "[CTG][ATG][ACT][ACG][ACGT]"),
+            ("ACGNTA", "[A][C][G][ACGT][T][A]"),
+        ];
+        for (a, b) in iupac_base {
+            let a: Sequence<IupacDnaBase> = a.parse().unwrap();
+            assert_eq!(a.compile_regex::<DnaBase>(), b, "{a:?}/{b:?}");
+        }
+
+        let iupac_iupac = [
+            ("", ""),
+            ("R", "[AGR]"),
+            ("Y", "[CTY]"),
+            ("S", "[GCS]"),
+            ("W", "[ATW]"),
+            ("K", "[GTK]"),
+            ("M", "[ACM]"),
+            ("B", "[CTGYSKB]"),
+            ("D", "[ATGRWKD]"),
+            ("H", "[ACTYWMH]"),
+            ("V", "[ACGRSMV]"),
+            ("N", "[ACGTRYSWKMBDHVN]"),
+            ("AR", "[A][AGR]"),
+            ("RA", "[AGR][A]"),
+            ("RNY", "[AGR][ACGTRYSWKMBDHVN][CTY]"),
+            ("BHV", "[CTGYSKB][ACTYWMH][ACGRSMV]"),
+        ];
+        for (a, b) in iupac_iupac {
+            let a: Sequence<IupacDnaBase> = a.parse().unwrap();
+            assert_eq!(a.compile_regex::<IupacDnaBase>(), b, "{a:?}/{b:?}");
+        }
     }
 }

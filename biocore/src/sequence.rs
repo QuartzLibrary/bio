@@ -545,9 +545,9 @@ impl<T> SequenceSlice<T> {
         self.into_iter().rev().cloned().map(T::complement).collect()
     }
 
-    pub fn matches<Target>(&self, target: &SequenceSlice<Target>) -> bool
+    pub fn is_exact_match<Target>(&self, target: &SequenceSlice<Target>) -> bool
     where
-        T: PatternChar<Target> + Clone,
+        T: MatchesChar<Target> + Clone,
         Target: PartialEq + Clone,
     {
         if self.len() != target.len() {
@@ -561,7 +561,7 @@ impl<T> SequenceSlice<T> {
 
     pub fn compile_regex<Target>(&self) -> String
     where
-        T: PatternChar<Target> + Clone,
+        T: MatchesChar<Target> + Clone,
         Target: AsciiChar,
     {
         T::compile_regex(self.iter().cloned())
@@ -578,16 +578,20 @@ pub trait AsciiChar: Sized {
     fn decode(bases: Vec<u8>) -> Result<Sequence<Self>, Self::DecodeError>;
 }
 
-pub trait PatternChar<Target>: Sized {
+/// A trait that documents what target characters match a given value
+/// and helps compile sequences into patterns.
+///
+/// For example `NGG` would be equivalent to a regex pattern `[ACGT][G][G]`.
+pub trait MatchesChar<Target>: Sized {
     /// For a given item, return all the target items that would match.
     /// For example, `N` as a DNA base would match any of the other bases.
-    fn matching(self) -> impl Iterator<Item = Target>;
+    fn iter_matching(self) -> impl Iterator<Item = Target>;
 
     fn matches(self, target: Target) -> bool
     where
         Target: PartialEq,
     {
-        self.matching().any(|m| m == target)
+        self.iter_matching().any(|m| m == target)
     }
 
     /// Compile a regex that matches the provided sequence.
@@ -597,7 +601,7 @@ pub trait PatternChar<Target>: Sized {
         Target: AsciiChar,
     {
         items
-            .map(Self::matching)
+            .map(Self::iter_matching)
             .flat_map(|matching| {
                 let p = matching.map(|m| m.single_encode().to_char());
                 [].into_iter().chain(['[']).chain(p).chain([']'])
