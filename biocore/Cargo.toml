@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 utile = { path = "../utile" }
 
+either = "1"
 log = "0.4"
 noodles = { version = "0.98", features = ["core", "fasta", "vcf", "tabix", "bgzf", "csi", "bcf"] }
 ref-cast = "1"
