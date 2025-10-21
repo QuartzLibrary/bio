@@ -99,11 +99,11 @@ impl DnaBase {
         }
     }
 
-    pub fn to_char(&self) -> char {
-        *self as u8 as char
+    pub fn to_char(self) -> char {
+        self as u8 as char
     }
-    pub fn to_byte(&self) -> u8 {
-        *self as u8
+    pub fn to_byte(self) -> u8 {
+        self as u8
     }
 
     pub fn iter() -> impl Iterator<Item = Self> {
@@ -111,12 +111,12 @@ impl DnaBase {
     }
 
     // Check if the nucleotide is a purine (A or G)
-    pub fn is_purine(&self) -> bool {
+    pub fn is_purine(self) -> bool {
         matches!(self, Self::A | Self::G)
     }
 
     // Check if the nucleotide is a pyrimidine (C or T)
-    pub fn is_pyrimidine(&self) -> bool {
+    pub fn is_pyrimidine(self) -> bool {
         matches!(self, Self::C | Self::T)
     }
 }
@@ -137,7 +137,7 @@ impl AsciiChar for DnaBase {
     where
         Self: Sized,
     {
-        bases.iter().map(Self::to_char).collect()
+        bases.iter().copied().map(Self::to_char).collect()
     }
 
     type DecodeError = DnaDecodeError;
@@ -257,11 +257,11 @@ impl AmbiguousDnaBase {
         }
     }
 
-    pub fn to_char(&self) -> char {
-        *self as u8 as char
+    pub fn to_char(self) -> char {
+        self as u8 as char
     }
-    pub fn to_byte(&self) -> u8 {
-        *self as u8
+    pub fn to_byte(self) -> u8 {
+        self as u8
     }
 
     pub fn iter() -> impl Iterator<Item = Self> {
@@ -269,16 +269,16 @@ impl AmbiguousDnaBase {
     }
 
     // Check if the nucleotide is a purine (A or G)
-    pub fn is_purine(&self) -> bool {
+    pub fn is_purine(self) -> bool {
         matches!(self, Self::A | Self::G)
     }
     // Check if the nucleotide is a pyrimidine (C or T)
-    pub fn is_pyrimidine(&self) -> bool {
+    pub fn is_pyrimidine(self) -> bool {
         matches!(self, Self::C | Self::T)
     }
 
-    pub fn is_ambiguous(&self) -> bool {
-        !matches!(self, Self::A | Self::C | Self::G | Self::T)
+    pub fn is_ambiguous(self) -> bool {
+        self == Self::N
     }
 }
 impl From<AmbiguousDnaBase> for u8 {
@@ -298,7 +298,7 @@ impl AsciiChar for AmbiguousDnaBase {
     where
         Self: Sized,
     {
-        bases.iter().map(Self::to_char).collect()
+        bases.iter().copied().map(Self::to_char).collect()
     }
 
     type DecodeError = DnaDecodeError;
@@ -406,11 +406,11 @@ impl IupacDnaBase {
         }
     }
 
-    pub fn to_char(&self) -> char {
-        *self as u8 as char
+    pub fn to_char(self) -> char {
+        self as u8 as char
     }
-    pub fn to_byte(&self) -> u8 {
-        *self as u8
+    pub fn to_byte(self) -> u8 {
+        self as u8
     }
 
     pub fn iter() -> impl Iterator<Item = Self> {
@@ -434,13 +434,13 @@ impl IupacDnaBase {
         .into_iter()
     }
 
-    pub fn is_purine(&self) -> bool {
+    pub fn is_purine(self) -> bool {
         matches!(self, Self::A | Self::G | Self::R)
     }
-    pub fn is_pyrimidine(&self) -> bool {
+    pub fn is_pyrimidine(self) -> bool {
         matches!(self, Self::C | Self::T | Self::Y)
     }
-    pub fn is_ambiguous(&self) -> bool {
+    pub fn is_ambiguous(self) -> bool {
         !matches!(self, Self::A | Self::C | Self::G | Self::T)
     }
 }
@@ -461,7 +461,7 @@ impl AsciiChar for IupacDnaBase {
     where
         Self: Sized,
     {
-        bases.iter().map(Self::to_char).collect()
+        bases.iter().copied().map(Self::to_char).collect()
     }
 
     type DecodeError = DnaDecodeError;
