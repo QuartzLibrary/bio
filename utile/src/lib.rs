@@ -16,6 +16,7 @@ pub mod num;
 pub mod plot;
 pub mod python;
 pub mod range;
+pub mod regex_ext;
 pub mod resource;
 pub mod serde_ext;
 pub mod task;
