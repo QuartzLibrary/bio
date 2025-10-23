@@ -263,9 +263,45 @@ pub mod codons {
 
         use utile::collections::complete_map::CompleteHashMap;
 
-        use crate::dna::{DnaBase, DnaBase::*};
+        use crate::{
+            aminoacid::ProteinSequence,
+            dna::DnaBase::{self, *},
+        };
 
         use super::super::AminoAcid;
+
+        impl crate::dna::DnaSequenceSlice {
+            /// Convert a DNA sequence to an amino acid sequence.
+            ///
+            /// Note: this will truncate the sequence if it is not a multiple of 3.
+            /// Note: this will stop if a stop codon is encountered.
+            /// Note: uses the [STANDARD] mapping.
+            pub fn to_amino_acids(&self) -> ProteinSequence {
+                self.chunks(3)
+                    .filter_map(|codon| {
+                        let codon: &[DnaBase; 3] = codon
+                            .try_into()
+                            .inspect_err(|_| {
+                                log::debug!("DNA sequence was not a multiple of 3, truncating.");
+                            })
+                            .ok()?;
+
+                        Some(codon)
+                    })
+                    .map(|codon| {
+                        let aa = *STANDARD.get(codon);
+                        if aa.is_none() {
+                            log::debug!(
+                                "Amino acid sequence terminated early due to stop codon ({codon:?})."
+                            );
+                        }
+                        aa
+                    })
+                    .take_while(Option::is_some)
+                    .flatten()
+                    .collect()
+            }
+        }
 
         /// Standard genetic code translation from a DNA codon (5'->3') to an amino acid.
         /// (AA, start_codon, stop_codon)

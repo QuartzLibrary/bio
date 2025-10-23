@@ -683,6 +683,16 @@ pub mod pattern {
     }
 }
 
+pub mod util {
+    use super::Complement;
+
+    // TODO: Maybe move to an extension trait for arrays/sequences/slices?
+    pub fn array_reverse_complement<const N: usize, T: Complement>(mut array: [T; N]) -> [T; N] {
+        array.reverse();
+        array.map(T::complement)
+    }
+}
+
 mod from {
     use super::*;
 

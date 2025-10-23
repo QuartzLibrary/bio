@@ -1,5 +1,10 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt, io, ops::Index, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    fmt, io,
+    ops::{Index, Range},
+    sync::Arc,
+};
 
 use utile::{range::RangeExt, serde_ext::arc_str::SerdeArcStr};
 
@@ -14,6 +19,19 @@ use crate::{
 
 pub trait Contig: AsRef<str> + PartialEq + Eq + fmt::Debug {
     fn size(&self) -> u64;
+
+    fn at(self, at: u64) -> ContigPosition<Self>
+    where
+        Self: Sized,
+    {
+        ContigPosition { contig: self, at }
+    }
+    fn at_range(self, at: Range<u64>) -> ContigRange<Self>
+    where
+        Self: Sized,
+    {
+        ContigRange { contig: self, at }
+    }
 }
 impl<C> Contig for &C
 where
@@ -70,7 +88,7 @@ impl<'a> Contig for ContigRef<'a> {
     }
 }
 impl<'a> ContigRef<'a> {
-    pub fn new(name: &'a str, size: u64) -> Self {
+    pub const fn new(name: &'a str, size: u64) -> Self {
         Self { name, size }
     }
 }

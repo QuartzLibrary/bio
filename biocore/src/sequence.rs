@@ -318,6 +318,8 @@ impl<T> Sequence<T> {
     }
 }
 
+/// A sequence of bases or proteins.
+/// If this is a DNA/RNA sequence, it's 5' -> 3' by convention.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, ref_cast::RefCast)]
 #[repr(transparent)]
 pub struct SequenceSlice<T> {
