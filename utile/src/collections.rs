@@ -471,19 +471,19 @@ pub mod complete_map {
             self.0.len()
         }
 
-        pub fn get<Q>(&self, key: &Q) -> &V
+        // Note: we intentionally don't allow borrows to avoid allowing more general values.
+        // For example We dont' want to allow `&[T]` instead of `[T; 3]`.
+        pub fn get(&self, key: &K) -> &V
         where
-            K: std::borrow::Borrow<Q> + Hash + Eq,
-            Q: Hash + Eq + ?Sized,
+            K: Hash + Eq,
         {
-            self.0.get(std::borrow::Borrow::borrow(key)).unwrap()
+            self.0.get(key).unwrap()
         }
-        pub fn get_mut<Q>(&mut self, key: &Q) -> &mut V
+        pub fn get_mut(&mut self, key: &K) -> &mut V
         where
-            K: std::borrow::Borrow<Q> + Hash + Eq,
-            Q: Hash + Eq + ?Sized,
+            K: Hash + Eq,
         {
-            self.0.get_mut(std::borrow::Borrow::borrow(key)).unwrap()
+            self.0.get_mut(key).unwrap()
         }
 
         pub fn iter(&self) -> <&HashMap<K, V> as IntoIterator>::IntoIter {
@@ -516,23 +516,21 @@ pub mod complete_map {
             self.0.iter()
         }
     }
-    impl<K, Q, V> Index<&Q> for CompleteHashMap<K, V>
+    impl<K, V> Index<&K> for CompleteHashMap<K, V>
     where
-        K: std::borrow::Borrow<Q> + Hash + Eq,
-        Q: Hash + Eq + ?Sized,
+        K: Hash + Eq,
     {
         type Output = V;
 
-        fn index(&self, key: &Q) -> &V {
+        fn index(&self, key: &K) -> &V {
             self.get(key)
         }
     }
-    impl<K, Q, V> IndexMut<&Q> for CompleteHashMap<K, V>
+    impl<K, V> IndexMut<&K> for CompleteHashMap<K, V>
     where
-        K: std::borrow::Borrow<Q> + Hash + Eq,
-        Q: Hash + Eq + ?Sized,
+        K: Hash + Eq,
     {
-        fn index_mut(&mut self, key: &Q) -> &mut V {
+        fn index_mut(&mut self, key: &K) -> &mut V {
             self.get_mut(key)
         }
     }
@@ -570,19 +568,19 @@ pub mod complete_map {
             self.0.len()
         }
 
-        pub fn get<Q>(&self, key: &Q) -> &V
+        // Note: we intentionally don't allow borrows to avoid allowing more general values.
+        // For example We dont' want to allow `&[T]` instead of `[T; 3]`.
+        pub fn get(&self, key: &K) -> &V
         where
-            K: std::borrow::Borrow<Q> + Ord,
-            Q: Ord + ?Sized,
+            K: Ord,
         {
-            self.0.get(std::borrow::Borrow::borrow(key)).unwrap()
+            self.0.get(key).unwrap()
         }
-        pub fn get_mut<Q>(&mut self, key: &Q) -> &mut V
+        pub fn get_mut(&mut self, key: &K) -> &mut V
         where
-            K: std::borrow::Borrow<Q> + Ord,
-            Q: Ord + ?Sized,
+            K: Ord,
         {
-            self.0.get_mut(std::borrow::Borrow::borrow(key)).unwrap()
+            self.0.get_mut(key).unwrap()
         }
 
         pub fn iter(&self) -> <&BTreeMap<K, V> as IntoIterator>::IntoIter {
@@ -615,23 +613,21 @@ pub mod complete_map {
             self.0.iter()
         }
     }
-    impl<K, Q, V> Index<&Q> for CompleteBTreeMap<K, V>
+    impl<K, V> Index<&K> for CompleteBTreeMap<K, V>
     where
-        K: std::borrow::Borrow<Q> + Ord,
-        Q: Ord + ?Sized,
+        K: Ord,
     {
         type Output = V;
 
-        fn index(&self, key: &Q) -> &V {
+        fn index(&self, key: &K) -> &V {
             self.get(key)
         }
     }
-    impl<K, Q, V> IndexMut<&Q> for CompleteBTreeMap<K, V>
+    impl<K, V> IndexMut<&K> for CompleteBTreeMap<K, V>
     where
-        K: std::borrow::Borrow<Q> + Ord,
-        Q: Ord + ?Sized,
+        K: Ord,
     {
-        fn index_mut(&mut self, key: &Q) -> &mut V {
+        fn index_mut(&mut self, key: &K) -> &mut V {
             self.get_mut(key)
         }
     }
