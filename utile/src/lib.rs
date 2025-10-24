@@ -8,6 +8,7 @@ pub mod any;
 pub mod cache;
 pub mod collections;
 pub mod drop;
+pub mod fmt;
 pub mod fs;
 pub mod io;
 pub mod iter;
