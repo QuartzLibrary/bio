@@ -1,4 +1,17 @@
 [workspace]
-members = ["biocore", "ensembl", "genomes1000", "gwas_catalog", "hail", "ids", "liftover", "pan_ukbb", "pgs_catalog", "utile"]
+members = [
+    #
+    "biocore",
+    "ensembl",
+    "genomes1000",
+    "gwas_catalog",
+    "hail",
+    "ids",
+    "liftover",
+    "pan_ukbb",
+    "pgs_catalog",
+    "primeedit",
+    "utile",
+]
 exclude = ["target"]
 resolver = "2"
