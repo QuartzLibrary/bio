@@ -6,8 +6,12 @@ use std::{
 
 use biocore::{
     dna::{DnaBase, DnaSequence, IupacDnaBase, IupacDnaSequenceSlice},
-    genome::{ArcContig, ContigRef, EditedContig},
-    location::orientation::{SequenceOrientation, WithOrientation},
+    genome::{ArcContig, Contig, ContigRef, EditedContig},
+    location::{
+        ContigPosition, ContigRange,
+        orientation::{SequenceOrientation, WithOrientation},
+    },
+    mutation::SilentMutation,
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -17,20 +21,22 @@ use utile::{
     regex_ext::find_iter_overlapping,
 };
 
-use crate::{ContigPosition, ContigRange, SilentMutation, editor::Editor};
+use crate::editor::Editor;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
-pub struct Edit {
+pub struct Edit<C> {
+    contig: C,
+
     start: DnaSequence,
     original: DnaSequence,
     edited: DnaSequence,
     end: DnaSequence,
 
     /// On the sense/RNA-like strand (as opposed to the antisense/template strand).
-    pub translation_frame_start: Option<WithOrientation<ContigPosition>>,
+    pub translation_frame_start: Option<WithOrientation<ContigPosition<C>>>,
 }
-impl Edit {
+impl Edit<ArcContig> {
     pub fn parse(input: &str) -> Option<Self> {
         let (start, rest) = input.split_once('(')?;
         let (mut original, rest) = rest.split_once('/')?;
@@ -57,24 +63,42 @@ impl Edit {
             end = format!("{e}{end}");
         }
 
+        let start: DnaSequence = start.parse().ok()?;
+        let original: DnaSequence = original.parse().ok()?;
+        let edited: DnaSequence = edited.parse().ok()?;
+        let end: DnaSequence = end.parse().ok()?;
+
+        let contig = ArcContig::from_contig(ContigRef::new(
+            "original",
+            (start.len() + original.len() + end.len()).u64_unwrap(),
+        ));
+
         Some(Self {
-            start: start.parse().ok()?,
-            original: original.parse().ok()?,
-            edited: edited.parse().ok()?,
-            end: end.parse().ok()?,
+            contig,
+
+            start,
+            original,
+            edited,
+            end,
 
             translation_frame_start: None,
         })
     }
-
+}
+impl<C> Edit<C>
+where
+    C: Contig + Clone,
+{
     pub fn original_len(&self) -> usize {
         self.start.len() + self.original.len() + self.end.len()
     }
-    pub fn original_contig(&self) -> ArcContig {
-        ArcContig::from_contig(ContigRef::new("original", self.original_len() as u64))
+    pub fn original_contig(&self) -> C {
+        self.contig.clone()
     }
     pub fn original(&self) -> DnaSequence {
         let Self {
+            contig: _,
+
             start,
             original,
             edited: _,
@@ -83,8 +107,9 @@ impl Edit {
         } = self;
         format!("{start}{original}{end}").parse().unwrap()
     }
-    pub fn edit_range_in_original(&self) -> WithOrientation<ContigRange> {
+    pub fn edit_range_in_original(&self) -> WithOrientation<ContigRange<C>> {
         let Self {
+            contig: _,
             start,
             original,
             edited: _,
@@ -102,7 +127,7 @@ impl Edit {
         }
     }
     #[track_caller]
-    pub fn get_original(&self, range: WithOrientation<ContigRange>) -> DnaSequence {
+    pub fn get_original(&self, range: WithOrientation<ContigRange<C>>) -> DnaSequence {
         assert_eq!(self.original_contig(), range.v.contig);
         match range.orientation {
             SequenceOrientation::Forward => self.original()[range.v].to_owned(),
@@ -115,7 +140,7 @@ impl Edit {
     pub fn edited_len(&self) -> usize {
         self.start.len() + self.edited.len() + self.end.len()
     }
-    pub fn edited_contig(&self) -> EditedContig<ArcContig> {
+    pub fn edited_contig(&self) -> EditedContig<C> {
         let original_contig = self.original_contig();
         let remove = self.edit_range_in_original().v;
         let insert = self.raw_edit_range_in_edited().range_len();
@@ -123,6 +148,7 @@ impl Edit {
     }
     pub fn edited(&self) -> DnaSequence {
         let Self {
+            contig: _,
             start,
             original: _,
             edited,
@@ -131,18 +157,19 @@ impl Edit {
         } = self;
         format!("{start}{edited}{end}").parse().unwrap()
     }
-    pub fn edit_range_in_edited(&self) -> WithOrientation<ContigRange> {
+    pub fn edit_range_in_edited(&self) -> WithOrientation<ContigRange<EditedContig<C>>> {
         let range = self.raw_edit_range_in_edited();
         WithOrientation {
             orientation: SequenceOrientation::Forward,
             v: ContigRange {
-                contig: ArcContig::from_contig(self.edited_contig()),
+                contig: self.edited_contig(),
                 at: range,
             },
         }
     }
     fn raw_edit_range_in_edited(&self) -> Range<u64> {
         let Self {
+            contig: _,
             start,
             original: _,
             edited,
@@ -152,8 +179,8 @@ impl Edit {
         let range = start.len()..start.len() + edited.len();
         range.start.u64_unwrap()..range.end.u64_unwrap()
     }
-    pub fn get_edited(&self, range: WithOrientation<ContigRange>) -> DnaSequence {
-        assert_eq!(ArcContig::from_contig(self.edited_contig()), range.v.contig);
+    pub fn get_edited(&self, range: WithOrientation<ContigRange<EditedContig<C>>>) -> DnaSequence {
+        assert_eq!(self.edited_contig(), range.v.contig);
         match range.orientation {
             SequenceOrientation::Forward => self.edited()[range.v].to_owned(),
             SequenceOrientation::Reverse => self.edited().reverse_complement()[range.v].to_owned(),
@@ -170,7 +197,7 @@ impl Edit {
             })
     }
 
-    pub fn closest_pam(&self, editor: &Editor) -> Option<WithOrientation<ContigRange>> {
+    pub fn closest_pam(&self, editor: &Editor) -> Option<WithOrientation<ContigRange<C>>> {
         let edit_start = self.edit_range_in_original().into_start();
         let edit_start = edit_start.as_ref_contig();
         self.pams(editor)
@@ -182,7 +209,7 @@ impl Edit {
             })
             .cloned()
     }
-    pub fn distance_from_edit(&self, pam: WithOrientation<ContigRange>) -> i64 {
+    pub fn distance_from_edit(&self, pam: WithOrientation<ContigRange<C>>) -> i64 {
         let edit_start = self
             .edit_range_in_original()
             .into_orientation(pam.orientation)
@@ -195,7 +222,7 @@ impl Edit {
     }
 
     /// Returns the PAM locations in the original sequence, all ranges are 5' → 3' (and annotated with the orientation).
-    pub fn pams(&self, editor: &Editor) -> Vec<WithOrientation<ContigRange>> {
+    pub fn pams(&self, editor: &Editor) -> Vec<WithOrientation<ContigRange<C>>> {
         let Editor {
             pam_pattern,
             nick_distance,
@@ -250,8 +277,8 @@ impl Edit {
     pub fn nick(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange>,
-    ) -> Option<WithOrientation<ContigPosition>> {
+        pam: WithOrientation<ContigRange<C>>,
+    ) -> Option<WithOrientation<ContigPosition<C>>> {
         Some(WithOrientation {
             orientation: pam.orientation,
             v: pam.into_start().v.checked_sub(editor.nick_distance)?,
@@ -260,20 +287,19 @@ impl Edit {
     pub fn nick_in_edited(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange>,
-    ) -> Option<WithOrientation<ContigPosition>> {
-        let contig = ArcContig::from_contig(self.edited_contig());
-        let mut nick = self.nick(editor, pam)?;
-        // Since the nick is where the edit start, the position doesn't change and we can just update the contig.
-        nick.v.contig = contig;
-        Some(nick)
+        pam: WithOrientation<ContigRange<C>>,
+    ) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
+        Some(
+            self.nick(editor, pam)?
+                .map_value(|p| p.map_contig(|_| self.edited_contig())),
+        )
     }
     /// The spacer matches the sequence on the same side as the PAM, and will anneal to the opposite side.
     pub fn spacer(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange>,
-    ) -> Option<WithOrientation<ContigRange>> {
+        pam: WithOrientation<ContigRange<C>>,
+    ) -> Option<WithOrientation<ContigRange<C>>> {
         let spacer_size = editor.spacer_size;
         if pam.v.at.start < spacer_size {
             return None;
@@ -291,16 +317,16 @@ impl Edit {
     pub fn cas_target(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange>,
-    ) -> Option<WithOrientation<ContigRange>> {
+        pam: WithOrientation<ContigRange<C>>,
+    ) -> Option<WithOrientation<ContigRange<C>>> {
         Some(self.spacer(editor, pam)?.flip_orientation())
     }
     /// The section between the nick and the PAM.
     pub fn editable_seed(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange>,
-    ) -> Option<WithOrientation<ContigRange>> {
+        pam: WithOrientation<ContigRange<C>>,
+    ) -> Option<WithOrientation<ContigRange<C>>> {
         let start = pam.v.at.start;
         Some(WithOrientation {
             orientation: pam.orientation,
@@ -314,8 +340,8 @@ impl Edit {
     pub fn editable_range(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange>,
-    ) -> Option<WithOrientation<ContigRange>> {
+        pam: WithOrientation<ContigRange<C>>,
+    ) -> Option<WithOrientation<ContigRange<C>>> {
         let start = pam.v.at.start;
         Some(WithOrientation {
             orientation: pam.orientation,
@@ -329,8 +355,8 @@ impl Edit {
     pub fn non_editable_range(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange>,
-    ) -> Option<WithOrientation<ContigRange>> {
+        pam: WithOrientation<ContigRange<C>>,
+    ) -> Option<WithOrientation<ContigRange<C>>> {
         let start = pam.v.at.start;
         Some(WithOrientation {
             orientation: pam.orientation,
@@ -344,9 +370,9 @@ impl Edit {
     /// Capped at `cap` away from the edit.
     pub fn mmr_evading_ranges(
         &self,
-        pam: WithOrientation<ContigRange>,
+        pam: WithOrientation<ContigRange<C>>,
         cap: u64,
-    ) -> Option<impl Iterator<Item = WithOrientation<ContigRange>>> {
+    ) -> Option<impl Iterator<Item = WithOrientation<ContigRange<C>>>> {
         let mut edit_range = self.edit_range_in_original();
         edit_range.set_orientation(pam.orientation);
 
@@ -381,9 +407,9 @@ impl Edit {
     pub fn primer_binding_site(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange>,
+        pam: WithOrientation<ContigRange<C>>,
         pbs_size: u64,
-    ) -> Option<WithOrientation<ContigRange>> {
+    ) -> Option<WithOrientation<ContigRange<C>>> {
         let nick_distance = editor.nick_distance.u64_unwrap();
 
         let end = pam.v.at.start.checked_sub(nick_distance)?;
@@ -401,26 +427,29 @@ impl Edit {
     pub fn primer(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange>,
+        pam: WithOrientation<ContigRange<C>>,
         pbs_size: u64,
-    ) -> Option<WithOrientation<ContigRange>> {
+    ) -> Option<WithOrientation<ContigRange<C>>> {
         Some(
             self.primer_binding_site(editor, pam, pbs_size)?
                 .flip_orientation(),
         )
     }
 
-    pub fn translation_frame_start_edited(&self) -> Option<WithOrientation<ContigPosition>> {
+    pub fn translation_frame_start_edited(
+        &self,
+    ) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
         let translation_frame_start = self.translation_frame_start.clone()?;
 
         let result = self.edited_contig().liftover(translation_frame_start);
         if result.is_none() {
             log::warn!("Unable to lift translation frame into edited contig.\n{self:?}");
         }
-
-        Some(result?.map_value(|p| p.map_contig(ArcContig::from_contig)))
+        result
     }
-    pub fn original_silent_mutations(&self) -> Option<impl Iterator<Item = SilentMutation>> {
+    pub fn original_silent_mutations(
+        &self,
+    ) -> Option<impl Iterator<Item = SilentMutation<C, DnaBase>>> {
         Some(
             self.original()
                 .silent_mutations(self.translation_frame_start.clone()?)
@@ -428,7 +457,9 @@ impl Edit {
                 .into_iter(),
         )
     }
-    pub fn edited_silent_mutations(&self) -> Option<impl Iterator<Item = SilentMutation>> {
+    pub fn edited_silent_mutations(
+        &self,
+    ) -> Option<impl Iterator<Item = SilentMutation<EditedContig<C>, DnaBase>>> {
         Some(
             self.edited()
                 .silent_mutations(self.translation_frame_start_edited()?)

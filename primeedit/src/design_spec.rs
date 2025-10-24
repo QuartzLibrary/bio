@@ -1,7 +1,12 @@
 use std::{iter, ops::Range};
 
-use biocore::{dna::DnaBase, location::orientation::WithOrientation};
+use biocore::{
+    dna::DnaBase,
+    genome::{Contig, EditedContig},
+    location::orientation::WithOrientation,
+};
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 use utile::any::AnyMap;
 
 use crate::{ContigRange, Design, Editor, SilentMutation, edit::Edit};
@@ -74,23 +79,29 @@ impl DesignSpec {
     /// Returns all valid designs for the given edit and PAM.
     ///
     /// If you want to include distruptions, use [Self::designs_with_distruptions].
-    pub fn designs(
+    pub fn designs<C>(
         self,
-        edit: Edit,
-        pam: WithOrientation<ContigRange>,
-    ) -> Option<impl Iterator<Item = Design> + use<>> {
+        edit: Edit<C>,
+        pam: WithOrientation<ContigRange<C>>,
+    ) -> Option<impl Iterator<Item = Design<C>> + use<C>>
+    where
+        C: Contig + Clone + Hash,
+    {
         self.designs_with_distruptions(edit.clone(), pam.clone(), vec![])
     }
     /// Returns all valid designs for the given edit and PAM, with or without distruptions.
     ///
     /// If you don't want to include distruptions, use [Self::designs].
     // TODO: better name, and maybe make it combinatorial?
-    pub fn designs_with_and_without_distruptions(
+    pub fn designs_with_and_without_distruptions<C>(
         self,
-        edit: Edit,
-        pam: WithOrientation<ContigRange>,
-        distruptions: Vec<SilentMutation>,
-    ) -> Option<impl Iterator<Item = Design> + use<>> {
+        edit: Edit<C>,
+        pam: WithOrientation<ContigRange<C>>,
+        distruptions: Vec<SilentMutation<EditedContig<C>, DnaBase>>,
+    ) -> Option<impl Iterator<Item = Design<C>> + use<C>>
+    where
+        C: Contig + Clone + Hash,
+    {
         let any_distruptions = !distruptions.is_empty();
         Some(
             self.clone()
@@ -103,12 +114,15 @@ impl DesignSpec {
                 ),
         )
     }
-    fn designs_with_distruptions(
+    fn designs_with_distruptions<C>(
         self,
-        edit: Edit,
-        pam: WithOrientation<ContigRange>,
-        distruptions: Vec<SilentMutation>,
-    ) -> Option<impl Iterator<Item = Design> + use<>> {
+        edit: Edit<C>,
+        pam: WithOrientation<ContigRange<C>>,
+        distruptions: Vec<SilentMutation<EditedContig<C>, DnaBase>>,
+    ) -> Option<impl Iterator<Item = Design<C>> + use<C>>
+    where
+        C: Contig + Clone + Hash,
+    {
         let Self {
             editor,
             force_5_prime_g,

@@ -2,36 +2,35 @@ pub mod design_spec;
 pub mod edit;
 pub mod editor;
 
-use std::{collections::HashSet, ops::Range};
+use std::{collections::HashSet, hash::Hash, ops::Range};
 
 use biocore::{
     dna::{DnaBase, DnaSequence},
-    genome::ArcContig,
-    location::orientation::WithOrientation,
+    genome::{Contig, EditedContig},
+    location::{ContigPosition, ContigRange, orientation::WithOrientation},
+    mutation::SilentMutation,
 };
 use serde::{Deserialize, Serialize};
 use utile::num::TryUsize;
 
 use crate::{design_spec::DesignSpec, edit::Edit, editor::Editor};
 
-pub type ContigPosition = biocore::location::ContigPosition<ArcContig>;
-pub type ContigRange = biocore::location::ContigRange<ArcContig>;
-
-pub type SilentMutation = biocore::mutation::SilentMutation<ArcContig, DnaBase>;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
-pub struct Design {
-    pub edit: Edit,
+pub struct Design<C> {
+    pub edit: Edit<C>,
     pub editor: Editor,
-    pub pam: WithOrientation<ContigRange>,
+    pub pam: WithOrientation<ContigRange<C>>,
     pub force_5_prime_g: bool,
     pub primer_size: u64,
     pub rtt_template_homology: u64,
-    pub distruptions: Vec<SilentMutation>,
+    pub distruptions: Vec<SilentMutation<EditedContig<C>, DnaBase>>,
 }
 
-impl Design {
+impl<C> Design<C>
+where
+    C: Contig + Clone + Hash + PartialEq,
+{
     fn assert_valid(&self) {
         assert!(self.pams().contains(&self.pam));
 
@@ -115,7 +114,10 @@ impl Design {
             && self.distruptions.iter().all(|m| distruptions.contains(m))
             && self.is_in_range()
     }
-    pub fn with_distruptions(self, distruptions: Vec<SilentMutation>) -> Self {
+    pub fn with_distruptions(
+        self,
+        distruptions: Vec<SilentMutation<EditedContig<C>, DnaBase>>,
+    ) -> Self {
         Self {
             distruptions,
             ..self
@@ -127,28 +129,30 @@ impl Design {
             && self.reverse_transcriptase_template().is_some()
     }
 
-    fn mutation_in_edit_affects_pam(&self, m: &SilentMutation) -> bool {
+    fn mutation_in_edit_affects_pam(&self, m: &SilentMutation<EditedContig<C>, DnaBase>) -> bool {
         let edited_contig = self.edit.edited_contig();
         let affected_positions: HashSet<_> = m.affected_positions().collect();
         self.pam
             .iter_positions()
             .filter_map(move |p| edited_contig.clone().liftover(p))
-            .map(|p| p.map_value(|p| p.map_contig(ArcContig::from_contig)))
             .any(|p| affected_positions.contains(&p))
     }
-    fn mutation_in_edit_affects_seed(&self, m: &SilentMutation) -> bool {
+    fn mutation_in_edit_affects_seed(&self, m: &SilentMutation<EditedContig<C>, DnaBase>) -> bool {
         let edited_contig = self.edit.edited_contig();
         let affected_positions: HashSet<_> = m.affected_positions().collect();
         self.editable_seed()
             .into_iter()
             .flat_map(|editable_seed| editable_seed.iter_positions())
             .filter_map(move |p| edited_contig.clone().liftover(p))
-            .map(|p| p.map_value(|p| p.map_contig(ArcContig::from_contig)))
             .any(|p| affected_positions.contains(&p))
     }
     /// Any mutation that affects the bases surrounding the edit, excluding the seed and pam.
     // TODO: right now it just checks the selected range is affected, not that a mutation doesn't spill outside of the cap.
-    fn _mutation_in_edit_is_mmr_evading(&self, m: &SilentMutation, cap: u64) -> bool {
+    fn _mutation_in_edit_is_mmr_evading(
+        &self,
+        m: &SilentMutation<EditedContig<C>, DnaBase>,
+        cap: u64,
+    ) -> bool {
         let edited_contig = self.edit.edited_contig();
         let affected_positions: HashSet<_> = m.affected_positions().collect();
         self.edit
@@ -161,34 +165,23 @@ impl Design {
                     .liftover_range(r)
                     .expect("mmr evading does not overlap edit")
             })
-            .map(|p| p.map_value(|p| p.map_contig(ArcContig::from_contig)))
             .flat_map(|p| p.iter_positions())
             .any(|p| affected_positions.contains(&p))
     }
 
-    pub fn editable_range_in_edit(&self) -> Option<WithOrientation<ContigRange>> {
+    pub fn editable_range_in_edit(&self) -> Option<WithOrientation<ContigRange<EditedContig<C>>>> {
         let edited_contig = self.edit.edited_contig();
         let range = self.edit.editable_range(&self.editor, self.pam.clone())?;
-        Some(
-            edited_contig
-                .clone()
-                .liftover_range(range)
-                .unwrap()
-                .map_value(|v| v.map_contig(ArcContig::from_contig)),
-        )
+        Some(edited_contig.clone().liftover_range(range).unwrap())
     }
-    pub fn non_editable_range_in_edit(&self) -> Option<WithOrientation<ContigRange>> {
+    pub fn non_editable_range_in_edit(
+        &self,
+    ) -> Option<WithOrientation<ContigRange<EditedContig<C>>>> {
         let edited_contig = self.edit.edited_contig();
         let range = self
             .edit
             .non_editable_range(&self.editor, self.pam.clone())?;
-        Some(
-            edited_contig
-                .clone()
-                .liftover_range(range)
-                .unwrap()
-                .map_value(|v| v.map_contig(ArcContig::from_contig)),
-        )
+        Some(edited_contig.clone().liftover_range(range).unwrap())
     }
 
     pub fn has_poly_u(&self) -> Option<bool> {
@@ -250,7 +243,10 @@ impl Design {
     }
 }
 
-impl Design {
+impl<C> Design<C>
+where
+    C: Contig + Clone,
+{
     pub fn full_guide_sequence(&self) -> Option<DnaSequence> {
         let mut guide = self.spacer_sequence()?;
         guide.append(&mut self.editor.scaffold.clone());
@@ -259,23 +255,23 @@ impl Design {
         Some(guide)
     }
 
-    pub fn pams(&self) -> Vec<WithOrientation<ContigRange>> {
+    pub fn pams(&self) -> Vec<WithOrientation<ContigRange<C>>> {
         self.edit.pams(&self.editor)
     }
 
-    pub fn nick(&self) -> Option<WithOrientation<ContigPosition>> {
+    pub fn nick(&self) -> Option<WithOrientation<ContigPosition<C>>> {
         self.edit.nick(&self.editor, self.pam.clone())
     }
-    pub fn nick_in_edited(&self) -> Option<WithOrientation<ContigPosition>> {
+    pub fn nick_in_edited(&self) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
         self.edit.nick_in_edited(&self.editor, self.pam.clone())
     }
 
     /// The spacer matches the sequence on the same side as the PAM, and will anneal to the opposite side.
-    pub fn spacer(&self) -> Option<WithOrientation<ContigRange>> {
+    pub fn spacer(&self) -> Option<WithOrientation<ContigRange<C>>> {
         self.edit.spacer(&self.editor, self.pam.clone())
     }
     /// The CAS target is on the opposite strand as the PAM, it's what the spacer will anneal to.
-    pub fn cas_target(&self) -> Option<WithOrientation<ContigRange>> {
+    pub fn cas_target(&self) -> Option<WithOrientation<ContigRange<C>>> {
         self.edit.cas_target(&self.editor, self.pam.clone())
     }
     pub fn spacer_sequence(&self) -> Option<DnaSequence> {
@@ -287,16 +283,16 @@ impl Design {
     }
 
     /// The section between the nick and the PAM.
-    pub fn editable_seed(&self) -> Option<WithOrientation<ContigRange>> {
+    pub fn editable_seed(&self) -> Option<WithOrientation<ContigRange<C>>> {
         self.edit.editable_seed(&self.editor, self.pam.clone())
     }
 
-    pub fn primer_binding_site(&self) -> Option<WithOrientation<ContigRange>> {
+    pub fn primer_binding_site(&self) -> Option<WithOrientation<ContigRange<C>>> {
         self.edit
             .primer_binding_site(&self.editor, self.pam.clone(), self.primer_size)
     }
     /// The primer matches the sequence on the opposite side as the PAM.
-    pub fn primer(&self) -> Option<WithOrientation<ContigRange>> {
+    pub fn primer(&self) -> Option<WithOrientation<ContigRange<C>>> {
         self.edit
             .primer(&self.editor, self.pam.clone(), self.primer_size)
     }
@@ -316,7 +312,7 @@ impl Design {
             distruptions,
         } = self;
 
-        let edited_contig = ArcContig::from_contig(edit.edited_contig());
+        let edited_contig = edit.edited_contig();
         let orientation = pam.orientation;
 
         let nick = edit.nick_in_edited(editor, pam.clone())?;
@@ -350,7 +346,7 @@ impl Design {
         )
     }
     /// The full edited range, including silent mutations.
-    pub fn full_edited_range_in_edited(&self) -> WithOrientation<ContigRange> {
+    pub fn full_edited_range_in_edited(&self) -> WithOrientation<ContigRange<EditedContig<C>>> {
         let Self {
             edit,
             editor: _,
@@ -361,7 +357,7 @@ impl Design {
             distruptions,
         } = self;
         let orientation = pam.orientation;
-        let edited_contig = ArcContig::from_contig(edit.edited_contig());
+        let edited_contig = edit.edited_contig();
 
         assert_eq!(edited_contig, edit.edit_range_in_edited().v.contig);
 
