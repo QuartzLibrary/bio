@@ -89,6 +89,9 @@ impl<C> Edit<C>
 where
     C: Contig + Clone,
 {
+    pub fn has_any_effect(&self) -> bool {
+        self.original != self.edited // Both could be empty
+    }
     pub fn original_len(&self) -> usize {
         self.start.len() + self.original.len() + self.end.len()
     }
@@ -234,21 +237,17 @@ where
 
         let original = self.original();
 
-        if original.len().u64_unwrap() < nick_distance + pam_size {
-            return vec![];
-        }
-
         let edit_range = self.edit_range_in_original();
 
         let mut forward = edit_range.clone().into_start().v;
         let mut reverse = edit_range.flip_orientation().into_start().v;
 
         // We can go slightly past the edit range because the nick is before the PAM.
-        forward += nick_distance;
-        reverse += nick_distance;
+        forward.saturating_add_assign(nick_distance);
+        reverse.saturating_add_assign(nick_distance);
         // And we include the PAM size so that the regex can find it even if at the end.
-        forward += pam_size;
-        reverse += pam_size;
+        forward.saturating_add_assign(pam_size);
+        reverse.saturating_add_assign(pam_size);
 
         let regex = cached_regex(pam_pattern);
 
@@ -368,7 +367,8 @@ where
     }
     /// The ranges that are editable, but excluding the seed, pam, and the region that is already being edited.
     /// Capped at `cap` away from the edit.
-    pub fn mmr_evading_ranges(
+    // TODO: test
+    pub(super) fn _mmr_evading_ranges(
         &self,
         pam: WithOrientation<ContigRange<C>>,
         cap: u64,
@@ -469,7 +469,7 @@ where
     }
 }
 
-fn cached_regex(regex: &IupacDnaSequenceSlice) -> Arc<Regex> {
+pub(super) fn cached_regex(regex: &IupacDnaSequenceSlice) -> Arc<Regex> {
     static PAM_REGEX: LazyLock<Arc<Regex>> = LazyLock::new(|| {
         let sequence = Editor::sp_cas9().pam_pattern.compile_regex::<DnaBase>();
         Arc::new(Regex::new(&sequence).unwrap())
@@ -486,4 +486,166 @@ fn cached_regex(regex: &IupacDnaSequenceSlice) -> Arc<Regex> {
         .entry(regex.clone())
         .or_insert_with(|| Arc::new(Regex::new(&regex).unwrap()))
         .clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use biocore::genome::ArcContig;
+    use utile::num::TryU64;
+
+    const EDIT_REGEX: &str = r"[ACGT]{0,50}\([ACGT]{0,5}/[ACGT]{0,5}\)[ACGT]{0,50}";
+
+    proptest::proptest! {
+        #[test]
+        fn test_parse_edit(edit in EDIT_REGEX) {
+            Edit::parse(&edit).unwrap();
+        }
+
+        #[test]
+        fn test_no_panic(edit in EDIT_REGEX) {
+            run_all_methods(&Edit::parse(&edit).unwrap());
+        }
+
+        #[test]
+        fn test_invariants(edit in EDIT_REGEX) {
+            invariants(&Edit::parse(&edit).unwrap());
+        }
+    }
+
+    fn run_all_methods(edit: &Edit<ArcContig>) {
+        let editor = Editor::sp_cas9();
+        let _ = edit.edit_range_in_original();
+        let _ = edit.edit_range_in_edited();
+        let _ = edit.original_len();
+        let _ = edit.edited_len();
+        let _ = edit.original_contig();
+        let _ = edit.edited_contig();
+        let _ = edit.original();
+        let _ = edit.edited();
+        edit.diff_edit_range().for_each(drop);
+        let pams = edit.pams(&editor);
+        for pam in pams {
+            let _ = edit.nick(&editor, pam.clone());
+            let _ = edit.spacer(&editor, pam.clone());
+            let _ = edit.editable_seed(&editor, pam.clone());
+            let _ = edit.primer_binding_site(&editor, pam.clone(), 10);
+            let _ = edit.primer(&editor, pam.clone(), 10);
+        }
+    }
+
+    fn invariants(edit: &Edit<ArcContig>) {
+        let editor = Editor::sp_cas9();
+
+        let pams = edit.pams(&editor);
+        for pam in pams {
+            assert!(pam.v.at.start < edit.original_len().u64_unwrap());
+            assert!(pam.v.at.end <= edit.original_len().u64_unwrap());
+
+            let seq = edit.get_original(pam.clone());
+            assert_eq!(seq.len(), 3);
+            assert_eq!(&seq.to_string()[1..3], "GG");
+
+            if let Some(nick) = edit.nick(&editor, pam.clone()) {
+                let expected_nick = pam.v.at.start.checked_sub(editor.nick_distance);
+                assert_eq!(Some(nick.v.at), expected_nick);
+                assert_eq!(nick.orientation, pam.orientation);
+
+                let non_editable = edit.non_editable_range(&editor, pam.clone()).unwrap();
+                let editable = edit.editable_range(&editor, pam.clone()).unwrap();
+                assert_eq!(non_editable.v.at.end, editable.v.at.start);
+                assert_eq!(non_editable.v.at.start, 0);
+                assert_eq!(editable.v.at.end, edit.original_len().u64_unwrap());
+
+                let nick_in_edited = edit.nick_in_edited(&editor, pam.clone()).unwrap();
+                assert_eq!(nick.v.at, nick_in_edited.v.at);
+                assert_eq!(nick.orientation, nick_in_edited.orientation);
+            } else {
+                assert!(pam.v.at.start < editor.nick_distance);
+            }
+
+            if let Some(spacer) = edit.spacer(&editor, pam.clone()) {
+                assert_eq!(spacer.v.len(), editor.spacer_size);
+                assert_eq!(spacer.v.at.end, pam.v.at.start);
+                assert_eq!(spacer.orientation, pam.orientation);
+                let target = edit.cas_target(&editor, pam.clone()).unwrap();
+                assert_eq!(spacer, target.flip_orientation());
+            } else {
+                assert!(pam.v.at.start < editor.spacer_size);
+            }
+
+            if let Some(seed) = edit.editable_seed(&editor, pam.clone()) {
+                assert_eq!(seed.v.len(), editor.nick_distance);
+                assert_eq!(seed.v.at.end, pam.v.at.start);
+                assert_eq!(seed.orientation, pam.orientation);
+            }
+
+            for pbs_size in [8, 10, 13, 15] {
+                if let Some(pbs) = edit.primer_binding_site(&editor, pam.clone(), pbs_size) {
+                    assert_eq!(pbs.v.len(), pbs_size);
+                    assert_eq!(pbs.orientation, pam.orientation);
+
+                    let nick = edit.nick(&editor, pam.clone()).unwrap();
+                    assert_eq!(pbs.v.at.end, nick.v.at);
+                } else {
+                    assert!(pam.v.at.start < editor.nick_distance + pbs_size);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_pam_finding_sanity_check() {
+        let editor = Editor::sp_cas9();
+
+        let edit = Edit::parse("TTTTTTGGGTTT(/)TTTCCCTTTTTT").unwrap();
+        let pams = edit.pams(&editor);
+
+        assert_eq!(
+            pams,
+            vec![
+                WithOrientation {
+                    orientation: SequenceOrientation::Forward,
+                    v: ContigRange {
+                        contig: edit.original_contig(),
+                        at: 5..8
+                    }
+                },
+                WithOrientation {
+                    orientation: SequenceOrientation::Forward,
+                    v: ContigRange {
+                        contig: edit.original_contig(),
+                        at: 6..9
+                    }
+                },
+                WithOrientation {
+                    orientation: SequenceOrientation::Reverse,
+                    v: ContigRange {
+                        contig: edit.original_contig(),
+                        at: 5..8
+                    }
+                },
+                WithOrientation {
+                    orientation: SequenceOrientation::Reverse,
+                    v: ContigRange {
+                        contig: edit.original_contig(),
+                        at: 6..9
+                    }
+                }
+            ]
+        );
+
+        let short_edit = Edit::parse("AGGA(C/T)").unwrap();
+        let pams = short_edit.pams(&editor);
+        assert_eq!(pams.len(), 1);
+
+        let no_pam = Edit::parse("AAAAAAAAAAAAAAAAAAAA(C/T)AAAAAAAAAAAAAAAA").unwrap();
+        let pams = no_pam.pams(&editor);
+        assert_eq!(pams.len(), 0);
+
+        let overlap = Edit::parse("AAAAAAAAAGGGGAAAAAAAAAAA(C/T)AAAAAAAAAAA").unwrap();
+        let pams = overlap.pams(&editor);
+        assert_eq!(pams.len(), 3);
+    }
 }

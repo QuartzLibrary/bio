@@ -172,8 +172,7 @@ impl DesignSpec {
             // Checks sizing, so we don't have to worry about that.
             .filter(|design| design.is_in_range())
             .flat_map(move |design| {
-                let spacer_range = design.spacer().expect("sizing");
-                let first_spacer_base = design.edit.get_original(spacer_range)[0];
+                let first_spacer_base = design.unforced_spacer_sequence().expect("sizing")[0];
 
                 let forced = {
                     let mut design = design.clone();
@@ -217,7 +216,177 @@ impl DesignSpec {
                 minimum_edit_size
                     .is_none_or(|min| min <= design.full_edited_range_in_edited().v.len())
             })
-            .inspect(|design| design.assert_valid())
+            .inspect(move |design| {
+                #[cfg(debug_assertions)]
+                design.assert_valid();
+                #[cfg(debug_assertions)]
+                design.assert_compliant(&self);
+                let _ = design; // Suppress unused warning.
+            })
             .any_map(Some)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use biocore::genome::ArcContig;
+
+    const EDIT_REGEX: &str = r"[ACGT]{0,50}\([ACGT]{0,5}/[ACGT]{0,5}\)[ACGT]{0,50}";
+
+    fn make_edit(s: &str) -> Edit<ArcContig> {
+        Edit::parse(s).unwrap()
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn test_designs_all_compliant(edit in EDIT_REGEX) {
+            test_designs_all_compliant_(&edit);
+        }
+    }
+    fn test_designs_all_compliant_(edit: &str) {
+        let edit = Edit::parse(edit).unwrap();
+
+        let spec = DesignSpec::default();
+
+        for pam in edit.pams(&spec.editor) {
+            let designs = spec.clone().designs(edit.clone(), pam).unwrap();
+
+            for design in designs {
+                design.assert_compliant(&spec);
+                design.assert_valid();
+            }
+        }
+    }
+
+    #[test]
+    fn test_sanity_check_count() {
+        let spec = DesignSpec {
+            editor: Editor::sp_cas9(),
+            force_5_prime_g: Some(false),
+            primer_size_range: 10..12,
+            rtt_template_homology_range: 14..16,
+            avoid_poly_u: false,
+            avoid_rtt_cytosine: false,
+            require_seed_or_pam_disruption: false,
+            minimum_edit_size: None,
+        };
+
+        let edit =
+            Edit::parse("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATGGAA(C/T)AAAAAAAAAAAAAAAAAAAA").unwrap();
+        let pam = edit.pams(&spec.editor).into_iter().next().unwrap();
+
+        let designs = spec.designs(edit, pam).unwrap();
+        assert_eq!(designs.count(), 4);
+    }
+
+    #[test]
+    fn test_avoid_poly_u_filter() {
+        let spec_avoid = DesignSpec {
+            avoid_poly_u: true,
+            ..DesignSpec::default()
+        };
+
+        let spec_allow = DesignSpec {
+            avoid_poly_u: false,
+            ..DesignSpec::default()
+        };
+
+        let edit =
+            Edit::parse("AAAAAAAAAAAAAAAAAAAAAAAATGGAAAAAA(C/T)AAAAAAAAAAAAAAAAAAA").unwrap();
+
+        assert!(!edit.pams(&spec_avoid.editor).is_empty());
+
+        for pam in edit.pams(&spec_avoid.editor) {
+            let designs_avoid = spec_avoid
+                .clone()
+                .designs(edit.clone(), pam.clone())
+                .unwrap();
+            let designs_allow = spec_allow
+                .clone()
+                .designs(edit.clone(), pam.clone())
+                .unwrap();
+
+            assert_eq!(0, designs_avoid.count());
+            assert!(designs_allow.count() > 0);
+        }
+    }
+
+    #[test]
+    fn test_avoid_rtt_cytosine_filter() {
+        let spec = DesignSpec {
+            avoid_rtt_cytosine: true,
+            avoid_poly_u: false,
+            rtt_template_homology_range: 3..4,
+            ..DesignSpec::default()
+        };
+
+        {
+            let edit =
+                Edit::parse("AAAAAAAAAAAAAAAAAAAAAAAATGGAAA(C/T)AAGAAAAAAAAAAAAAAAA").unwrap();
+
+            assert!(!edit.pams(&spec.editor).is_empty());
+
+            for pam in edit.pams(&spec.editor) {
+                let mut range = edit.edit_range_in_original().into_forward();
+                range.v += 3;
+                let v = *edit.get_original(range).last().unwrap();
+                assert_eq!(v, DnaBase::G);
+
+                let mut designs = spec.clone().designs(edit.clone(), pam.clone()).unwrap();
+                assert!(designs.next().is_none());
+            }
+        }
+
+        {
+            let edit =
+                Edit::parse("AAAAAAAAAAAAAAAAAAAAAAAATGGAAA(C/T)AATAAAAAAAAAAAAAAAA").unwrap();
+
+            assert!(!edit.pams(&spec.editor).is_empty());
+
+            for pam in edit.pams(&spec.editor) {
+                let mut range = edit.edit_range_in_original().into_forward();
+                range.v += 3;
+                let v = *edit.get_original(range).last().unwrap();
+                assert_eq!(v, DnaBase::T);
+
+                let mut designs = spec.clone().designs(edit.clone(), pam.clone()).unwrap();
+                assert!(designs.next().is_some());
+            }
+        }
+    }
+
+    #[test]
+    fn test_require_seed_or_pam_disruption_filter() {
+        let spec = DesignSpec {
+            require_seed_or_pam_disruption: true,
+            avoid_poly_u: false,
+            ..DesignSpec::default()
+        };
+
+        let edit = make_edit("AAAAAAAAAAAAAAAAAAAAAAAAA(C/T)TGGAAAAAAAAAAAAAAAAA");
+        assert!(!edit.pams(&spec.editor).is_empty());
+        for pam in edit.pams(&spec.editor) {
+            let designs = spec.clone().designs(edit.clone(), pam.clone()).unwrap();
+            assert!(designs.count() > 0);
+            let designs = spec.clone().designs(edit.clone(), pam.clone()).unwrap();
+            for design in designs {
+                assert!(design.distrupts_seed().unwrap());
+                assert!(!design.distrupts_pam().unwrap());
+            }
+        }
+
+        let edit = make_edit("AAAAAAAAAAAAAAAAAAAAAAAAAT(G/C)GAAAAAAAAAAAAAAAAA");
+        assert!(!edit.pams(&spec.editor).is_empty());
+        for pam in edit.pams(&spec.editor) {
+            let designs = spec.clone().designs(edit.clone(), pam.clone()).unwrap();
+            assert!(designs.count() > 0);
+            let designs = spec.clone().designs(edit.clone(), pam.clone()).unwrap();
+            for design in designs {
+                assert!(!design.distrupts_seed().unwrap());
+                assert!(design.distrupts_pam().unwrap());
+            }
+        }
     }
 }

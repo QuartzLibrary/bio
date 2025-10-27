@@ -11,3 +11,7 @@ diff = "0.1"
 log = "0.4"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+proptest = "1.9"
+rand = { version = "0.9", features = ["small_rng"] }

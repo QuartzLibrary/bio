@@ -21,8 +21,11 @@ pub struct Design<C> {
     pub edit: Edit<C>,
     pub editor: Editor,
     pub pam: WithOrientation<ContigRange<C>>,
+    /// See [DesignSpec::force_5_prime_g].
     pub force_5_prime_g: bool,
+    /// See [DesignSpec::primer_size_range].
     pub primer_size: u64,
+    /// See [DesignSpec::rtt_template_homology_range].
     pub rtt_template_homology: u64,
     pub distruptions: Vec<SilentMutation<EditedContig<C>, DnaBase>>,
 }
@@ -31,8 +34,8 @@ impl<C> Design<C>
 where
     C: Contig + Clone + Hash + PartialEq,
 {
-    fn assert_valid(&self) {
-        assert!(self.pams().contains(&self.pam));
+    pub fn assert_valid(&self) {
+        assert!(self.edit.pams(&self.editor).contains(&self.pam));
 
         let distruptions: HashSet<_> = self
             .edit
@@ -51,10 +54,58 @@ where
 
         assert!(self.is_valid());
     }
-    fn assert_in_range(&self) {
+    pub fn assert_in_range(&self) {
         assert!(self.spacer().is_some());
         assert!(self.primer_binding_site().is_some());
         assert!(self.reverse_transcriptase_template().is_some());
+    }
+    pub fn assert_compliant(&self, spec: &DesignSpec) {
+        let DesignSpec {
+            editor,
+            force_5_prime_g,
+            primer_size_range,
+            rtt_template_homology_range,
+            avoid_poly_u,
+            avoid_rtt_cytosine,
+            require_seed_or_pam_disruption,
+            minimum_edit_size,
+        } = spec;
+        {
+            let Self {
+                edit: _,
+                editor: _,
+                pam: _,
+                force_5_prime_g: _,
+                primer_size: _,
+                rtt_template_homology: _,
+                distruptions: _,
+            } = self; // Exhaustiveness check.
+        }
+        assert!(editor == &self.editor);
+        if let Some(force_5_prime_g) = force_5_prime_g {
+            let equal = *force_5_prime_g == self.force_5_prime_g;
+            let last_5_prime_is_g = self
+                .unforced_spacer_sequence()
+                .map(|s| s[0])
+                .is_none_or(|b| b == DnaBase::G);
+            assert!(equal || last_5_prime_is_g);
+        }
+        assert!(primer_size_range.contains(&self.primer_size));
+        assert!(rtt_template_homology_range.contains(&self.rtt_template_homology));
+        if *avoid_poly_u {
+            assert!(!self.has_poly_u().expect("sizing"));
+        }
+        if *avoid_rtt_cytosine {
+            assert!(!self.has_rtt_cytosine().expect("sizing"));
+        }
+        if *require_seed_or_pam_disruption {
+            assert!(
+                self.distrupts_seed().expect("sizing") || self.distrupts_pam().expect("sizing")
+            );
+        }
+        if let Some(minimum_edit_size) = minimum_edit_size {
+            assert!(*minimum_edit_size <= self.full_edited_range_in_edited().v.len());
+        }
     }
 
     pub fn is_compliant(&self, spec: &DesignSpec) -> bool {
@@ -81,7 +132,16 @@ where
         }
         self.is_valid()
             && editor == &self.editor
-            && force_5_prime_g.is_none_or(|f| f == self.force_5_prime_g)
+            && if let Some(force_5_prime_g) = force_5_prime_g {
+                let equal = *force_5_prime_g == self.force_5_prime_g;
+                let last_5_prime_is_g = self
+                    .unforced_spacer_sequence()
+                    .map(|s| s[0])
+                    .is_none_or(|b| b == DnaBase::G);
+                equal || last_5_prime_is_g
+            } else {
+                true
+            }
             && primer_size_range.contains(&self.primer_size)
             && rtt_template_homology_range.contains(&self.rtt_template_homology)
             && if *avoid_poly_u {
@@ -110,7 +170,7 @@ where
             .flatten()
             .collect();
 
-        self.pams().contains(&self.pam)
+        self.edit.pams(&self.editor).contains(&self.pam)
             && self.distruptions.iter().all(|m| distruptions.contains(m))
             && self.is_in_range()
     }
@@ -129,23 +189,6 @@ where
             && self.reverse_transcriptase_template().is_some()
     }
 
-    fn mutation_in_edit_affects_pam(&self, m: &SilentMutation<EditedContig<C>, DnaBase>) -> bool {
-        let edited_contig = self.edit.edited_contig();
-        let affected_positions: HashSet<_> = m.affected_positions().collect();
-        self.pam
-            .iter_positions()
-            .filter_map(move |p| edited_contig.clone().liftover(p))
-            .any(|p| affected_positions.contains(&p))
-    }
-    fn mutation_in_edit_affects_seed(&self, m: &SilentMutation<EditedContig<C>, DnaBase>) -> bool {
-        let edited_contig = self.edit.edited_contig();
-        let affected_positions: HashSet<_> = m.affected_positions().collect();
-        self.editable_seed()
-            .into_iter()
-            .flat_map(|editable_seed| editable_seed.iter_positions())
-            .filter_map(move |p| edited_contig.clone().liftover(p))
-            .any(|p| affected_positions.contains(&p))
-    }
     /// Any mutation that affects the bases surrounding the edit, excluding the seed and pam.
     // TODO: right now it just checks the selected range is affected, not that a mutation doesn't spill outside of the cap.
     fn _mutation_in_edit_is_mmr_evading(
@@ -156,7 +199,7 @@ where
         let edited_contig = self.edit.edited_contig();
         let affected_positions: HashSet<_> = m.affected_positions().collect();
         self.edit
-            .mmr_evading_ranges(self.pam.clone(), cap)
+            ._mmr_evading_ranges(self.pam.clone(), cap)
             .into_iter()
             .flatten()
             .map(|r| {
@@ -184,6 +227,10 @@ where
         Some(edited_contig.clone().liftover_range(range).unwrap())
     }
 
+    /// Checks whether the guide RNA has a poly-U tract.
+    ///
+    /// Note that this does not check the scaffold, since the default one does have poly-U tracts.
+    /// See [DesignSpec::avoid_poly_u].
     pub fn has_poly_u(&self) -> Option<bool> {
         const PATTERN: [DnaBase; 4] = [DnaBase::T; 4];
 
@@ -192,34 +239,32 @@ where
         rest.append(&mut self.primer_sequence()?);
         Some(spacer.contains(&PATTERN) || rest.contains(&PATTERN))
     }
+    /// See [DesignSpec::avoid_rtt_cytosine].
     pub fn has_rtt_cytosine(&self) -> Option<bool> {
         let rtt_template = self.reverse_transcriptase_template()?;
 
-        Some(rtt_template.last() == Some(&DnaBase::C))
+        Some(rtt_template.first() == Some(&DnaBase::C))
     }
+    /// See [DesignSpec::require_seed_or_pam_disruption].
     pub fn distrupts_pam(&self) -> Option<bool> {
-        let edit = &self.edit;
         let editor = &self.editor;
 
-        let pam_sequence = edit.get_original(self.pam.clone());
-        let rtt_template = self.reverse_transcriptase_template()?;
+        let rtt_template = self.reverse_transcriptase_template()?.reverse_complement();
 
-        assert_eq!(3, pam_sequence.len());
         assert!(3 < rtt_template.len());
-
-        let nick = editor.nick_distance.usize_unwrap();
 
         // TODO: what if you get an insertion or deletion in the editable section of the seed?
         // Technically the pam might not be distrupted.
 
-        Some(
-            pam_sequence[1..3] != *rtt_template[(nick + 1)..(nick + 3)].reverse_complement()
-                || self
-                    .distruptions
-                    .iter()
-                    .any(|m| self.mutation_in_edit_affects_pam(m)),
-        )
+        let pam_size = editor.pam_size().usize_unwrap();
+        let nick = editor.nick_distance.usize_unwrap();
+        let new_pam_sequence = rtt_template[nick..(nick + pam_size)].encode();
+
+        let regex = edit::cached_regex(&editor.pam_pattern);
+
+        Some(!regex.is_match(&new_pam_sequence))
     }
+    /// See [DesignSpec::require_seed_or_pam_disruption].
     pub fn distrupts_seed(&self) -> Option<bool> {
         let edit = &self.edit;
         let editor = &self.editor;
@@ -227,19 +272,13 @@ where
         let editable_seed_sequence =
             edit.get_original(edit.editable_seed(editor, self.pam.clone())?);
 
-        let rtt_template = self.reverse_transcriptase_template()?;
+        let rtt_template = self.reverse_transcriptase_template()?.reverse_complement();
 
         assert!(editable_seed_sequence.len() < rtt_template.len());
 
         let nick = editor.nick_distance.usize_unwrap();
 
-        Some(
-            editable_seed_sequence[0..nick] != *rtt_template[0..nick].reverse_complement()
-                || self
-                    .distruptions
-                    .iter()
-                    .any(|m| self.mutation_in_edit_affects_seed(m)),
-        )
+        Some(editable_seed_sequence[0..nick] != rtt_template[0..nick])
     }
 }
 
@@ -255,13 +294,11 @@ where
         Some(guide)
     }
 
-    pub fn pams(&self) -> Vec<WithOrientation<ContigRange<C>>> {
-        self.edit.pams(&self.editor)
-    }
-
+    /// The location of the nick on the original sequence.
     pub fn nick(&self) -> Option<WithOrientation<ContigPosition<C>>> {
         self.edit.nick(&self.editor, self.pam.clone())
     }
+    /// The location of the nick on the edited sequence.
     pub fn nick_in_edited(&self) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
         self.edit.nick_in_edited(&self.editor, self.pam.clone())
     }
@@ -274,6 +311,7 @@ where
     pub fn cas_target(&self) -> Option<WithOrientation<ContigRange<C>>> {
         self.edit.cas_target(&self.editor, self.pam.clone())
     }
+    /// The sequence of the spacer, this includes forcing the first base to be a G if [Self::force_5_prime_g] is true.
     pub fn spacer_sequence(&self) -> Option<DnaSequence> {
         let mut spacer = self.edit.get_original(self.spacer()?);
         if self.force_5_prime_g {
@@ -287,6 +325,8 @@ where
         self.edit.editable_seed(&self.editor, self.pam.clone())
     }
 
+    /// The PBS (primer binding site) target is the flap on the same side as the PAM,
+    /// it's what will function as a jumping off point for the reverse transcription.
     pub fn primer_binding_site(&self) -> Option<WithOrientation<ContigRange<C>>> {
         self.edit
             .primer_binding_site(&self.editor, self.pam.clone(), self.primer_size)
@@ -296,11 +336,12 @@ where
         self.edit
             .primer(&self.editor, self.pam.clone(), self.primer_size)
     }
+    /// The sequence of the primer section of the guide RNA.
     pub fn primer_sequence(&self) -> Option<DnaSequence> {
         Some(self.edit.get_original(self.primer()?))
     }
 
-    /// Returns the sequence of the reverse transcriptase template and the range it covers in the original sequence.
+    /// Returns the sequence of the reverse transcriptase template.
     pub fn reverse_transcriptase_template(&self) -> Option<DnaSequence> {
         let Self {
             edit,
@@ -335,6 +376,32 @@ where
         for m in distruptions {
             m.apply(&mut edited);
         }
+
+        {
+            let full_edited_range_in_original = edit.edit_range_in_original().into_forward().v;
+            let full_edited_range = edit.edit_range_in_edited().into_forward().v;
+            let original = edit.original();
+            assert_eq!(
+                original[..full_edited_range_in_original.clone().into_start()],
+                edited[..full_edited_range.clone().into_start()]
+            );
+            assert_eq!(
+                original[full_edited_range_in_original.clone().into_end()..],
+                edited[full_edited_range.clone().into_end()..]
+            );
+            let original = &original[full_edited_range_in_original];
+            let edited = &edited[full_edited_range];
+            if self.edit.has_any_effect() {
+                assert_ne!(original, edited);
+                if let (Some(original), Some(edited)) = (original.first(), edited.first()) {
+                    assert_ne!(original, edited);
+                }
+                if let (Some(original), Some(edited)) = (original.last(), edited.last()) {
+                    assert_ne!(original, edited);
+                }
+            }
+        }
+
         if rtt_range.orientation.is_reverse() {
             edited = edited.reverse_complement();
         }
@@ -368,17 +435,13 @@ where
             .at;
 
         for m in distruptions {
-            assert_eq!(edited_contig, m.at_range().v.contig);
+            assert_eq!(edited_contig, m.at.v.contig);
             let Range {
                 start: m_start,
                 end: m_end,
-            } = m.at_range().into_orientation(orientation).v.at;
-            if m_start < start {
-                start = m_start;
-            }
-            if end < m_end {
-                end = m_end;
-            }
+            } = m.affected_range().into_orientation(orientation).v.at;
+            start = start.min(m_start);
+            end = end.max(m_end);
         }
 
         WithOrientation {
@@ -388,5 +451,14 @@ where
                 at: start..end,
             },
         }
+    }
+}
+
+impl<C> Design<C>
+where
+    C: Contig + Clone,
+{
+    fn unforced_spacer_sequence(&self) -> Option<DnaSequence> {
+        Some(self.edit.get_original(self.spacer()?))
     }
 }
