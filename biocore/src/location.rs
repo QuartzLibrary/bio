@@ -518,6 +518,16 @@ mod math {
                 Some(())
             }
         }
+
+        pub fn saturating_add(mut self, rhs: u64) -> Self {
+            self.saturating_add_assign(rhs);
+            self
+        }
+        pub fn saturating_add_assign(&mut self, rhs: u64) {
+            if self.contig.size() <= self.at + rhs {
+                self.at = self.contig.size();
+            } else {
+                self.at += rhs;
             }
         }
     }
