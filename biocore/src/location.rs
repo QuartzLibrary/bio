@@ -506,14 +506,18 @@ mod math {
     use super::*;
 
     impl<C: Contig> ContigPosition<C> {
-        pub fn checked_add(self, rhs: u64) -> Option<Self> {
+        pub fn checked_add(mut self, rhs: u64) -> Option<Self> {
+            self.checked_add_assign(rhs)?;
+            Some(self)
+        }
+        pub fn checked_add_assign(&mut self, rhs: u64) -> Option<()> {
             if self.contig.size() <= self.at + rhs {
                 None
             } else {
-                Some(Self {
-                    contig: self.contig,
-                    at: self.at + rhs,
-                })
+                self.at += rhs;
+                Some(())
+            }
+        }
             }
         }
     }
@@ -522,14 +526,25 @@ mod math {
 
         #[track_caller]
         fn add(self, rhs: u64) -> Self::Output {
-            self.checked_add(rhs).unwrap()
+            let at = self.at;
+            let size = self.contig.size();
+            match self.checked_add(rhs) {
+                Some(pos) => pos,
+                None => panic!("Contig overflow: {at} + {rhs} > {size}"),
+            }
         }
     }
     impl<C: Contig> AddAssign<u64> for ContigPosition<C> {
         #[track_caller]
         fn add_assign(&mut self, rhs: u64) {
-            assert!(self.at + rhs <= self.contig.size());
-            self.at += rhs;
+            match self.checked_add_assign(rhs) {
+                Some(()) => (),
+                None => {
+                    let at = self.at;
+                    let size = self.contig.size();
+                    panic!("Contig overflow: {at} + {rhs} > {size}");
+                }
+            }
         }
     }
 
@@ -558,14 +573,17 @@ mod math {
     }
 
     impl<C: Contig> ContigRange<C> {
-        pub fn checked_add(self, rhs: u64) -> Option<Self> {
+        pub fn checked_add(mut self, rhs: u64) -> Option<Self> {
+            self.checked_add_assign(rhs)?;
+            Some(self)
+        }
+        pub fn checked_add_assign(&mut self, rhs: u64) -> Option<()> {
             if self.contig.size() <= self.at.end + rhs {
                 None
             } else {
-                Some(Self {
-                    contig: self.contig,
-                    at: self.at.start + rhs..self.at.end + rhs,
-                })
+                self.at.start += rhs;
+                self.at.end += rhs;
+                Some(())
             }
         }
     }
@@ -574,15 +592,25 @@ mod math {
 
         #[track_caller]
         fn add(self, rhs: u64) -> Self::Output {
-            self.checked_add(rhs).unwrap()
+            let at = self.at.clone();
+            let size = self.contig.size();
+            match self.checked_add(rhs) {
+                Some(range) => range,
+                None => panic!("Contig overflow: {at:?} + {rhs} > {size}"),
+            }
         }
     }
     impl<C: Contig> AddAssign<u64> for ContigRange<C> {
         #[track_caller]
         fn add_assign(&mut self, rhs: u64) {
-            assert!(self.at.end + rhs <= self.contig.size());
-            self.at.start += rhs;
-            self.at.end += rhs;
+            match self.checked_add_assign(rhs) {
+                Some(()) => (),
+                None => {
+                    let at = self.at.clone();
+                    let size = self.contig.size();
+                    panic!("Contig overflow: {at:?} + {rhs} > {size}");
+                }
+            }
         }
     }
 
