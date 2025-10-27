@@ -520,11 +520,13 @@ mod math {
     impl<C: Contig> Add<u64> for ContigPosition<C> {
         type Output = Self;
 
+        #[track_caller]
         fn add(self, rhs: u64) -> Self::Output {
             self.checked_add(rhs).unwrap()
         }
     }
     impl<C: Contig> AddAssign<u64> for ContigPosition<C> {
+        #[track_caller]
         fn add_assign(&mut self, rhs: u64) {
             assert!(self.at + rhs <= self.contig.size());
             self.at += rhs;
@@ -542,11 +544,13 @@ mod math {
     impl<C> Sub<u64> for ContigPosition<C> {
         type Output = Self;
 
+        #[track_caller]
         fn sub(self, rhs: u64) -> Self::Output {
             self.checked_sub(rhs).unwrap()
         }
     }
     impl<C> SubAssign<u64> for ContigPosition<C> {
+        #[track_caller]
         fn sub_assign(&mut self, rhs: u64) {
             assert!(self.at >= rhs);
             self.at -= rhs;
@@ -568,11 +572,13 @@ mod math {
     impl<C: Contig> Add<u64> for ContigRange<C> {
         type Output = Self;
 
+        #[track_caller]
         fn add(self, rhs: u64) -> Self::Output {
             self.checked_add(rhs).unwrap()
         }
     }
     impl<C: Contig> AddAssign<u64> for ContigRange<C> {
+        #[track_caller]
         fn add_assign(&mut self, rhs: u64) {
             assert!(self.at.end + rhs <= self.contig.size());
             self.at.start += rhs;
@@ -591,11 +597,13 @@ mod math {
     impl<C> Sub<u64> for ContigRange<C> {
         type Output = Self;
 
+        #[track_caller]
         fn sub(self, rhs: u64) -> Self::Output {
             self.checked_sub(rhs).unwrap()
         }
     }
     impl<C> SubAssign<u64> for ContigRange<C> {
+        #[track_caller]
         fn sub_assign(&mut self, rhs: u64) {
             assert!(self.at.start >= rhs);
             self.at.start -= rhs;
