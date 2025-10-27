@@ -514,6 +514,64 @@ impl From<AminoDecodeError> for std::io::Error {
     }
 }
 
+mod random {
+    use rand::Rng;
+
+    use super::*;
+
+    impl rand::distr::Distribution<AminoAcid> for rand::distr::StandardUniform {
+        fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> AminoAcid {
+            let _ = || match AminoAcid::A {
+                AminoAcid::A
+                | AminoAcid::R
+                | AminoAcid::N
+                | AminoAcid::D
+                | AminoAcid::C
+                | AminoAcid::Q
+                | AminoAcid::E
+                | AminoAcid::G
+                | AminoAcid::H
+                | AminoAcid::I
+                | AminoAcid::L
+                | AminoAcid::K
+                | AminoAcid::M
+                | AminoAcid::F
+                | AminoAcid::P
+                | AminoAcid::S
+                | AminoAcid::T
+                | AminoAcid::W
+                | AminoAcid::Y
+                | AminoAcid::V => {
+                    unreachable!("exhaustive match")
+                }
+            };
+            match rng.random_range(0..20) {
+                0 => AminoAcid::A,
+                1 => AminoAcid::R,
+                2 => AminoAcid::N,
+                3 => AminoAcid::D,
+                4 => AminoAcid::C,
+                5 => AminoAcid::Q,
+                6 => AminoAcid::E,
+                7 => AminoAcid::G,
+                8 => AminoAcid::H,
+                9 => AminoAcid::I,
+                10 => AminoAcid::L,
+                11 => AminoAcid::K,
+                12 => AminoAcid::M,
+                13 => AminoAcid::F,
+                14 => AminoAcid::P,
+                15 => AminoAcid::S,
+                16 => AminoAcid::T,
+                17 => AminoAcid::W,
+                18 => AminoAcid::Y,
+                19 => AminoAcid::V,
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use utile::collections::complete_map::CompleteHashMap;

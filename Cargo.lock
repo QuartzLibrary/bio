@@ -352,6 +352,7 @@ dependencies = [
  "either",
  "log",
  "noodles",
+ "rand 0.9.1",
  "ref-cast",
  "serde",
  "thiserror",

@@ -740,6 +740,96 @@ mod eq {
     }
 }
 
+mod random {
+    use rand::Rng;
+
+    use super::*;
+
+    impl rand::distr::Distribution<DnaBase> for rand::distr::StandardUniform {
+        fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> DnaBase {
+            let _ = || match DnaBase::A {
+                DnaBase::A | DnaBase::C | DnaBase::G | DnaBase::T => {
+                    unreachable!("exhaustive match")
+                }
+            };
+            match rng.random_range(0..4) {
+                0 => DnaBase::A,
+                1 => DnaBase::C,
+                2 => DnaBase::G,
+                3 => DnaBase::T,
+                _ => unreachable!(""),
+            }
+        }
+    }
+
+    impl rand::distr::Distribution<AmbiguousDnaBase> for rand::distr::StandardUniform {
+        fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> AmbiguousDnaBase {
+            let _ = || match AmbiguousDnaBase::A {
+                AmbiguousDnaBase::A
+                | AmbiguousDnaBase::C
+                | AmbiguousDnaBase::G
+                | AmbiguousDnaBase::T
+                | AmbiguousDnaBase::N => {
+                    unreachable!("exhaustive match")
+                }
+            };
+            match rng.random_range(0..5) {
+                0 => AmbiguousDnaBase::A,
+                1 => AmbiguousDnaBase::C,
+                2 => AmbiguousDnaBase::G,
+                3 => AmbiguousDnaBase::T,
+                4 => AmbiguousDnaBase::N,
+                _ => unreachable!(""),
+            }
+        }
+    }
+
+    impl rand::distr::Distribution<IupacDnaBase> for rand::distr::StandardUniform {
+        fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> IupacDnaBase {
+            let _ = || match IupacDnaBase::A {
+                IupacDnaBase::A
+                | IupacDnaBase::C
+                | IupacDnaBase::G
+                | IupacDnaBase::T
+                | IupacDnaBase::R
+                | IupacDnaBase::Y
+                | IupacDnaBase::S
+                | IupacDnaBase::W
+                | IupacDnaBase::K
+                | IupacDnaBase::M
+                | IupacDnaBase::B
+                | IupacDnaBase::D
+                | IupacDnaBase::H
+                | IupacDnaBase::V
+                | IupacDnaBase::N => {
+                    unreachable!("exhaustive match")
+                }
+            };
+            match rng.random_range(0..15) {
+                0 => IupacDnaBase::A,
+                1 => IupacDnaBase::C,
+                2 => IupacDnaBase::G,
+                3 => IupacDnaBase::T,
+
+                4 => IupacDnaBase::R,
+                5 => IupacDnaBase::Y,
+                6 => IupacDnaBase::S,
+                7 => IupacDnaBase::W,
+                8 => IupacDnaBase::K,
+                9 => IupacDnaBase::M,
+
+                10 => IupacDnaBase::B,
+                11 => IupacDnaBase::D,
+                12 => IupacDnaBase::H,
+                13 => IupacDnaBase::V,
+
+                14 => IupacDnaBase::N,
+                _ => unreachable!(""),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::{collections::HashSet, fmt};

@@ -58,3 +58,26 @@ impl std::fmt::Display for RnaBase {
         write!(f, "{}", self.to_char())
     }
 }
+
+mod random {
+    use rand::Rng;
+
+    use super::*;
+
+    impl rand::distr::Distribution<RnaBase> for rand::distr::StandardUniform {
+        fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> RnaBase {
+            let _ = || match RnaBase::A {
+                RnaBase::A | RnaBase::C | RnaBase::G | RnaBase::U => {
+                    unreachable!("exhaustive match")
+                }
+            };
+            match rng.random_range(0..4) {
+                0 => RnaBase::A,
+                1 => RnaBase::C,
+                2 => RnaBase::G,
+                3 => RnaBase::U,
+                _ => unreachable!(),
+            }
+        }
+    }
+}

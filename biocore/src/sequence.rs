@@ -316,6 +316,18 @@ impl<T> Sequence<T> {
             .windows(needle.len())
             .any(|window| window == needle)
     }
+
+    pub fn simple_random<R: rand::Rng>(mut rng: R) -> Self
+    where
+        rand::distr::StandardUniform: rand::distr::Distribution<T>,
+    {
+        let len = rng.random_range(0..20);
+        Self::new(
+            rng.sample_iter(rand::distr::StandardUniform)
+                .take(len)
+                .collect(),
+        )
+    }
 }
 
 /// A sequence of bases or proteins.

@@ -9,6 +9,7 @@ utile = { path = "../utile" }
 either = "1"
 log = "0.4"
 noodles = { version = "0.98", features = ["core", "fasta", "vcf", "tabix", "bgzf", "csi", "bcf"] }
+rand = "0.9"
 ref-cast = "1"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
