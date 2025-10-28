@@ -21,7 +21,7 @@ use utile::{
     regex_ext::find_iter_overlapping,
 };
 
-use crate::editor::Editor;
+use crate::{Pam, editor::Editor};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
@@ -34,7 +34,7 @@ pub struct Edit<C> {
     end: DnaSequence,
 
     /// On the sense/RNA-like strand (as opposed to the antisense/template strand).
-    pub translation_frame_start: Option<WithOrientation<ContigPosition<C>>>,
+    translation_frame_start: Option<WithOrientation<ContigPosition<C>>>,
 }
 impl Edit<ArcContig> {
     pub fn parse(input: &str) -> Option<Self> {
@@ -83,6 +83,13 @@ impl Edit<ArcContig> {
 
             translation_frame_start: None,
         })
+    }
+    pub fn with_translation_frame_start(
+        mut self,
+        translation_frame_start: WithOrientation<ContigPosition<ArcContig>>,
+    ) -> Self {
+        self.translation_frame_start = Some(translation_frame_start);
+        self
     }
 }
 impl<C> Edit<C>
@@ -200,32 +207,8 @@ where
             })
     }
 
-    pub fn closest_pam(&self, editor: &Editor) -> Option<WithOrientation<ContigRange<C>>> {
-        let edit_start = self.edit_range_in_original().into_start();
-        let edit_start = edit_start.as_ref_contig();
-        self.pams(editor)
-            .iter()
-            .min_by_key(move |pam| {
-                let edit_start = edit_start.into_orientation(pam.orientation).v.at;
-
-                edit_start.i64_unwrap() - pam.v.at.start.i64_unwrap()
-            })
-            .cloned()
-    }
-    pub fn distance_from_edit(&self, pam: WithOrientation<ContigRange<C>>) -> i64 {
-        let edit_start = self
-            .edit_range_in_original()
-            .into_orientation(pam.orientation)
-            .v
-            .at
-            .start
-            .i64_unwrap();
-
-        edit_start - pam.v.at.start.i64_unwrap()
-    }
-
     /// Returns the PAM locations in the original sequence, all ranges are 5' → 3' (and annotated with the orientation).
-    pub fn pams(&self, editor: &Editor) -> Vec<WithOrientation<ContigRange<C>>> {
+    pub fn pams(&self, editor: &Editor) -> Vec<Pam<C>> {
         let Editor {
             pam_pattern,
             nick_distance,
@@ -272,21 +255,47 @@ where
             })
             .collect()
     }
+    /// Returns the PAM closest to the edit range, if any is present.
+    pub fn closest_pam(&self, editor: &Editor) -> Option<Pam<C>> {
+        let edit_start = self.edit_range_in_original().into_start();
+        let edit_start = edit_start.as_ref_contig();
+        self.pams(editor)
+            .iter()
+            .min_by_key(move |pam| {
+                let edit_start = edit_start.into_orientation(pam.orientation).v.at;
+
+                edit_start.i64_unwrap() - pam.v.at.start.i64_unwrap()
+            })
+            .cloned()
+    }
+    /// Returns the distance from the start of the pam to the start of the edit.
+    ///
+    /// Since the edit can cover the pam, the distance can be negative.
+    pub fn distance_from_edit(&self, pam: Pam<C>) -> i64 {
+        let edit_start = self
+            .edit_range_in_original()
+            .into_orientation(pam.orientation)
+            .v
+            .at
+            .start
+            .i64_unwrap();
+
+        edit_start - pam.v.at.start.i64_unwrap()
+    }
+
     /// The nick is on the same strand as the PAM, the side the spacer anneals to.
-    pub fn nick(
-        &self,
-        editor: &Editor,
-        pam: WithOrientation<ContigRange<C>>,
-    ) -> Option<WithOrientation<ContigPosition<C>>> {
+    pub fn nick(&self, editor: &Editor, pam: Pam<C>) -> Option<WithOrientation<ContigPosition<C>>> {
         Some(WithOrientation {
             orientation: pam.orientation,
             v: pam.into_start().v.checked_sub(editor.nick_distance)?,
         })
     }
+    /// The nick in the edited contig, note that since the edit is always on the 3' side of the nick,
+    /// the coordinates of the nick in the original and edited contigs are the same.
     pub fn nick_in_edited(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange<C>>,
+        pam: Pam<C>,
     ) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
         Some(
             self.nick(editor, pam)?
@@ -294,11 +303,7 @@ where
         )
     }
     /// The spacer matches the sequence on the same side as the PAM, and will anneal to the opposite side.
-    pub fn spacer(
-        &self,
-        editor: &Editor,
-        pam: WithOrientation<ContigRange<C>>,
-    ) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn spacer(&self, editor: &Editor, pam: Pam<C>) -> Option<WithOrientation<ContigRange<C>>> {
         let spacer_size = editor.spacer_size;
         if pam.v.at.start < spacer_size {
             return None;
@@ -316,7 +321,7 @@ where
     pub fn cas_target(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange<C>>,
+        pam: Pam<C>,
     ) -> Option<WithOrientation<ContigRange<C>>> {
         Some(self.spacer(editor, pam)?.flip_orientation())
     }
@@ -324,7 +329,7 @@ where
     pub fn editable_seed(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange<C>>,
+        pam: Pam<C>,
     ) -> Option<WithOrientation<ContigRange<C>>> {
         let start = pam.v.at.start;
         Some(WithOrientation {
@@ -339,7 +344,7 @@ where
     pub fn editable_range(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange<C>>,
+        pam: Pam<C>,
     ) -> Option<WithOrientation<ContigRange<C>>> {
         let start = pam.v.at.start;
         Some(WithOrientation {
@@ -354,7 +359,7 @@ where
     pub fn non_editable_range(
         &self,
         editor: &Editor,
-        pam: WithOrientation<ContigRange<C>>,
+        pam: Pam<C>,
     ) -> Option<WithOrientation<ContigRange<C>>> {
         let start = pam.v.at.start;
         Some(WithOrientation {
@@ -365,12 +370,96 @@ where
             },
         })
     }
+    /// The PBS (primer binding site) target is the flap on the same side as the PAM,
+    /// it's what will function as a jumping off point for the reverse transcription.
+    pub fn primer_binding_site(
+        &self,
+        editor: &Editor,
+        pam: Pam<C>,
+        pbs_size: u64,
+    ) -> Option<WithOrientation<ContigRange<C>>> {
+        let nick_distance = editor.nick_distance.u64_unwrap();
+
+        let end = pam.v.at.start.checked_sub(nick_distance)?;
+        let range = end.checked_sub(pbs_size)?..end;
+
+        Some(WithOrientation {
+            orientation: pam.orientation,
+            v: ContigRange {
+                contig: pam.v.contig,
+                at: range,
+            },
+        })
+    }
+    /// The primer matches the sequence on the opposite side as the PAM.
+    pub fn primer(
+        &self,
+        editor: &Editor,
+        pam: Pam<C>,
+        pbs_size: u64,
+    ) -> Option<WithOrientation<ContigRange<C>>> {
+        Some(
+            self.primer_binding_site(editor, pam, pbs_size)?
+                .flip_orientation(),
+        )
+    }
+
+    /// The start of the translation frame.
+    /// On the sense/RNA-like strand (as opposed to the antisense/template strand).
+    pub fn translation_frame_start(&self) -> Option<WithOrientation<ContigPosition<C>>> {
+        self.translation_frame_start.clone()
+    }
+    /// The start of the translation frame in the edited contig.
+    /// On the sense/RNA-like strand (as opposed to the antisense/template strand).
+    pub fn translation_frame_start_edited(
+        &self,
+    ) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
+        let translation_frame_start = self.translation_frame_start.clone()?;
+
+        let result = self.edited_contig().liftover(translation_frame_start);
+        if result.is_none() {
+            log::warn!("Unable to lift translation frame into edited contig.\n{self:?}");
+        }
+        result
+    }
+
+    /// Potential silent mutations in the original sequence.
+    ///
+    /// NOTE: in general you will want to use [Self::edited_silent_mutations] instead,
+    /// as you'll want to account for any other changes you are making,
+    /// including alternatives to the main edit and frame shifts.
+    pub fn original_silent_mutations(
+        &self,
+    ) -> Option<impl Iterator<Item = SilentMutation<C, DnaBase>>> {
+        Some(
+            self.original()
+                .silent_mutations(self.translation_frame_start.clone()?)
+                .collect::<Vec<_>>()
+                .into_iter(),
+        )
+    }
+    /// Potential silent mutations in the edited sequence.
+    pub fn edited_silent_mutations(
+        &self,
+    ) -> Option<impl Iterator<Item = SilentMutation<EditedContig<C>, DnaBase>>> {
+        Some(
+            self.edited()
+                .silent_mutations(self.translation_frame_start_edited()?)
+                .collect::<Vec<_>>()
+                .into_iter(),
+        )
+    }
+}
+impl<C> Edit<C>
+where
+    C: Contig + Clone,
+{
     /// The ranges that are editable, but excluding the seed, pam, and the region that is already being edited.
     /// Capped at `cap` away from the edit.
     // TODO: test
     pub(super) fn _mmr_evading_ranges(
         &self,
-        pam: WithOrientation<ContigRange<C>>,
+        pam: Pam<C>,
         cap: u64,
     ) -> Option<impl Iterator<Item = WithOrientation<ContigRange<C>>>> {
         let mut edit_range = self.edit_range_in_original();
@@ -401,71 +490,6 @@ where
         };
 
         Some([head, tail].into_iter().filter(|r| !r.v.is_empty()))
-    }
-    /// The PBS (primer binding site) target is the flap on the same side as the PAM,
-    /// it's what will function as a jumping off point for the reverse transcription.
-    pub fn primer_binding_site(
-        &self,
-        editor: &Editor,
-        pam: WithOrientation<ContigRange<C>>,
-        pbs_size: u64,
-    ) -> Option<WithOrientation<ContigRange<C>>> {
-        let nick_distance = editor.nick_distance.u64_unwrap();
-
-        let end = pam.v.at.start.checked_sub(nick_distance)?;
-        let range = end.checked_sub(pbs_size)?..end;
-
-        Some(WithOrientation {
-            orientation: pam.orientation,
-            v: ContigRange {
-                contig: pam.v.contig,
-                at: range,
-            },
-        })
-    }
-    /// The primer matches the sequence on the opposite side as the PAM.
-    pub fn primer(
-        &self,
-        editor: &Editor,
-        pam: WithOrientation<ContigRange<C>>,
-        pbs_size: u64,
-    ) -> Option<WithOrientation<ContigRange<C>>> {
-        Some(
-            self.primer_binding_site(editor, pam, pbs_size)?
-                .flip_orientation(),
-        )
-    }
-
-    pub fn translation_frame_start_edited(
-        &self,
-    ) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
-        let translation_frame_start = self.translation_frame_start.clone()?;
-
-        let result = self.edited_contig().liftover(translation_frame_start);
-        if result.is_none() {
-            log::warn!("Unable to lift translation frame into edited contig.\n{self:?}");
-        }
-        result
-    }
-    pub fn original_silent_mutations(
-        &self,
-    ) -> Option<impl Iterator<Item = SilentMutation<C, DnaBase>>> {
-        Some(
-            self.original()
-                .silent_mutations(self.translation_frame_start.clone()?)
-                .collect::<Vec<_>>()
-                .into_iter(),
-        )
-    }
-    pub fn edited_silent_mutations(
-        &self,
-    ) -> Option<impl Iterator<Item = SilentMutation<EditedContig<C>, DnaBase>>> {
-        Some(
-            self.edited()
-                .silent_mutations(self.translation_frame_start_edited()?)
-                .collect::<Vec<_>>()
-                .into_iter(),
-        )
     }
 }
 
