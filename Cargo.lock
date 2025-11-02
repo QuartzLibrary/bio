@@ -2294,6 +2294,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "puv"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "log",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

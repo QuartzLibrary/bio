@@ -15,7 +15,6 @@ pub mod iter;
 pub mod jsonl;
 pub mod num;
 pub mod plot;
-pub mod python;
 pub mod range;
 pub mod regex_ext;
 pub mod resource;
