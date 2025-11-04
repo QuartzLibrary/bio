@@ -3,17 +3,45 @@ use std::{fmt, io, process::Output, sync::LazyLock};
 use regex::Regex;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
+#[cfg(not(target_arch = "wasm32"))]
+use uv_pep440::VersionSpecifier;
+#[cfg(not(target_arch = "wasm32"))]
+use uv_pep508::{Requirement, VerbatimUrl};
 
-use super::script::PythonScript;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::{
+    metadata::script_dependencies,
+    metadata::{ScriptMetadataError, script_python_version},
+    script::PythonScript,
+};
 
+/// A Python function.
+///
+/// It must:
+/// - be valid Python code with PEP 723 metadata.
+/// - expose a `process` function
+///
+/// ```python
+/// # Both input and output must be typed and JSON serializable.
+/// def process(input: int) -> int:
+///     return input + 1
+/// ```
+///
+/// You can use Pydantic models for complex input and output types.
+/// ```python
+/// from pydantic import BaseModel
+///
+/// class Input(BaseModel):
+///     input: int
+///
+/// class Output(BaseModel):
+///     output: int
+///
+/// def process(input: Input) -> Output:
+///     return Output(output=input.input + 1)
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PythonFunction {
-    pub python_version: String,
-    pub dependencies: Vec<String>,
-    /// The function must be valid Python code and expose a `process` function
-    /// that takes a single argument and returns a single value.
-    ///
-    /// The input and output types must be typed and JSON serializable.
     pub function: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -60,6 +88,13 @@ impl PythonFunction {
         parse_and_unpack(output)
     }
 
+    pub fn python_version(&self) -> Result<VersionSpecifier, ScriptMetadataError> {
+        script_python_version(&self.function)
+    }
+    pub fn dependencies(&self) -> Result<Vec<Requirement<VerbatimUrl>>, ScriptMetadataError> {
+        script_dependencies(&self.function)
+    }
+
     pub async fn into_map(self) -> io::Result<super::map::PythonMap> {
         super::map::PythonMap::new(&self).await
     }
@@ -69,7 +104,7 @@ impl PythonFunction {
     fn script(&self) -> io::Result<PythonScript> {
         let (input, output) = self.output_and_parse_input()?;
 
-        let function = &self.function;
+        let function = crate::metadata::inject_dependency(&self.function, "pydantic")?;
 
         let content = format!(
             r##"{function}
@@ -137,22 +172,11 @@ if __name__ == "__main__":
 "##
         );
 
-        Ok(PythonScript {
-            python_version: self.python_version.clone(),
-            dependencies: self.deps(),
-            content,
-        })
+        Ok(PythonScript { content })
     }
 }
 #[cfg(not(target_arch = "wasm32"))]
 impl PythonFunction {
-    pub(super) fn deps(&self) -> Vec<String> {
-        let mut deps = self.dependencies.clone();
-        if !deps.contains(&"pydantic".to_owned()) {
-            deps.push("pydantic".to_owned());
-        }
-        deps
-    }
     pub(super) fn output_and_parse_input(&self) -> io::Result<(&str, &str)> {
         static FN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             let var = "[a-zA-Z0-9_-]+";
@@ -259,12 +283,16 @@ impl PythonFunction {
     }
 
     pub(super) fn simple() -> (Self, Vec<TestValue>) {
-        const PYTHON_VERSION: &str = "==3.10";
-        const FUNCTION: &str = "
+        const FUNCTION: &str = r#"
+# /// script
+# requires-python = "==3.10"
+# dependencies = []
+# ///
+
 def process(input: int) -> int:
-    print(\"hello\")
+    print("hello")
     return input + 2
-";
+"#;
 
         let values = vec![(
             Value::Number(40.into()),
@@ -277,8 +305,6 @@ def process(input: int) -> int:
 
         (
             Self {
-                python_version: PYTHON_VERSION.to_string(),
-                dependencies: vec![],
                 function: FUNCTION.to_string(),
             },
             values,
@@ -286,12 +312,16 @@ def process(input: int) -> int:
     }
 
     pub(super) fn dep() -> (Self, Vec<TestValue>) {
-        const PYTHON_VERSION: &str = "==3.10";
-        const FUNCTION: &str = "
+        const FUNCTION: &str = r#"
+# /// script
+# requires-python = "==3.10"
+# dependencies = ["numpy", "pandas"]
+# ///
+
 import numpy as np
 def process(x: int) -> list[int]:
     return np.array([x]).tolist()
-";
+"#;
 
         let values = vec![(
             Value::Number(40.into()),
@@ -304,8 +334,6 @@ def process(x: int) -> list[int]:
 
         (
             Self {
-                python_version: PYTHON_VERSION.to_string(),
-                dependencies: vec!["numpy".to_owned(), "pandas".to_owned()],
                 function: FUNCTION.to_string(),
             },
             values,
@@ -313,13 +341,23 @@ def process(x: int) -> list[int]:
     }
 
     pub(super) fn exception() -> (Self, Vec<TestValue>) {
-        const PYTHON_VERSION: &str = "==3.10";
-        const FUNCTION: &str = "
+        const FUNCTION: &str = r#"
+# /// script
+# requires-python = "==3.10"
+# dependencies = []
+# ///
+
 def process(input: int) -> int:
-    print(\"hello\")
+    print("hello")
     raise Exception('This is a test')
-";
-        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 59, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+"#;
+        const ERROR: &str = r#"Traceback (most recent call last):
+  File "/temp_folder/script.py", line 60, in main
+    result = process(input)
+  File "/temp_folder/script.py", line 11, in process
+    raise Exception('This is a test')
+Exception: This is a test
+"#;
 
         let values = vec![(
             Value::Number(40.into()),
@@ -332,8 +370,6 @@ def process(input: int) -> int:
 
         (
             Self {
-                python_version: PYTHON_VERSION.to_string(),
-                dependencies: vec![],
                 function: FUNCTION.to_string(),
             },
             values,
@@ -342,12 +378,16 @@ def process(input: int) -> int:
 
     #[cfg(test)]
     pub(super) fn invalid_function() -> (Self, Vec<TestValue>) {
-        const PYTHON_VERSION: &str = "==3.10";
-        const FUNCTION: &str = "
+        const FUNCTION: &str = r#"
+# /// script
+# requires-python = "==3.10"
+# dependencies = []
+# ///
+
 def pro cess(input: int) -> int:
-    print(\"hello\")
+    print("hello")
     raise Exception('This is a test')
-";
+"#;
 
         let values = vec![(
             Value::Number(40.into()),
@@ -360,8 +400,6 @@ def pro cess(input: int) -> int:
 
         (
             Self {
-                python_version: PYTHON_VERSION.to_string(),
-                dependencies: vec![],
                 function: FUNCTION.to_string(),
             },
             values,
@@ -370,13 +408,17 @@ def pro cess(input: int) -> int:
 
     #[cfg(test)]
     pub(super) fn invalid_import() -> (Self, Vec<TestValue>) {
-        const PYTHON_VERSION: &str = "==3.10";
-        const FUNCTION: &str = "
+        const FUNCTION: &str = r#"
+# /// script
+# requires-python = "==3.10"
+# dependencies = []
+# ///
+
 import numpy as np # Fails
 
 def process(input: int) -> int:
     return 42
-";
+"#;
 
         let values = vec![(
             Value::Number(40.into()),
@@ -389,8 +431,6 @@ def process(input: int) -> int:
 
         (
             Self {
-                python_version: PYTHON_VERSION.to_string(),
-                dependencies: vec![],
                 function: FUNCTION.to_string(),
             },
             values,
@@ -550,8 +590,14 @@ mod tests {
 mod exception_tests {
     use super::*;
 
-    const STDOUT: &str = "{\"value\":null,\"error\":\"Traceback (most recent call last):\\n  File \\\"/temp_folder/script.py\\\", line 59, in main\\n    result = process(input)\\n  File \\\"/temp_folder/script.py\\\", line 10, in process\\n    raise Exception('This is a test')\\nException: This is a test\\n\",\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n";
-    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 59, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+    const STDOUT: &str = "{\"value\":null,\"error\":\"Traceback (most recent call last):\\n  File \\\"/temp_folder/script.py\\\", line 60, in main\\n    result = process(input)\\n  File \\\"/temp_folder/script.py\\\", line 11, in process\\n    raise Exception('This is a test')\\nException: This is a test\\n\",\"stdout\":\"hello\\n\",\"stderr\":\"\"}\n";
+    const ERROR: &str = r#"Traceback (most recent call last):
+  File "/temp_folder/script.py", line 60, in main
+    result = process(input)
+  File "/temp_folder/script.py", line 11, in process
+    raise Exception('This is a test')
+Exception: This is a test
+"#;
 
     #[tokio::test]
     async fn test_run_function_exception() {

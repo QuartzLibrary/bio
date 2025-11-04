@@ -11,13 +11,13 @@ use serde_json::Value;
 use tempfile::TempDir;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt as _};
 
-use super::{
-    function::{MaybeWithStdoutStderr, PythonFunction, WithStdoutStderr},
-    script::PythonScript,
-};
+use super::function::{MaybeWithStdoutStderr, PythonFunction, WithStdoutStderr};
 
 const SCRIPT_START_MARKER: &str = "c5b70a4e-69e8-4af2-ae50-2c392e6e2132";
 
+/// See [PythonFunction] for more information.
+///
+/// This is a 'live' version that allows mapping multiple values.
 #[derive(Debug)]
 pub struct PythonMap {
     _tempdir: TempDir,
@@ -31,14 +31,14 @@ pub struct PythonMap {
 impl PythonMap {
     #[tracing::instrument(level = "debug")]
     pub(super) async fn new(function: &PythonFunction) -> io::Result<Self> {
-        super::script::install_python(&function.python_version).await?;
+        super::script::install_python(&function.python_version()?).await?;
 
         let dir = tempfile::Builder::new().suffix("python_exec").tempdir()?;
 
         let script_path = dir.path().join("script.py");
 
         {
-            let script = function.stream_script()?.script();
+            let script = function.stream_script()?;
             let mut temp = std::fs::File::create(script_path.clone())?;
             temp.write_all(script.as_bytes())?;
             temp.flush()?;
@@ -240,10 +240,10 @@ async fn wait_for_marker(
     }
 }
 impl PythonFunction {
-    fn stream_script(&self) -> io::Result<PythonScript> {
+    fn stream_script(&self) -> io::Result<String> {
         let (input, output) = self.output_and_parse_input()?;
 
-        let function = &self.function;
+        let function = crate::metadata::inject_dependency(&self.function, "pydantic")?;
 
         let content = format!(
             r##"{function}
@@ -314,11 +314,7 @@ if __name__ == "__main__":
 "##
         );
 
-        Ok(PythonScript {
-            python_version: self.python_version.clone(),
-            dependencies: self.deps(),
-            content,
-        })
+        Ok(content)
     }
 }
 
@@ -337,7 +333,13 @@ impl PythonMap {
     }
 
     fn exception() -> (PythonFunction, Vec<TestValue>) {
-        const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 62, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+        const ERROR: &str = r#"Traceback (most recent call last):
+  File "/temp_folder/script.py", line 63, in main
+    result = process(input)
+  File "/temp_folder/script.py", line 11, in process
+    raise Exception('This is a test')
+Exception: This is a test
+"#;
 
         let (function, mut values) = PythonFunction::exception();
 
@@ -440,7 +442,13 @@ mod tests {
 mod exception_tests {
     use super::*;
 
-    const ERROR: &str = "Traceback (most recent call last):\n  File \"/temp_folder/script.py\", line 62, in main\n    result = process(input)\n  File \"/temp_folder/script.py\", line 10, in process\n    raise Exception('This is a test')\nException: This is a test\n";
+    const ERROR: &str = r#"Traceback (most recent call last):
+  File "/temp_folder/script.py", line 63, in main
+    result = process(input)
+  File "/temp_folder/script.py", line 11, in process
+    raise Exception('This is a test')
+Exception: This is a test
+"#;
 
     #[tokio::test]
     async fn test_map_exception() {

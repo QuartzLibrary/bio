@@ -7,17 +7,24 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt as _;
 
+#[cfg(not(target_arch = "wasm32"))]
+use uv_pep440::VersionSpecifier;
+#[cfg(not(target_arch = "wasm32"))]
+use uv_pep508::{Requirement, VerbatimUrl};
+
+#[cfg(not(target_arch = "wasm32"))]
+use crate::metadata::{ScriptMetadataError, script_dependencies, script_python_version};
+
+/// A python script that uses the PEP 723 metadata format.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PythonScript {
-    pub python_version: String,
-    pub dependencies: Vec<String>,
     pub content: String,
 }
 #[cfg(not(target_arch = "wasm32"))]
 impl PythonScript {
     #[tracing::instrument(level = "debug", skip(input))]
     pub async fn run(&self, input: impl AsRef<[u8]>) -> io::Result<Output> {
-        install_python(&self.python_version).await?;
+        install_python(&self.python_version()?).await?;
 
         let dir = tempfile::Builder::new().suffix("python_exec").tempdir()?;
 
@@ -25,7 +32,7 @@ impl PythonScript {
 
         {
             let mut temp = std::fs::File::create(script_path.clone())?;
-            temp.write_all(self.script().as_bytes())?;
+            temp.write_all(self.content.as_bytes())?;
             temp.flush()?;
         }
 
@@ -48,7 +55,7 @@ impl PythonScript {
     }
     #[tracing::instrument(level = "debug", skip(input))]
     pub fn run_blocking(&self, input: impl AsRef<[u8]>) -> io::Result<Output> {
-        install_python_blocking(&self.python_version)?;
+        install_python_blocking(&self.python_version()?)?;
 
         let dir = tempfile::Builder::new().suffix("python_exec").tempdir()?;
 
@@ -56,7 +63,7 @@ impl PythonScript {
 
         {
             let mut temp = std::fs::File::create(script_path.clone())?;
-            temp.write_all(self.script().as_bytes())?;
+            temp.write_all(self.content.as_bytes())?;
             temp.flush()?;
         }
 
@@ -76,26 +83,11 @@ impl PythonScript {
         let output = child.wait_with_output()?;
         Ok(clean_output(output, dir.path()))
     }
-}
-#[cfg(not(target_arch = "wasm32"))]
-impl PythonScript {
-    pub(super) fn script(&self) -> String {
-        let Self {
-            python_version,
-            dependencies,
-            content,
-        } = self;
-        let dependencies: String = dependencies.iter().map(|d| format!(" {d:?}, ")).collect();
-        format!(
-            "
-# /// script
-# requires-python = {python_version:?}
-# dependencies = [{dependencies}]
-# ///
-
-{content}
-"
-        )
+    pub fn python_version(&self) -> Result<VersionSpecifier, ScriptMetadataError> {
+        script_python_version(&self.content)
+    }
+    pub fn dependencies(&self) -> Result<Vec<Requirement<VerbatimUrl>>, ScriptMetadataError> {
+        script_dependencies(&self.content)
     }
 }
 #[cfg(not(target_arch = "wasm32"))]
@@ -118,11 +110,11 @@ fn clean_temp_path(data: Vec<u8>, path: &Path) -> Vec<u8> {
 
 #[cfg(not(target_arch = "wasm32"))]
 #[tracing::instrument(level = "debug")]
-pub(super) fn install_python_blocking(version: &str) -> io::Result<()> {
+pub(super) fn install_python_blocking(version: &VersionSpecifier) -> io::Result<()> {
     let child = std::process::Command::new("uv")
         .arg("python")
         .arg("install")
-        .arg(version)
+        .arg(version.to_string())
         .spawn()?;
     let output = child.wait_with_output()?;
     if output.status.success() {
@@ -137,11 +129,11 @@ pub(super) fn install_python_blocking(version: &str) -> io::Result<()> {
 // uv python install
 #[cfg(not(target_arch = "wasm32"))]
 #[tracing::instrument(level = "debug")]
-pub(super) async fn install_python(version: &str) -> io::Result<()> {
+pub(super) async fn install_python(version: &VersionSpecifier) -> io::Result<()> {
     let child = tokio::process::Command::new("uv")
         .arg("python")
         .arg("install")
-        .arg(version)
+        .arg(version.to_string())
         .spawn()?;
     let output = child.wait_with_output().await?;
     if output.status.success() {
@@ -157,12 +149,19 @@ pub(super) async fn install_python(version: &str) -> io::Result<()> {
 mod tests {
     use super::*;
 
+    const TEST_SCRIPT: &str = r#"
+# /// script
+# requires-python = "==3.10"
+# dependencies = []
+# ///
+
+print(1)
+"#;
+
     #[tokio::test]
     async fn test_run() {
         let script = PythonScript {
-            python_version: "==3.10".to_string(),
-            dependencies: vec![],
-            content: "print(1)".to_string(),
+            content: TEST_SCRIPT.to_string(),
         };
         let output = script.run(b"").await.unwrap();
         println!("{output:?}");
@@ -178,9 +177,7 @@ mod tests {
     #[test]
     fn test_run_blocking() {
         let script = PythonScript {
-            python_version: "==3.10".to_string(),
-            dependencies: vec![],
-            content: "print(1)".to_string(),
+            content: TEST_SCRIPT.to_string(),
         };
         let output = script.run_blocking(b"").unwrap();
         println!("{output:?}");
@@ -201,12 +198,19 @@ mod exception_tests {
 
     const TEST_EXCEPTION: &[u8] = b"Traceback (most recent call last):\n  File \"/tmp/temp_folder/script.py\", line 7, in <module>\n    raise Exception('This is a test')\nException: This is a test\n";
 
+    const TEST_EXCEPTION_SCRIPT: &str = r#"
+# /// script
+# requires-python = "==3.10"
+# dependencies = []
+# ///
+
+raise Exception('This is a test')
+"#;
+
     #[tokio::test]
     async fn test_run_exception() {
         let script = PythonScript {
-            python_version: "==3.10".to_string(),
-            dependencies: vec![],
-            content: "raise Exception('This is a test')".to_string(),
+            content: TEST_EXCEPTION_SCRIPT.to_string(),
         };
         let output = script.run(b"").await.unwrap();
         println!("{output:?}");
@@ -222,9 +226,7 @@ mod exception_tests {
     #[test]
     fn test_run_exception_blocking() {
         let script = PythonScript {
-            python_version: "==3.10".to_string(),
-            dependencies: vec![],
-            content: "raise Exception('This is a test')".to_string(),
+            content: TEST_EXCEPTION_SCRIPT.to_string(),
         };
         let output = script.run_blocking(b"").unwrap();
         println!("{output:?}");
