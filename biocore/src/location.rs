@@ -213,7 +213,7 @@ pub mod orientation {
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[derive(Serialize, Deserialize)]
-    pub struct WithOrientation<T> {
+    pub struct Stranded<T> {
         pub orientation: SequenceOrientation,
         pub v: T,
     }
@@ -242,7 +242,7 @@ pub mod orientation {
         }
     }
 
-    impl<T> WithOrientation<T> {
+    impl<T> Stranded<T> {
         pub fn new_forward(v: T) -> Self {
             Self {
                 orientation: SequenceOrientation::Forward,
@@ -263,15 +263,15 @@ pub mod orientation {
             self.orientation == SequenceOrientation::Reverse
         }
 
-        pub fn map_value<O>(self, f: impl FnOnce(T) -> O) -> WithOrientation<O> {
-            WithOrientation {
+        pub fn map_value<O>(self, f: impl FnOnce(T) -> O) -> Stranded<O> {
+            Stranded {
                 orientation: self.orientation,
                 v: f(self.v),
             }
         }
     }
 
-    impl<C> WithOrientation<ContigPosition<C>>
+    impl<C> Stranded<ContigPosition<C>>
     where
         C: Contig,
     {
@@ -299,7 +299,7 @@ pub mod orientation {
             self.into_orientation(SequenceOrientation::Reverse)
         }
     }
-    impl<C> WithOrientation<ContigPosition<C>> {
+    impl<C> Stranded<ContigPosition<C>> {
         #[track_caller]
         pub fn set_orientation_with(&mut self, orientation: SequenceOrientation, size: u64) {
             if self.orientation != orientation {
@@ -318,15 +318,15 @@ pub mod orientation {
             }
         }
 
-        pub fn as_ref_contig(&self) -> WithOrientation<ContigPosition<&C>> {
-            WithOrientation {
+        pub fn as_ref_contig(&self) -> Stranded<ContigPosition<&C>> {
+            Stranded {
                 orientation: self.orientation,
                 v: self.v.as_ref_contig(),
             }
         }
     }
 
-    impl<C> WithOrientation<ContigRange<C>>
+    impl<C> Stranded<ContigRange<C>>
     where
         C: Contig,
     {
@@ -352,7 +352,7 @@ pub mod orientation {
             self.into_orientation(SequenceOrientation::Reverse)
         }
 
-        pub fn contains(&self, loc: &WithOrientation<ContigPosition<C>>) -> bool
+        pub fn contains(&self, loc: &Stranded<ContigPosition<C>>) -> bool
         where
             C: PartialEq,
         {
@@ -379,28 +379,26 @@ pub mod orientation {
             self.overlaps_with(b, self.v.contig.size())
         }
 
-        pub fn iter_positions(
-            &self,
-        ) -> impl Iterator<Item = WithOrientation<ContigPosition<C>>> + use<C>
+        pub fn iter_positions(&self) -> impl Iterator<Item = Stranded<ContigPosition<C>>> + use<C>
         where
             C: Clone,
         {
             let orientation = self.orientation;
-            self.v.iter_positions().map(move |pos| WithOrientation {
+            self.v.iter_positions().map(move |pos| Stranded {
                 orientation,
                 v: pos,
             })
         }
     }
-    impl<C> WithOrientation<ContigRange<C>> {
-        pub fn into_start(self) -> WithOrientation<ContigPosition<C>> {
-            WithOrientation {
+    impl<C> Stranded<ContigRange<C>> {
+        pub fn into_start(self) -> Stranded<ContigPosition<C>> {
+            Stranded {
                 orientation: self.orientation,
                 v: self.v.into_start(),
             }
         }
-        pub fn into_end(self) -> WithOrientation<ContigPosition<C>> {
-            WithOrientation {
+        pub fn into_end(self) -> Stranded<ContigPosition<C>> {
+            Stranded {
                 orientation: self.orientation,
                 v: self.v.into_end(),
             }
@@ -436,7 +434,7 @@ pub mod orientation {
             }
         }
 
-        pub fn contains_with(&self, pos: &WithOrientation<ContigPosition<C>>, size: u64) -> bool
+        pub fn contains_with(&self, pos: &Stranded<ContigPosition<C>>, size: u64) -> bool
         where
             C: PartialEq,
         {
@@ -489,8 +487,8 @@ pub mod orientation {
             self.v.as_ref_contig().overlaps(&b.v)
         }
 
-        pub fn as_ref_contig(&self) -> WithOrientation<ContigRange<&C>> {
-            WithOrientation {
+        pub fn as_ref_contig(&self) -> Stranded<ContigRange<&C>> {
+            Stranded {
                 orientation: self.orientation,
                 v: self.v.as_ref_contig(),
             }

@@ -12,7 +12,7 @@ use crate::{
     dna::DnaBase,
     location::{
         ContigPosition, ContigRange,
-        orientation::{SequenceOrientation, WithOrientation},
+        orientation::{SequenceOrientation, Stranded},
     },
     sequence::{Sequence, SequenceSlice},
 };
@@ -224,15 +224,15 @@ impl<C: Contig> EditedContig<C> {
     /// Takes a range on the original contig and returns the equivalent range on the edited contig.
     pub fn liftover(
         self,
-        mut original: WithOrientation<ContigPosition<C>>,
-    ) -> Option<WithOrientation<ContigPosition<Self>>> {
+        mut original: Stranded<ContigPosition<C>>,
+    ) -> Option<Stranded<ContigPosition<Self>>> {
         let orientation = original.orientation;
 
         original.set_orientation(SequenceOrientation::Forward);
 
         let new = self.liftover_(original.v)?;
 
-        let mut new = WithOrientation {
+        let mut new = Stranded {
             orientation: SequenceOrientation::Forward,
             v: new,
         };
@@ -267,15 +267,15 @@ impl<C: Contig> EditedContig<C> {
     /// Takes a range on the original contig and returns the equivalent range on the edited contig.
     pub fn liftover_range(
         self,
-        mut original: WithOrientation<ContigRange<C>>,
-    ) -> Option<WithOrientation<ContigRange<Self>>> {
+        mut original: Stranded<ContigRange<C>>,
+    ) -> Option<Stranded<ContigRange<Self>>> {
         let orientation = original.orientation;
 
         original.set_orientation(SequenceOrientation::Forward);
 
         let new = self.liftover_range_(original.v)?;
 
-        let mut new = WithOrientation {
+        let mut new = Stranded {
             orientation: SequenceOrientation::Forward,
             v: new,
         };

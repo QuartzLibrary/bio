@@ -7,7 +7,7 @@ use std::{collections::HashSet, hash::Hash, ops::Range};
 use biocore::{
     dna::{DnaBase, DnaSequence},
     genome::{Contig, EditedContig},
-    location::{ContigPosition, ContigRange, orientation::WithOrientation},
+    location::{ContigPosition, ContigRange, orientation::Stranded},
     mutation::SilentMutation,
 };
 use serde::{Deserialize, Serialize};
@@ -15,7 +15,7 @@ use utile::num::TryUsize;
 
 use crate::{design_spec::DesignSpec, edit::Edit, editor::Editor};
 
-pub type Pam<C> = WithOrientation<ContigRange<C>>;
+pub type Pam<C> = Stranded<ContigRange<C>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
@@ -109,20 +109,20 @@ where
     }
 
     /// The location of the nick on the original sequence.
-    pub fn nick(&self) -> Option<WithOrientation<ContigPosition<C>>> {
+    pub fn nick(&self) -> Option<Stranded<ContigPosition<C>>> {
         self.edit.nick(&self.editor, self.pam.clone())
     }
     /// The location of the nick on the edited sequence.
-    pub fn nick_in_edited(&self) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
+    pub fn nick_in_edited(&self) -> Option<Stranded<ContigPosition<EditedContig<C>>>> {
         self.edit.nick_in_edited(&self.editor, self.pam.clone())
     }
 
     /// The spacer matches the sequence on the same side as the PAM, and will anneal to the opposite side.
-    pub fn spacer(&self) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn spacer(&self) -> Option<Stranded<ContigRange<C>>> {
         self.edit.spacer(&self.editor, self.pam.clone())
     }
     /// The CAS target is on the opposite strand as the PAM, it's what the spacer will anneal to.
-    pub fn cas_target(&self) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn cas_target(&self) -> Option<Stranded<ContigRange<C>>> {
         self.edit.cas_target(&self.editor, self.pam.clone())
     }
     /// The sequence of the spacer, this includes forcing the first base to be a G if [Self::force_5_prime_g] is true.
@@ -135,18 +135,18 @@ where
     }
 
     /// The section between the nick and the PAM.
-    pub fn editable_seed(&self) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn editable_seed(&self) -> Option<Stranded<ContigRange<C>>> {
         self.edit.editable_seed(&self.editor, self.pam.clone())
     }
 
     /// The PBS (primer binding site) target is the flap on the same side as the PAM,
     /// it's what will function as a jumping off point for the reverse transcription.
-    pub fn primer_binding_site(&self) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn primer_binding_site(&self) -> Option<Stranded<ContigRange<C>>> {
         self.edit
             .primer_binding_site(&self.editor, self.pam.clone(), self.primer_size)
     }
     /// The primer matches the sequence on the opposite side as the PAM.
-    pub fn primer(&self) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn primer(&self) -> Option<Stranded<ContigRange<C>>> {
         self.edit
             .primer(&self.editor, self.pam.clone(), self.primer_size)
     }
@@ -155,14 +155,12 @@ where
         Some(self.edit.get_original(self.primer()?))
     }
 
-    pub fn editable_range_in_edit(&self) -> Option<WithOrientation<ContigRange<EditedContig<C>>>> {
+    pub fn editable_range_in_edit(&self) -> Option<Stranded<ContigRange<EditedContig<C>>>> {
         let edited_contig = self.edit.edited_contig();
         let range = self.edit.editable_range(&self.editor, self.pam.clone())?;
         Some(edited_contig.clone().liftover_range(range).unwrap())
     }
-    pub fn non_editable_range_in_edit(
-        &self,
-    ) -> Option<WithOrientation<ContigRange<EditedContig<C>>>> {
+    pub fn non_editable_range_in_edit(&self) -> Option<Stranded<ContigRange<EditedContig<C>>>> {
         let edited_contig = self.edit.edited_contig();
         let range = self
             .edit
@@ -193,7 +191,7 @@ where
         assert_eq!(orientation, full_edited_range.orientation);
         assert_eq!(edited_contig, full_edited_range.v.contig);
 
-        let rtt_range = WithOrientation {
+        let rtt_range = Stranded {
             orientation,
             v: ContigRange {
                 contig: edited_contig,
@@ -242,7 +240,7 @@ where
         )
     }
     /// The full edited range, including silent mutations.
-    pub fn full_edited_range_in_edited(&self) -> WithOrientation<ContigRange<EditedContig<C>>> {
+    pub fn full_edited_range_in_edited(&self) -> Stranded<ContigRange<EditedContig<C>>> {
         let Self {
             edit,
             editor: _,
@@ -273,7 +271,7 @@ where
             end = end.max(m_end);
         }
 
-        WithOrientation {
+        Stranded {
             orientation,
             v: ContigRange {
                 contig: edited_contig,

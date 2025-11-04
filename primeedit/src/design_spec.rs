@@ -3,7 +3,7 @@ use std::{iter, ops::Range};
 use biocore::{
     dna::DnaBase,
     genome::{Contig, EditedContig},
-    location::orientation::WithOrientation,
+    location::orientation::Stranded,
 };
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -82,7 +82,7 @@ impl DesignSpec {
     pub fn designs<C>(
         self,
         edit: Edit<C>,
-        pam: WithOrientation<ContigRange<C>>,
+        pam: Stranded<ContigRange<C>>,
     ) -> Option<impl Iterator<Item = Design<C>> + use<C>>
     where
         C: Contig + Clone + Hash,
@@ -96,7 +96,7 @@ impl DesignSpec {
     pub fn designs_with_and_without_distruptions<C>(
         self,
         edit: Edit<C>,
-        pam: WithOrientation<ContigRange<C>>,
+        pam: Stranded<ContigRange<C>>,
         distruptions: Vec<SilentMutation<EditedContig<C>, DnaBase>>,
     ) -> Option<impl Iterator<Item = Design<C>> + use<C>>
     where
@@ -117,7 +117,7 @@ impl DesignSpec {
     fn designs_with_distruptions<C>(
         self,
         edit: Edit<C>,
-        pam: WithOrientation<ContigRange<C>>,
+        pam: Stranded<ContigRange<C>>,
         distruptions: Vec<SilentMutation<EditedContig<C>, DnaBase>>,
     ) -> Option<impl Iterator<Item = Design<C>> + use<C>>
     where

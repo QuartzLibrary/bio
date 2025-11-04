@@ -15,7 +15,7 @@ use biocore::{
     genome::{ArcContig, Contig},
     location::{
         ContigPosition, ContigRange,
-        orientation::{SequenceOrientation, WithOrientation},
+        orientation::{SequenceOrientation, Stranded},
     },
 };
 
@@ -46,7 +46,7 @@ pub struct ChainHeader<From, To> {
     /// chain ID
     pub id: u32,
 }
-pub type ChainRange<C> = WithOrientation<ContigRange<C>>;
+pub type ChainRange<C> = Stranded<ContigRange<C>>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AlignmentBlock {
     /// the size of the ungapped alignment
@@ -108,7 +108,7 @@ where
             return None.into_iter().flatten();
         };
 
-        let loc = WithOrientation {
+        let loc = Stranded {
             orientation: SequenceOrientation::Forward,
             v: ContigPosition {
                 contig: internal.clone(),
@@ -135,7 +135,7 @@ where
             return None.into_iter().flatten();
         };
 
-        let range = WithOrientation {
+        let range = Stranded {
             orientation: SequenceOrientation::Forward,
             v: ContigRange {
                 contig: internal.clone(),
@@ -153,14 +153,14 @@ where
 
     pub fn map_raw(
         &self,
-        loc: WithOrientation<ContigPosition<From>>,
-    ) -> impl Iterator<Item = WithOrientation<ContigPosition<To>>> + use<'_, From, To> {
+        loc: Stranded<ContigPosition<From>>,
+    ) -> impl Iterator<Item = Stranded<ContigPosition<To>>> + use<'_, From, To> {
         self.chains.iter().flat_map(move |c| c.map_raw(&loc))
     }
     pub fn map_range_raw(
         &self,
-        range: WithOrientation<ContigRange<From>>,
-    ) -> impl Iterator<Item = WithOrientation<ContigRange<To>>> + use<'_, From, To> {
+        range: Stranded<ContigRange<From>>,
+    ) -> impl Iterator<Item = Stranded<ContigRange<To>>> + use<'_, From, To> {
         self.chains
             .iter()
             .flat_map(move |c| c.map_range_raw(&range))
@@ -173,8 +173,8 @@ where
 {
     pub fn map_raw(
         &self,
-        loc: &WithOrientation<ContigPosition<From>>,
-    ) -> impl Iterator<Item = WithOrientation<ContigPosition<To>>> + use<'_, From, To> {
+        loc: &Stranded<ContigPosition<From>>,
+    ) -> impl Iterator<Item = Stranded<ContigPosition<To>>> + use<'_, From, To> {
         let mut loc = loc.as_ref_contig();
         let initially_flipped = loc.orientation != self.header.t.orientation;
         loc.set_orientation(self.header.t.orientation);
@@ -194,7 +194,7 @@ where
                 let mut r = None;
 
                 if (t_start..(t_start + b.size)).contains(&at) {
-                    let new = WithOrientation {
+                    let new = Stranded {
                         orientation: self.header.q.orientation,
                         v: ContigPosition {
                             contig: self.header.q.v.contig.clone(),
@@ -225,8 +225,8 @@ where
     }
     pub fn map_range_raw(
         &self,
-        range: &WithOrientation<ContigRange<From>>,
-    ) -> impl Iterator<Item = WithOrientation<ContigRange<To>>> + use<'_, From, To> {
+        range: &Stranded<ContigRange<From>>,
+    ) -> impl Iterator<Item = Stranded<ContigRange<To>>> + use<'_, From, To> {
         let mut range = range.as_ref_contig();
         let initially_flipped = range.orientation != self.header.t.orientation;
         range.set_orientation(self.header.t.orientation);
@@ -249,7 +249,7 @@ where
 
                 if !intersected.is_empty() {
                     let shift = intersected.start - t_start;
-                    r = Some(WithOrientation {
+                    r = Some(Stranded {
                         orientation: self.header.q.orientation,
                         v: ContigRange {
                             contig: self.header.q.v.contig.clone(),
@@ -349,14 +349,14 @@ impl<From, To> Chain<From, To> {
             q_start += b.dq;
 
             (
-                WithOrientation {
+                Stranded {
                     orientation: self.header.t.orientation,
                     v: ContigRange {
                         contig: self.header.t.v.contig.clone(),
                         at: t_fragment,
                     },
                 },
-                WithOrientation {
+                Stranded {
                     orientation: self.header.q.orientation,
                     v: ContigRange {
                         contig: self.header.q.v.contig.clone(),
@@ -448,7 +448,7 @@ where
             return None.into_iter().flatten();
         };
 
-        let range = WithOrientation {
+        let range = Stranded {
             orientation: SequenceOrientation::Forward,
             v: ContigPosition {
                 contig: internal.clone(),
@@ -475,7 +475,7 @@ where
             return None.into_iter().flatten();
         };
 
-        let range = WithOrientation {
+        let range = Stranded {
             orientation: SequenceOrientation::Forward,
             v: ContigRange {
                 contig: internal.clone(),
@@ -493,8 +493,8 @@ where
 
     pub fn map_raw(
         &self,
-        loc: &WithOrientation<ContigPosition<From>>,
-    ) -> impl Iterator<Item = WithOrientation<ContigPosition<To>>> + use<'_, From, To> {
+        loc: &Stranded<ContigPosition<From>>,
+    ) -> impl Iterator<Item = Stranded<ContigPosition<To>>> + use<'_, From, To> {
         let Some(ranges) = self.chromosomes.get(&loc.v.contig) else {
             return None.into_iter().flatten();
         };
@@ -526,7 +526,7 @@ where
             }
 
             let shift = at - r.range.start;
-            let new = WithOrientation {
+            let new = Stranded {
                 orientation: r.data.orientation,
                 v: ContigPosition {
                     contig: r.data.v.contig.clone(),
@@ -545,8 +545,8 @@ where
     }
     pub fn map_range_raw(
         &self,
-        from: &WithOrientation<ContigRange<From>>,
-    ) -> impl Iterator<Item = WithOrientation<ContigRange<To>>> + use<'_, From, To> {
+        from: &Stranded<ContigRange<From>>,
+    ) -> impl Iterator<Item = Stranded<ContigRange<To>>> + use<'_, From, To> {
         let Some(ranges) = self.chromosomes.get(&from.v.contig) else {
             return None.into_iter().flatten();
         };
@@ -579,7 +579,7 @@ where
             }
 
             let shift = intersected.start - r.range.start;
-            let new = WithOrientation {
+            let new = Stranded {
                 orientation: r.data.orientation,
                 v: ContigRange {
                     contig: r.data.v.contig.clone(),

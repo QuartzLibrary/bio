@@ -9,7 +9,7 @@ use crate::{
     genome::Contig,
     location::{
         ContigPosition, ContigRange,
-        orientation::{SequenceOrientation, WithOrientation},
+        orientation::{SequenceOrientation, Stranded},
     },
     sequence::{Sequence, SequenceSlice},
 };
@@ -17,7 +17,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct SilentMutation<C, B> {
-    pub at: WithOrientation<ContigPosition<C>>,
+    pub at: Stranded<ContigPosition<C>>,
     pub original: [B; 3],
     pub edited: [B; 3],
 }
@@ -51,7 +51,7 @@ where
             }
         }
     }
-    pub fn affects_range(&self, range: WithOrientation<ContigRange<C>>) -> bool
+    pub fn affects_range(&self, range: Stranded<ContigRange<C>>) -> bool
     where
         C: Contig + Clone,
         B: Clone,
@@ -59,7 +59,7 @@ where
         assert_eq!(self.at.v.contig, range.v.contig);
         self.affected_positions().any(|pos| range.contains(&pos))
     }
-    pub fn affected_positions(&self) -> impl Iterator<Item = WithOrientation<ContigPosition<C>>>
+    pub fn affected_positions(&self) -> impl Iterator<Item = Stranded<ContigPosition<C>>>
     where
         C: Contig + Clone,
         B: Clone,
@@ -71,7 +71,7 @@ where
             .filter(|((_, o), e)| o != e)
             .map(|((at, _), _)| at)
     }
-    pub fn affected_range(&self) -> WithOrientation<ContigRange<C>>
+    pub fn affected_range(&self) -> Stranded<ContigRange<C>>
     where
         C: Clone,
     {
@@ -104,15 +104,15 @@ where
         assert!((0..3).contains_range(&range));
         if range.is_empty() { 0..0 } else { range }
     }
-    pub fn at_range(&self) -> WithOrientation<ContigRange<C>>
+    pub fn at_range(&self) -> Stranded<ContigRange<C>>
     where
         C: Clone,
     {
-        let WithOrientation {
+        let Stranded {
             orientation,
             v: ContigPosition { contig, at },
         } = self.at.clone();
-        WithOrientation {
+        Stranded {
             orientation,
             v: ContigRange {
                 contig,
@@ -133,7 +133,7 @@ impl SequenceSlice<DnaBase> {
     /// NOTE: Assumes the sequence is of the forward strand.
     pub fn silent_mutations<C: Contig + Clone>(
         &self,
-        frame_start: WithOrientation<ContigPosition<C>>,
+        frame_start: Stranded<ContigPosition<C>>,
     ) -> impl Iterator<Item = SilentMutation<C, DnaBase>> + use<'_, C> {
         assert_eq!(frame_start.v.contig.size(), self.len().u64_unwrap()); // TODO: relax constraint.
 
@@ -203,7 +203,7 @@ mod tests {
         genome::ContigRef,
         location::{
             ContigRange,
-            orientation::{SequenceOrientation, WithOrientation},
+            orientation::{SequenceOrientation, Stranded},
         },
     };
 
@@ -258,7 +258,7 @@ mod tests {
         let contig_ext = ContigRef::new(CONTIG, SEQ_EXT.replace('-', "").len().u64_unwrap());
 
         let to_synonyms = |i: usize, codon: [DnaBase; 3], orientation: SequenceOrientation| {
-            let at = WithOrientation {
+            let at = Stranded {
                 orientation,
                 v: contig.at(i.u64_unwrap()),
             };
@@ -289,12 +289,12 @@ mod tests {
         }
 
         {
-            let start = WithOrientation::new_forward(contig.at(0));
+            let start = Stranded::new_forward(contig.at(0));
 
             assert_eq!(
                 seq.silent_mutations(start).collect::<Vec<_>>(),
                 seq_ext
-                    .silent_mutations(WithOrientation::new_forward(contig_ext.at(1)))
+                    .silent_mutations(Stranded::new_forward(contig_ext.at(1)))
                     .map(|mut m| {
                         m.at.v.contig = contig;
                         m.at.v.at -= 1;
@@ -332,12 +332,12 @@ mod tests {
         {
             let seq_rc: DnaSequence = SEQ_RC.replace('-', "").parse().unwrap();
 
-            let start_rc = WithOrientation::new_reverse(contig.at(0));
+            let start_rc = Stranded::new_reverse(contig.at(0));
 
             assert_eq!(
                 seq.silent_mutations(start_rc).collect::<Vec<_>>(),
                 seq_ext
-                    .silent_mutations(WithOrientation::new_reverse(contig_ext.at(1)))
+                    .silent_mutations(Stranded::new_reverse(contig_ext.at(1)))
                     .map(|mut m| {
                         m.at.v.contig = contig;
                         m.at.v.at -= 1;
@@ -379,7 +379,7 @@ mod tests {
     #[expect(clippy::single_range_in_vec_init)]
     fn apply_affects_and_ranges_invariants() {
         let contig = ContigRef::new("test_contig", 3);
-        let at = WithOrientation::new_forward(contig.at(0));
+        let at = Stranded::new_forward(contig.at(0));
 
         let new_range = |range: Range<u64>| {
             at.map_value(|ContigPosition { contig, at }| ContigRange {

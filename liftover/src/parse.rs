@@ -6,7 +6,7 @@ use std::{
     str,
 };
 
-use biocore::{genome::ArcContig, location::orientation::WithOrientation};
+use biocore::{genome::ArcContig, location::orientation::Stranded};
 use flate2::read::MultiGzDecoder;
 
 use utile::{
@@ -200,7 +200,7 @@ fn read_chain_side(
         .get_or_insert(ArcContig::new(name.into(), size))
         .clone();
 
-    Ok(WithOrientation {
+    Ok(Stranded {
         orientation,
         v: ContigRange { contig, at },
     })

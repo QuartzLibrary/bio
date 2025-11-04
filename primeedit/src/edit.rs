@@ -9,7 +9,7 @@ use biocore::{
     genome::{ArcContig, Contig, ContigRef, EditedContig},
     location::{
         ContigPosition, ContigRange,
-        orientation::{SequenceOrientation, WithOrientation},
+        orientation::{SequenceOrientation, Stranded},
     },
     mutation::SilentMutation,
 };
@@ -34,7 +34,7 @@ pub struct Edit<C> {
     end: DnaSequence,
 
     /// On the sense/RNA-like strand (as opposed to the antisense/template strand).
-    translation_frame_start: Option<WithOrientation<ContigPosition<C>>>,
+    translation_frame_start: Option<Stranded<ContigPosition<C>>>,
 }
 impl Edit<ArcContig> {
     pub fn parse(input: &str) -> Option<Self> {
@@ -86,7 +86,7 @@ impl Edit<ArcContig> {
     }
     pub fn with_translation_frame_start(
         mut self,
-        translation_frame_start: WithOrientation<ContigPosition<ArcContig>>,
+        translation_frame_start: Stranded<ContigPosition<ArcContig>>,
     ) -> Self {
         self.translation_frame_start = Some(translation_frame_start);
         self
@@ -117,7 +117,7 @@ where
         } = self;
         format!("{start}{original}{end}").parse().unwrap()
     }
-    pub fn edit_range_in_original(&self) -> WithOrientation<ContigRange<C>> {
+    pub fn edit_range_in_original(&self) -> Stranded<ContigRange<C>> {
         let Self {
             contig: _,
             start,
@@ -128,7 +128,7 @@ where
         } = self;
         let range = start.len()..start.len() + original.len();
         let range = u64::try_from(range.start).unwrap()..u64::try_from(range.end).unwrap();
-        WithOrientation {
+        Stranded {
             orientation: SequenceOrientation::Forward,
             v: ContigRange {
                 contig: self.original_contig(),
@@ -137,7 +137,7 @@ where
         }
     }
     #[track_caller]
-    pub fn get_original(&self, range: WithOrientation<ContigRange<C>>) -> DnaSequence {
+    pub fn get_original(&self, range: Stranded<ContigRange<C>>) -> DnaSequence {
         assert_eq!(self.original_contig(), range.v.contig);
         match range.orientation {
             SequenceOrientation::Forward => self.original()[range.v].to_owned(),
@@ -167,9 +167,9 @@ where
         } = self;
         format!("{start}{edited}{end}").parse().unwrap()
     }
-    pub fn edit_range_in_edited(&self) -> WithOrientation<ContigRange<EditedContig<C>>> {
+    pub fn edit_range_in_edited(&self) -> Stranded<ContigRange<EditedContig<C>>> {
         let range = self.raw_edit_range_in_edited();
-        WithOrientation {
+        Stranded {
             orientation: SequenceOrientation::Forward,
             v: ContigRange {
                 contig: self.edited_contig(),
@@ -189,7 +189,7 @@ where
         let range = start.len()..start.len() + edited.len();
         range.start.u64_unwrap()..range.end.u64_unwrap()
     }
-    pub fn get_edited(&self, range: WithOrientation<ContigRange<EditedContig<C>>>) -> DnaSequence {
+    pub fn get_edited(&self, range: Stranded<ContigRange<EditedContig<C>>>) -> DnaSequence {
         assert_eq!(self.edited_contig(), range.v.contig);
         match range.orientation {
             SequenceOrientation::Forward => self.edited()[range.v].to_owned(),
@@ -245,7 +245,7 @@ where
             )
             .map(|(v, orientation)| {
                 assert_eq!(pam_size, v.end.strict_sub(v.start));
-                WithOrientation {
+                Stranded {
                     orientation,
                     v: ContigRange {
                         contig: self.original_contig(),
@@ -284,8 +284,8 @@ where
     }
 
     /// The nick is on the same strand as the PAM, the side the spacer anneals to.
-    pub fn nick(&self, editor: &Editor, pam: Pam<C>) -> Option<WithOrientation<ContigPosition<C>>> {
-        Some(WithOrientation {
+    pub fn nick(&self, editor: &Editor, pam: Pam<C>) -> Option<Stranded<ContigPosition<C>>> {
+        Some(Stranded {
             orientation: pam.orientation,
             v: pam.into_start().v.checked_sub(editor.nick_distance)?,
         })
@@ -296,20 +296,20 @@ where
         &self,
         editor: &Editor,
         pam: Pam<C>,
-    ) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
+    ) -> Option<Stranded<ContigPosition<EditedContig<C>>>> {
         Some(
             self.nick(editor, pam)?
                 .map_value(|p| p.map_contig(|_| self.edited_contig())),
         )
     }
     /// The spacer matches the sequence on the same side as the PAM, and will anneal to the opposite side.
-    pub fn spacer(&self, editor: &Editor, pam: Pam<C>) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn spacer(&self, editor: &Editor, pam: Pam<C>) -> Option<Stranded<ContigRange<C>>> {
         let spacer_size = editor.spacer_size;
         if pam.v.at.start < spacer_size {
             return None;
         }
         let start = pam.v.at.start;
-        Some(WithOrientation {
+        Some(Stranded {
             orientation: pam.orientation,
             v: ContigRange {
                 contig: pam.v.contig,
@@ -318,21 +318,13 @@ where
         })
     }
     /// The CAS target is on the opposite strand as the PAM, it's what the spacer will anneal to.
-    pub fn cas_target(
-        &self,
-        editor: &Editor,
-        pam: Pam<C>,
-    ) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn cas_target(&self, editor: &Editor, pam: Pam<C>) -> Option<Stranded<ContigRange<C>>> {
         Some(self.spacer(editor, pam)?.flip_orientation())
     }
     /// The section between the nick and the PAM.
-    pub fn editable_seed(
-        &self,
-        editor: &Editor,
-        pam: Pam<C>,
-    ) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn editable_seed(&self, editor: &Editor, pam: Pam<C>) -> Option<Stranded<ContigRange<C>>> {
         let start = pam.v.at.start;
-        Some(WithOrientation {
+        Some(Stranded {
             orientation: pam.orientation,
             v: ContigRange {
                 contig: pam.v.contig,
@@ -341,13 +333,9 @@ where
         })
     }
     /// The entire range that is editable, from the nick onwards.
-    pub fn editable_range(
-        &self,
-        editor: &Editor,
-        pam: Pam<C>,
-    ) -> Option<WithOrientation<ContigRange<C>>> {
+    pub fn editable_range(&self, editor: &Editor, pam: Pam<C>) -> Option<Stranded<ContigRange<C>>> {
         let start = pam.v.at.start;
-        Some(WithOrientation {
+        Some(Stranded {
             orientation: pam.orientation,
             v: ContigRange {
                 contig: pam.v.contig,
@@ -360,9 +348,9 @@ where
         &self,
         editor: &Editor,
         pam: Pam<C>,
-    ) -> Option<WithOrientation<ContigRange<C>>> {
+    ) -> Option<Stranded<ContigRange<C>>> {
         let start = pam.v.at.start;
-        Some(WithOrientation {
+        Some(Stranded {
             orientation: pam.orientation,
             v: ContigRange {
                 contig: pam.v.contig,
@@ -377,13 +365,13 @@ where
         editor: &Editor,
         pam: Pam<C>,
         pbs_size: u64,
-    ) -> Option<WithOrientation<ContigRange<C>>> {
+    ) -> Option<Stranded<ContigRange<C>>> {
         let nick_distance = editor.nick_distance.u64_unwrap();
 
         let end = pam.v.at.start.checked_sub(nick_distance)?;
         let range = end.checked_sub(pbs_size)?..end;
 
-        Some(WithOrientation {
+        Some(Stranded {
             orientation: pam.orientation,
             v: ContigRange {
                 contig: pam.v.contig,
@@ -397,7 +385,7 @@ where
         editor: &Editor,
         pam: Pam<C>,
         pbs_size: u64,
-    ) -> Option<WithOrientation<ContigRange<C>>> {
+    ) -> Option<Stranded<ContigRange<C>>> {
         Some(
             self.primer_binding_site(editor, pam, pbs_size)?
                 .flip_orientation(),
@@ -406,14 +394,14 @@ where
 
     /// The start of the translation frame.
     /// On the sense/RNA-like strand (as opposed to the antisense/template strand).
-    pub fn translation_frame_start(&self) -> Option<WithOrientation<ContigPosition<C>>> {
+    pub fn translation_frame_start(&self) -> Option<Stranded<ContigPosition<C>>> {
         self.translation_frame_start.clone()
     }
     /// The start of the translation frame in the edited contig.
     /// On the sense/RNA-like strand (as opposed to the antisense/template strand).
     pub fn translation_frame_start_edited(
         &self,
-    ) -> Option<WithOrientation<ContigPosition<EditedContig<C>>>> {
+    ) -> Option<Stranded<ContigPosition<EditedContig<C>>>> {
         let translation_frame_start = self.translation_frame_start.clone()?;
 
         let result = self.edited_contig().liftover(translation_frame_start);
@@ -461,7 +449,7 @@ where
         &self,
         pam: Pam<C>,
         cap: u64,
-    ) -> Option<impl Iterator<Item = WithOrientation<ContigRange<C>>>> {
+    ) -> Option<impl Iterator<Item = Stranded<ContigRange<C>>>> {
         let mut edit_range = self.edit_range_in_original();
         edit_range.set_orientation(pam.orientation);
 
@@ -470,20 +458,20 @@ where
             let contig = edit_range.v.contig.clone();
             // From the end of the pam to the beginning of the edit
             let at = pam.v.at.end..Ord::min(pam.v.at.end + cap, edit_range.v.at.start);
-            WithOrientation {
+            Stranded {
                 orientation,
                 v: ContigRange { contig, at },
             }
         };
 
         let tail = {
-            let WithOrientation {
+            let Stranded {
                 orientation,
                 v: ContigRange { contig, at },
             } = edit_range.clone();
             // From the end of the edit range onward.
             let at = at.end..Ord::min(at.end + cap, self.original_len().u64_unwrap());
-            WithOrientation {
+            Stranded {
                 orientation,
                 v: ContigRange { contig, at },
             }
@@ -629,28 +617,28 @@ mod tests {
         assert_eq!(
             pams,
             vec![
-                WithOrientation {
+                Stranded {
                     orientation: SequenceOrientation::Forward,
                     v: ContigRange {
                         contig: edit.original_contig(),
                         at: 5..8
                     }
                 },
-                WithOrientation {
+                Stranded {
                     orientation: SequenceOrientation::Forward,
                     v: ContigRange {
                         contig: edit.original_contig(),
                         at: 6..9
                     }
                 },
-                WithOrientation {
+                Stranded {
                     orientation: SequenceOrientation::Reverse,
                     v: ContigRange {
                         contig: edit.original_contig(),
                         at: 5..8
                     }
                 },
-                WithOrientation {
+                Stranded {
                     orientation: SequenceOrientation::Reverse,
                     v: ContigRange {
                         contig: edit.original_contig(),
