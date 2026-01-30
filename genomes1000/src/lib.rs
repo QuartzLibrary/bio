@@ -9,8 +9,8 @@ mod slow;
 
 pub mod contig;
 pub mod pedigree;
-pub mod resource;
 pub mod simplified;
+pub mod source;
 
 use either::Either;
 use std::{cmp::Ordering, collections::BTreeMap, io};
@@ -20,14 +20,10 @@ use biocore::{
     location::{ContigPosition, ContigRange},
     vcf::IndexedVcfReader,
 };
-use utile::{
-    cache::FsCache,
-    io::FromUtf8Bytes,
-    iter::IteratorExt,
-    resource::{RawResource, RawResourceExt},
-};
+use resource::{RawResource, RawResourceExt, fs::FsCache};
+use utile::{io::FromUtf8Bytes, iter::IteratorExt};
 
-use self::{pedigree::Pedigree, resource::Genomes1000Resource, simplified::SimplifiedRecord};
+use self::{pedigree::Pedigree, simplified::SimplifiedRecord, source::Genomes1000Resource};
 
 pub use self::{contig::GRCh38Contig, genotype::AltGenotype, info::RecordInfo};
 

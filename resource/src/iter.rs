@@ -1,4 +1,4 @@
-use crate::jsonl::JsonLinesReader;
+use utile::jsonl::JsonLinesReader;
 
 use super::RawResource;
 

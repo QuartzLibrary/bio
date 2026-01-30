@@ -7,7 +7,7 @@ use liftover::{
     bindings::{self, ucsc::UcscLiftoverSettings},
     sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
 };
-use utile::resource::{RawResource, RawResourceExt};
+use resource::{RawResource, RawResourceExt};
 
 #[ignore]
 #[tokio::test]
@@ -171,7 +171,7 @@ pub mod cache {
     use std::path::PathBuf;
 
     use biocore::location::{ContigPosition, ContigRange};
-    use utile::{cache::FsCacheEntry, resource::RawResourceExt};
+    use resource::{RawResourceExt, fs::FsCacheEntry};
 
     pub fn get(prefix: &str, key: &str) -> (Vec<Vec<ContigPosition>>, Vec<Vec<ContigRange>>) {
         (

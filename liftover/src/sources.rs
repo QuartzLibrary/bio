@@ -1,6 +1,6 @@
 use url::Url;
 
-use utile::resource::{Compression, RawResource, UrlResource};
+use resource::{Compression, RawResource, UrlResource};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnsemblResource {

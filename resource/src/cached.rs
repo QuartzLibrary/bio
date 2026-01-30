@@ -1,8 +1,9 @@
 use std::{fmt, path::PathBuf};
 
-use crate::cache::{FsCache, FsCacheEntry};
-
-use super::{Compression, RawResource, RawResourceExt, ResourceRef};
+use crate::{
+    Compression, RawResource, RawResourceExt, ResourceRef,
+    fs::{FsCache, FsCacheEntry},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FsCacheResource<R> {

@@ -101,9 +101,9 @@ pub static META: phf::Map<&'static str, ContigMeta> = phf::phf_map! {
 
 #[cfg(test)]
 mod tests {
-    use utile::resource::{RawResource, RawResourceExt};
+    use resource::{RawResource, RawResourceExt};
 
-    use crate::resource::Genomes1000Resource;
+    use crate::source::Genomes1000Resource;
 
     use super::*;
 

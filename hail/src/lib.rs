@@ -1,10 +1,10 @@
 #![feature(ascii_char)]
 
 pub mod contig;
-pub mod resource;
+pub mod source;
 
-use resource::HailCommonResource;
-use utile::resource::{RawResource, RawResourceExt};
+use resource::{RawResource, RawResourceExt};
+use source::HailCommonResource;
 
 pub async fn load_grch38_reference_genome()
 -> std::io::Result<biocore::fasta::IndexedFastaReader<std::io::BufReader<std::fs::File>>> {

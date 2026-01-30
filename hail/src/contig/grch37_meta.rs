@@ -93,9 +93,9 @@ pub static META: phf::Map<&'static str, ContigMeta> = phf::phf_map! {
 
 #[cfg(test)]
 mod tests {
-    use utile::resource::{RawResource, RawResourceExt};
+    use resource::{RawResource, RawResourceExt};
 
-    use crate::resource::HailCommonResource;
+    use crate::source::HailCommonResource;
 
     use super::ContigMeta;
 

@@ -1,5 +1,5 @@
 use url::Url;
-use utile::resource::{RawResource, UrlResource};
+use resource::{RawResource, UrlResource};
 
 const GRCH38_REFERENCE_GENOME_INDEXED: &str =
     "fasta/homo_sapiens/dna_index/Homo_sapiens.GRCh38.dna.toplevel.fa.gz";
@@ -113,8 +113,8 @@ impl RawResource for EnsemblResource {
         self.key.clone()
     }
 
-    fn compression(&self) -> Option<utile::resource::Compression> {
-        utile::resource::Compression::infer(&self.key)
+    fn compression(&self) -> Option<resource::Compression> {
+        resource::Compression::infer(&self.key)
     }
 
     type Reader = <UrlResource as RawResource>::Reader;

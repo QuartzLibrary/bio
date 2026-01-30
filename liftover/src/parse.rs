@@ -1,3 +1,4 @@
+use flate2::read::MultiGzDecoder;
 use std::{
     collections::BTreeSet,
     fs::File,
@@ -7,12 +8,8 @@ use std::{
 };
 
 use biocore::{genome::ArcContig, location::orientation::Stranded};
-use flate2::read::MultiGzDecoder;
-
-use utile::{
-    io::read_ext::AsyncReadInto,
-    resource::{RawResource, RawResourceExt},
-};
+use resource::{RawResource, RawResourceExt};
+use utile::io::read_ext::AsyncReadInto;
 
 use super::{
     AlignmentBlock, Chain, ChainHeader, ChainRange, ContigRange, Liftover, SequenceOrientation,

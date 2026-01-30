@@ -1,7 +1,7 @@
+use resource::{RawResource, RawResourceExt};
 use std::{collections::HashMap, io::Read};
-use utile::resource::{RawResource, RawResourceExt};
 
-use crate::resource::Genomes1000Resource;
+use crate::source::Genomes1000Resource;
 
 use super::{AltGenotype, GRCh38Contig, parse};
 

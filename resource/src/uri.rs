@@ -5,7 +5,7 @@ use futures::{Stream, TryStreamExt};
 use reqwest::IntoUrl;
 use url::Url;
 
-use crate::io::{get_filesize_from_headers, reqwest_error};
+use utile::io::{get_filesize_from_headers, reqwest_error};
 
 use super::{Compression, RawResource};
 
@@ -71,7 +71,7 @@ impl UrlResource {
                 Err(e) if i == retries => return Err(e),
                 Err(_) => {
                     let delay = 1000 * (1 << i); // 1s, 2s, 4s, 8s, 16s, ...
-                    crate::time::sleep(std::time::Duration::from_millis(delay)).await;
+                    utile::time::sleep(std::time::Duration::from_millis(delay)).await;
                 }
             }
         }

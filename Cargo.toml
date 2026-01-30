@@ -11,7 +11,7 @@ members = [
     "pan_ukbb",
     "pgs_catalog",
     "primeedit",
-    "puv",
+    "puv", "resource",
     "utile",
 ]
 exclude = ["target"]

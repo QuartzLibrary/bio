@@ -11,8 +11,8 @@ use ids::{
     pgs::{PgsId, pgp::PgpId, ppm::PpmId, pss::PssId},
     pubmed::PubmedId,
 };
+use resource::{RawResource, RawResourceExt};
 use url::Url;
-use utile::resource::{RawResource, RawResourceExt};
 
 use crate::{PgsCatalogResource, WeightType};
 

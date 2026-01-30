@@ -5,10 +5,8 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use biocore::location::ContigPosition;
-use utile::{
-    io::reqwest_error,
-    resource::{RawResource, RawResourceExt, UrlResource},
-};
+use resource::{RawResource, RawResourceExt, UrlResource};
+use utile::io::reqwest_error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GwasCatalogResource {
@@ -48,7 +46,7 @@ impl RawResource for GwasCatalogResource {
         self.key.clone()
     }
 
-    fn compression(&self) -> Option<utile::resource::Compression> {
+    fn compression(&self) -> Option<resource::Compression> {
         None
     }
 

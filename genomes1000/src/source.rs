@@ -1,5 +1,5 @@
+use resource::{RawResource, UrlResource};
 use url::Url;
-use utile::resource::{RawResource, UrlResource};
 
 use crate::contig::GRCh38Contig;
 
@@ -165,11 +165,11 @@ impl RawResource for Genomes1000Resource {
         self.key.clone()
     }
 
-    fn compression(&self) -> Option<utile::resource::Compression> {
+    fn compression(&self) -> Option<resource::Compression> {
         if self.key == old::REFERENCE_GENOME {
-            Some(utile::resource::Compression::Gzip)
+            Some(resource::Compression::Gzip)
         } else {
-            utile::resource::Compression::infer(&self.key)
+            resource::Compression::infer(&self.key)
         }
     }
 

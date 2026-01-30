@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 biocore = { path = "../biocore" }
+resource = { path = "../resource" }
 utile = { path = "../utile" }
 
 log = "0.4"

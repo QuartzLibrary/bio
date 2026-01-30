@@ -1,6 +1,6 @@
-use utile::resource::RawResourceExt;
+use resource::RawResourceExt;
 
-use genomes1000::{GRCh38Contig, load_grch38_reference_genome, resource::Genomes1000Resource};
+use genomes1000::{GRCh38Contig, load_grch38_reference_genome, source::Genomes1000Resource};
 
 #[tokio::main]
 async fn main() {

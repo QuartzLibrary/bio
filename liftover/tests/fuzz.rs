@@ -10,10 +10,7 @@ mod ucsc;
 use std::path::PathBuf;
 
 use biocore::location::ContigRange;
-use utile::{
-    cache::FsCache,
-    resource::{RawResource, RawResourceExt},
-};
+use resource::{RawResource, RawResourceExt, fs::FsCache};
 
 use liftover::{
     Liftover,

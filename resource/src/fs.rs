@@ -6,7 +6,9 @@ use std::{
 
 use directories::ProjectDirs;
 
-use crate::{io::not_found_error, resource::RawResource};
+use utile::io::not_found_error;
+
+use crate::RawResource;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FsCache {
@@ -128,7 +130,7 @@ impl FsCacheEntry {
         &self,
         data: impl IntoIterator<Item = T>,
     ) -> std::io::Result<()> {
-        self.write_file(crate::jsonl::JsonLinesReader::new(data.into_iter()))
+        self.write_file(utile::jsonl::JsonLinesReader::new(data.into_iter()))
     }
 
     /// Unfortunately some sources aren't pure.
@@ -147,7 +149,7 @@ impl RawResource for FsCacheEntry {
         self.path.to_string_lossy().as_ref().to_owned()
     }
 
-    fn compression(&self) -> Option<crate::resource::Compression> {
+    fn compression(&self) -> Option<crate::Compression> {
         None
     }
 

@@ -1,5 +1,5 @@
+use resource::{RawResource, UrlResource};
 use url::Url;
-use utile::resource::{RawResource, UrlResource};
 
 const HAIL_COMMON_BUCKET: &str = "hail-common";
 
@@ -51,16 +51,16 @@ impl RawResource for HailCommonResource {
         self.key.clone()
     }
 
-    fn compression(&self) -> Option<utile::resource::Compression> {
+    fn compression(&self) -> Option<resource::Compression> {
         match self.key.as_str() {
             GRCH38_REFERENCE_GENOME | GRCH37_REFERENCE_GENOME => {
-                Some(utile::resource::Compression::MultiGzip)
+                Some(resource::Compression::MultiGzip)
             }
             GRCH38_REFERENCE_GENOME_INDEX | GRCH37_REFERENCE_GENOME_INDEX => None,
             GRCH37_TO_GRCH38_LIFTOVER_CHAIN | GRCH38_TO_GRCH37_LIFTOVER_CHAIN => {
-                Some(utile::resource::Compression::Gzip)
+                Some(resource::Compression::Gzip)
             }
-            _ => utile::resource::Compression::infer_strict(&self.key),
+            _ => resource::Compression::infer_strict(&self.key),
         }
     }
 

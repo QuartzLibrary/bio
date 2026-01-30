@@ -11,7 +11,7 @@ use simplified::SimplificationError;
 use url::Url;
 
 use biocore::dna::DnaSequence;
-use utile::resource::{RawResource, RawResourceExt, UrlResource};
+use resource::{RawResource, RawResourceExt, UrlResource};
 
 pub use ids::{pgs::PgsId, rs::RsId};
 
@@ -53,10 +53,10 @@ impl RawResource for PgsCatalogResource {
         self.key()
     }
 
-    fn compression(&self) -> Option<utile::resource::Compression> {
+    fn compression(&self) -> Option<resource::Compression> {
         let key = self.key();
         if key.ends_with(".gz") || key.ends_with(".bgz") {
-            Some(utile::resource::Compression::MultiGzip)
+            Some(resource::Compression::MultiGzip)
         } else {
             None
         }

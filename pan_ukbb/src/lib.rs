@@ -11,7 +11,7 @@ use ordered_float::NotNan;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use url::Url;
 
-use utile::resource::{RawResource, RawResourceExt, UrlResource};
+use resource::{RawResource, RawResourceExt, UrlResource};
 
 const URL_BASE: &str = "https://pan-ukb-us-east-1.s3.amazonaws.com";
 const PHENOTYPE_MANIFEST_KEY: &str = "sumstats_release/phenotype_manifest.tsv.bgz";
@@ -43,9 +43,9 @@ impl RawResource for PanUKBBS3Resource {
         self.key.clone()
     }
 
-    fn compression(&self) -> Option<utile::resource::Compression> {
+    fn compression(&self) -> Option<resource::Compression> {
         if self.key.ends_with(".gz") || self.key.ends_with(".bgz") {
-            Some(utile::resource::Compression::MultiGzip)
+            Some(resource::Compression::MultiGzip)
         } else {
             None
         }
