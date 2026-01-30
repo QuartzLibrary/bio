@@ -1,8 +1,9 @@
-#![cfg_attr(target_family = "wasm", allow(unused_variables))] // TODO
-
+#[expect(dead_code)]
 pub struct Task {
     #[cfg(not(target_family = "wasm"))]
     task: tokio_task::Task,
+    #[cfg(target_family = "wasm")]
+    task: wasm_task::Task,
 }
 impl Drop for Task {
     fn drop(&mut self) {
@@ -12,17 +13,19 @@ impl Drop for Task {
 
 impl Task {
     pub fn new(f: impl Future<Output = ()> + Send + 'static) -> Self {
-        assert!(cfg!(not(target_family = "wasm"))); // TODO
         Self {
             #[cfg(not(target_family = "wasm"))]
             task: tokio_task::Task::new(f),
+            #[cfg(target_family = "wasm")]
+            task: wasm_task::Task::new_local(f), // TODO: forbid instead?
         }
     }
     pub fn new_local(f: impl Future<Output = ()> + 'static) -> Self {
-        assert!(cfg!(not(target_family = "wasm"))); // TODO
         Self {
             #[cfg(not(target_family = "wasm"))]
             task: tokio_task::Task::new_local(f),
+            #[cfg(target_family = "wasm")]
+            task: wasm_task::Task::new_local(f),
         }
     }
 }
@@ -31,7 +34,6 @@ impl Task {
 mod tokio_task {
     use tokio::task::JoinHandle;
 
-    #[derive(Debug)]
     pub struct Task {
         join_handle: JoinHandle<()>,
     }
@@ -54,19 +56,39 @@ mod tokio_task {
     }
 }
 
+#[cfg(target_family = "wasm")]
+mod wasm_task {
+    use futures::stream::{AbortHandle, Abortable};
+
+    pub struct Task {
+        abort_handle: AbortHandle,
+    }
+
+    impl Task {
+        pub fn new_local(f: impl Future<Output = ()> + 'static) -> Self {
+            let (abort_handle, abort_registration) = AbortHandle::new_pair();
+            let f = Abortable::new(f, abort_registration);
+            let f = async move {
+                let _ = f.await;
+            };
+            wasm_bindgen_futures::spawn_local(f);
+            Self { abort_handle }
+        }
+    }
+
+    impl Drop for Task {
+        fn drop(&mut self) {
+            self.abort_handle.abort();
+        }
+    }
+}
+
 mod boilerplate {
     use super::Task;
 
     impl std::fmt::Debug for Task {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            #[cfg(not(target_family = "wasm"))]
-            {
-                self.task.fmt(f)
-            }
-            #[cfg(target_family = "wasm")]
-            {
-                f.write_str("Task { .. }")
-            }
+            f.write_str("Task { .. }")
         }
     }
 }
