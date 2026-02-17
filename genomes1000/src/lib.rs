@@ -140,10 +140,10 @@ impl Record<Genotype> {
             move |(i, alt)| {
                 let mut record = self.clone();
                 record.alternate_alleles = vec![alt];
-                let i: u8 = i.try_into().unwrap();
+                let gt: u8 = (i + 1).try_into().unwrap();
                 for sample in record.samples.iter_mut() {
                     Genotype::visit_values_mut(sample, |value| {
-                        *value = if *value == i { 1 } else { 0 }
+                        *value = if *value == gt { 1 } else { 0 }
                     });
                 }
                 record
@@ -193,10 +193,10 @@ impl Record<Genotype> {
         for i in to_drop.into_iter().rev() {
             self.alternate_alleles.remove(i);
 
-            let i: u8 = i.try_into().unwrap();
+            let gt: u8 = (i + 1).try_into().unwrap();
 
             for sample in self.samples.iter_mut() {
-                Genotype::visit_values_mut(sample, |value| match Ord::cmp(&*value, &i) {
+                Genotype::visit_values_mut(sample, |value| match Ord::cmp(&*value, &gt) {
                     Ordering::Less => {}
                     Ordering::Equal => *value = 0,
                     Ordering::Greater => *value -= 1,
