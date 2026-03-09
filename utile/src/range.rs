@@ -1,7 +1,8 @@
-use std::{
-    iter::Step,
-    ops::{Add, Range, RangeInclusive, Sub},
-};
+#[cfg(feature = "nightly")]
+use std::iter::Step;
+use std::ops::{Add, Range, Sub};
+#[cfg(feature = "nightly")]
+use std::ops::RangeInclusive;
 
 /// Some helper methods for ranges.
 ///
@@ -90,6 +91,7 @@ where
         })
     }
 }
+#[cfg(feature = "nightly")]
 impl<T> RangeExt for RangeInclusive<T>
 where
     T: Ord + Step + Clone + std::fmt::Debug,
@@ -284,6 +286,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "nightly")]
     #[test]
     fn test_range_inclusive_random_intersection() {
         let mut rng = SmallRng::seed_from_u64(0);
@@ -345,6 +348,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "nightly")]
     #[test]
     fn test_range_inclusive_random_union() {
         let mut rng = SmallRng::seed_from_u64(0);

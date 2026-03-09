@@ -26,8 +26,8 @@ pub fn to_wsl_path(path: impl AsRef<Path>) -> Result<PathBuf, std::io::Error> {
                 Prefix::Verbatim(s) => {
                     Ok(s.to_str().unwrap().trim_start_matches(r"\\?\").to_owned())
                 }
-                Prefix::VerbatimDisk(d) => Ok(d.as_ascii().unwrap().to_string()),
-                Prefix::Disk(d) => Ok(d.as_ascii().unwrap().to_string()),
+                Prefix::VerbatimDisk(d) => Ok((d as char).to_string()),
+                Prefix::Disk(d) => Ok((d as char).to_string()),
 
                 Prefix::VerbatimUNC(_, _) => Err(error("UNC paths are not supported.")),
                 Prefix::DeviceNS(_) => Err(error("Device namespace paths are not supported.")),

@@ -268,14 +268,8 @@ macro_rules! from_bytes_ascii {
             type Err = FromAsciiBytesError<<$t as FromStr>::Err>;
 
             fn from_bytes(bytes: &[u8]) -> Result<Self, Self::Err> {
-                let Some(ascii) = bytes.as_ascii() else {
-                    Err(FromAsciiBytesError {
-                        raw: bytes.to_vec(),
-                        utf8: String::from_utf8(bytes.to_vec()),
-                        parse_error: None,
-                    })?
-                };
-                ascii.as_str().parse().map_err(|e| FromAsciiBytesError {
+                let s = as_ascii_str(bytes)?;
+                s.parse().map_err(|e| FromAsciiBytesError {
                     raw: bytes.to_vec(),
                     utf8: String::from_utf8(bytes.to_vec()),
                     parse_error: Some(e),
@@ -284,6 +278,7 @@ macro_rules! from_bytes_ascii {
         }
     };
 }
+
 from_bytes_ascii!(u8);
 from_bytes_ascii!(u16);
 from_bytes_ascii!(u32);
@@ -298,3 +293,33 @@ from_bytes_ascii!(i128);
 from_bytes_ascii!(isize);
 from_bytes_ascii!(f32);
 from_bytes_ascii!(f64);
+
+#[cfg(feature = "nightly")]
+fn as_ascii_str<E>(bytes: &[u8]) -> Result<&str, FromAsciiBytesError<E>> {
+    let Some(ascii) = bytes.as_ascii() else {
+        Err(FromAsciiBytesError {
+            raw: bytes.to_vec(),
+            utf8: String::from_utf8(bytes.to_vec()),
+            parse_error: None,
+        })?
+    };
+    Ok(ascii.as_str())
+}
+#[cfg(not(feature = "nightly"))]
+fn as_ascii_str<E>(bytes: &[u8]) -> Result<&str, FromAsciiBytesError<E>> {
+    let Ok(s) = std::str::from_utf8(bytes) else {
+        Err(FromAsciiBytesError {
+            raw: bytes.to_vec(),
+            utf8: String::from_utf8(bytes.to_vec()),
+            parse_error: None,
+        })?
+    };
+    if !s.is_ascii() {
+        Err(FromAsciiBytesError {
+            raw: bytes.to_vec(),
+            utf8: String::from_utf8(bytes.to_vec()),
+            parse_error: None,
+        })?
+    }
+    Ok(s)
+}

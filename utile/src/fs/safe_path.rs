@@ -142,7 +142,7 @@ fn from_safe_path(path: &Path) -> Option<String> {
                 Component::Normal(os_str) => decode_component(os_str.to_str()?),
             })
         })
-        .try_collect()?;
+        .collect::<Option<Vec<_>>>()?;
 
     let mut path = path.join("/");
 

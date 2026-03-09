@@ -1,6 +1,5 @@
-#![feature(ascii_char)]
-#![feature(iterator_try_collect)]
-#![feature(step_trait)]
+#![cfg_attr(feature = "nightly", feature(ascii_char))]
+#![cfg_attr(feature = "nightly", feature(step_trait))]
 
 pub mod any;
 pub mod collections;
