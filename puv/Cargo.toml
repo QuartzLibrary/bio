@@ -17,11 +17,11 @@ tracing = "0.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1", features = ["fs", "process"] }
-# TODO: vendor and slim them down to compile on wasm?
-uv-pep440 = { git = "https://github.com/QuartzLibrary/uv", rev = "9e4c4eb53147c5fc8f59da6a6757ff0022664aa4" }
-uv-pep508 = { git = "https://github.com/QuartzLibrary/uv", rev = "9e4c4eb53147c5fc8f59da6a6757ff0022664aa4" }
-uv-scripts = { git = "https://github.com/QuartzLibrary/uv", rev = "9e4c4eb53147c5fc8f59da6a6757ff0022664aa4" }
-uv-workspace = { git = "https://github.com/QuartzLibrary/uv", rev = "9e4c4eb53147c5fc8f59da6a6757ff0022664aa4" }
+
+uv-pep440 = { git = "https://github.com/astral-sh/uv", rev = "988952519528988cf9185ea867b192cead613c68" }
+uv-pep508 = { git = "https://github.com/astral-sh/uv", rev = "988952519528988cf9185ea867b192cead613c68" }
+uv-scripts = { git = "https://github.com/astral-sh/uv", rev = "988952519528988cf9185ea867b192cead613c68" }
+uv-workspace = { git = "https://github.com/astral-sh/uv", rev = "988952519528988cf9185ea867b192cead613c68" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros"] }
