@@ -24,13 +24,18 @@ pub async fn sleep(duration: Duration) {
     }
 }
 
-// TODO
-// pub async fn sleep_until(i: Instant) {
-//     #[cfg(not(target_family = "wasm"))]
-//     tokio::time::sleep_until(tokio::time::Instant::from_std(i)).await;
-//     #[cfg(target_family = "wasm")]
-//     gloo_timers::future::sleep_until(i).await;
-// }
+pub async fn sleep_until(until: Instant) {
+    #[cfg(not(target_family = "wasm"))]
+    tokio::time::sleep_until(tokio::time::Instant::from_std(until)).await;
+    #[cfg(target_family = "wasm")]
+    {
+        while let now = Instant::now()
+            && now < until
+        {
+            sleep(until - now).await;
+        }
+    }
+}
 
 #[track_caller]
 pub fn time<O>(f: impl FnOnce() -> O) -> (O, Duration) {
