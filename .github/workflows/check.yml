@@ -97,5 +97,5 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Check project
+      - name: Test project
         run: RUST_BACKTRACE=1 cargo test --workspace --all-targets --all-features
