@@ -1,6 +1,5 @@
 use std::{fmt, io::BufRead, path::Path, str::FromStr};
 
-use hyperx::header::{ContentDisposition, DispositionParam, DispositionType, Header};
 use reqwest::header::{CONTENT_DISPOSITION, CONTENT_LENGTH, HeaderMap};
 
 pub mod read_ext {
@@ -211,24 +210,8 @@ pub fn not_found_error(e: std::io::Error, path: impl AsRef<Path>) -> std::io::Er
 }
 
 pub fn get_filename_from_headers(headers: &HeaderMap) -> Option<String> {
-    let header_value = headers.get(CONTENT_DISPOSITION)?;
-    let mut content_disposition = ContentDisposition::parse_header(&header_value).ok()?;
-
-    if content_disposition.disposition == DispositionType::Ext("attachement".to_owned()) {
-        content_disposition.disposition = DispositionType::Attachment;
-    }
-
-    if content_disposition.disposition != DispositionType::Attachment {
-        return None;
-    }
-
-    content_disposition.parameters.iter().find_map(|param| {
-        if let DispositionParam::Filename(_, _, bytes) = param {
-            String::from_utf8(bytes.clone()).ok()
-        } else {
-            None
-        }
-    })
+    let value = headers.get(CONTENT_DISPOSITION)?.to_str().ok()?;
+    content_disposition::parse_content_disposition(value).filename_full()
 }
 pub fn get_filesize_from_headers(headers: &HeaderMap) -> Option<u64> {
     headers.get(CONTENT_LENGTH)?.to_str().ok()?.parse().ok()

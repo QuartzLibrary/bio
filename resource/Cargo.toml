@@ -17,7 +17,6 @@ bytes = "1"
 directories = "6"
 flate2 = "1"
 futures = "0.3"
-hyperx = { version = "1", git = "https://github.com/QuartzLibrary/hyperx", rev = "b4bf9e31a8a8676bb0ce229fec36a140e0d096f7" } # branch = "bump"
 indicatif = { version = "0.17", features = ["tokio"] }
 log = "0.4"
 nohash-hasher = "0.2"
