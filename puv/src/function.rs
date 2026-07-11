@@ -285,7 +285,7 @@ impl PythonFunction {
     pub(super) fn simple() -> (Self, Vec<TestValue>) {
         const FUNCTION: &str = r#"
 # /// script
-# requires-python = "==3.10"
+# requires-python = "==3.10.*"
 # dependencies = []
 # ///
 
@@ -314,7 +314,7 @@ def process(input: int) -> int:
     pub(super) fn dep() -> (Self, Vec<TestValue>) {
         const FUNCTION: &str = r#"
 # /// script
-# requires-python = "==3.10"
+# requires-python = "==3.10.*"
 # dependencies = ["numpy", "pandas"]
 # ///
 
@@ -343,7 +343,7 @@ def process(x: int) -> list[int]:
     pub(super) fn exception() -> (Self, Vec<TestValue>) {
         const FUNCTION: &str = r#"
 # /// script
-# requires-python = "==3.10"
+# requires-python = "==3.10.*"
 # dependencies = []
 # ///
 
@@ -380,7 +380,7 @@ Exception: This is a test
     pub(super) fn invalid_function() -> (Self, Vec<TestValue>) {
         const FUNCTION: &str = r#"
 # /// script
-# requires-python = "==3.10"
+# requires-python = "==3.10.*"
 # dependencies = []
 # ///
 
@@ -410,7 +410,7 @@ def pro cess(input: int) -> int:
     pub(super) fn invalid_import() -> (Self, Vec<TestValue>) {
         const FUNCTION: &str = r#"
 # /// script
-# requires-python = "==3.10"
+# requires-python = "==3.10.*"
 # dependencies = []
 # ///
 

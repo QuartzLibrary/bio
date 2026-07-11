@@ -169,7 +169,7 @@ fn decode_component(c: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use rand::{Rng, SeedableRng, rngs::SmallRng, seq::IndexedRandom};
+    use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng, seq::IndexedRandom};
 
     use super::*;
 

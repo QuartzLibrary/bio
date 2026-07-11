@@ -1,8 +1,8 @@
 #[cfg(feature = "nightly")]
 use std::iter::Step;
-use std::ops::{Add, Range, Sub};
 #[cfg(feature = "nightly")]
 use std::ops::RangeInclusive;
+use std::ops::{Add, Range, Sub};
 
 /// Some helper methods for ranges.
 ///
@@ -184,7 +184,7 @@ range_len!(isize);
 mod tests {
     use std::collections::HashSet;
 
-    use rand::{Rng, SeedableRng, rngs::SmallRng};
+    use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
     use crate::range::RangeExt;
 

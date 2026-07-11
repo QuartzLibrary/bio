@@ -16,7 +16,7 @@ This crate allows you to run plain PEP 723 scripts, or scripts that expose a `pr
 
 ```python
 # /// script
-# requires-python = "==3.10"
+# requires-python = "==3.10.*"
 # dependencies = ["numpy"]
 # ///
 
@@ -38,7 +38,7 @@ def process(x: Input) -> int:
 let function = PythonFunction {
     function: r#"
 # /// script
-# requires-python = "==3.10"
+# requires-python = "==3.10.*"
 # dependencies = ["numpy"]
 # ///
 
@@ -98,7 +98,7 @@ struct Output {
 let function = PythonFunction {
     function: r#"
 # /// script
-# requires-python = "==3.10"
+# requires-python = "==3.10.*"
 # dependencies = ["pydantic"]
 # ///
 
