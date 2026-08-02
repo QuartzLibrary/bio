@@ -10,7 +10,6 @@ utile = { path = "../utile" }
 
 csv = "1"
 either = "1"
-flate2 = "1"
 jiff = { version = "0.2", features = ["serde"] }
 log = "0.4"
 noodles = { version = "0.98", features = ["core", "fasta", "vcf"] }
@@ -19,8 +18,6 @@ serde = { version = "1", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
 
 [dev-dependencies]
-pgs_catalog = { path = "../pgs_catalog" }
-
 env_logger = "0.11"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 futures = "0.3"
