@@ -18,10 +18,10 @@ tracing = "0.1"
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1", features = ["fs", "process"] }
 
-uv-pep440 = { git = "https://github.com/astral-sh/uv", rev = "988952519528988cf9185ea867b192cead613c68" }
-uv-pep508 = { git = "https://github.com/astral-sh/uv", rev = "988952519528988cf9185ea867b192cead613c68" }
-uv-scripts = { git = "https://github.com/astral-sh/uv", rev = "988952519528988cf9185ea867b192cead613c68" }
-uv-workspace = { git = "https://github.com/astral-sh/uv", rev = "988952519528988cf9185ea867b192cead613c68" }
+uv-pep440 = "=0.0.29"
+uv-pep508 = "=0.0.29"
+uv-scripts = "=0.0.29"
+uv-workspace = "=0.0.29"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros"] }
