@@ -68,11 +68,11 @@ jobs:
         run: rustup target add wasm32-unknown-unknown --toolchain stable
 
       - name: Check on stable
-        run: cargo +stable clippy --all-targets -p utile -- -D warnings
+        run: cargo +stable clippy --all-targets -p utile -p puv -- -D warnings
 
       - name: Check project (WASM) on stable
         # Note lack of --all-targets here because tests and examples are not wasm compatible
-        run: cargo +stable clippy --target wasm32-unknown-unknown -p utile -- -D warnings
+        run: cargo +stable clippy --target wasm32-unknown-unknown -p utile -p puv -- -D warnings
 
   test:
     runs-on: ubuntu-latest
