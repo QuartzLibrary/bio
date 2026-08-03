@@ -124,7 +124,7 @@ impl UcscResource {
 
     pub fn url(&self) -> Url {
         let key = &self.key;
-        Url::parse(&format!("https://hgdownload2.cse.ucsc.edu/{key}")).unwrap()
+        Url::parse(&format!("https://hgdownload2.soe.ucsc.edu/{key}")).unwrap()
     }
 
     fn url_resource(&self) -> UrlResource {
