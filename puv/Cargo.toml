@@ -2,6 +2,10 @@
 name = "puv"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Quickly run Python scripts as `uv` subprocesses."
+readme = "README.md"
+repository = "https://github.com/QuartzLibrary/bio"
 
 [dependencies]
 futures = "0.3"
