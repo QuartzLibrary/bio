@@ -1,4 +1,4 @@
-name: Publish on crates.io
+name: Publish `utile` on crates.io
 
 on:
   workflow_dispatch:
