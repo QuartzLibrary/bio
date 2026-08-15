@@ -216,13 +216,39 @@ mod tests {
     fn random_string(rng: &mut impl Rng) -> String {
         let len = rng.random_range(0..5);
         (0..len)
-            .map(|_| {
-                (0..rng.random_range(0..10))
-                    .map(|_| random_char(rng))
-                    .collect::<String>()
-            })
+            .map(|_| random_component(rng))
             .collect::<Vec<String>>()
             .join("/")
+    }
+    fn random_component(rng: &mut impl Rng) -> String {
+        match rng.random_range(0..6) {
+            0 => (0..rng.random_range(0..10))
+                .map(|_| random_char(rng))
+                .collect(),
+            1 => {
+                let reserved = RESERVED_NAMES_WINDOWS.choose(rng).unwrap();
+                if rng.random_bool(0.5) {
+                    reserved.to_ascii_lowercase()
+                } else {
+                    reserved.to_string()
+                }
+            }
+            2 => RESERVED_NAMES_UNIX.choose(rng).unwrap().to_string(),
+            3 => {
+                let mut component: String = (0..rng.random_range(0..10))
+                    .map(|_| random_char(rng))
+                    .collect();
+                component.push(*['.', ' '].choose(rng).unwrap());
+                component
+            }
+            4 => match rng.random_range(0..ESCAPED_CHARS.len() + 2) {
+                0 => PERCENT.1.to_string(),
+                1 => "%END".to_string(),
+                index => ESCAPED_CHARS[index - 2].1.to_string(),
+            },
+            5 => String::new(),
+            _ => unreachable!(),
+        }
     }
     fn random_char(rng: &mut impl Rng) -> char {
         match rng.random_range(0..5) {
