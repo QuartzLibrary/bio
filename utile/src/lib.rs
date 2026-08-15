@@ -6,6 +6,7 @@ pub mod collections;
 pub mod drop;
 pub mod fmt;
 pub mod fs;
+pub mod hash;
 pub mod io;
 pub mod iter;
 pub mod jsonl;
