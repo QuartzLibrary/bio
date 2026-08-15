@@ -111,24 +111,22 @@ fn to_safe_path(input: &str) -> PathBuf {
         result = result.replace(char, encoded);
     }
 
-    let fragments: Vec<String> = result
-        .split('/')
-        .map(|s| {
-            if RESERVED_NAMES_WINDOWS.contains(&s.to_uppercase().as_str())
-                || RESERVED_NAMES_UNIX.contains(&s.to_uppercase().as_str())
-            {
-                format!("%{s}")
-            } else if s.ends_with('.') || s.ends_with(' ') {
-                format!("{s}%END")
-            } else if s.is_empty() {
-                "%END".to_string()
-            } else {
-                s.to_string()
-            }
-        })
-        .collect();
+    let fragments: Vec<String> = result.split('/').map(encode_component).collect();
 
     fragments.join("/").into()
+}
+fn encode_component(s: &str) -> String {
+    if RESERVED_NAMES_WINDOWS.contains(&s.to_uppercase().as_str())
+        || RESERVED_NAMES_UNIX.contains(&s.to_uppercase().as_str())
+    {
+        format!("%{s}")
+    } else if s.ends_with('.') || s.ends_with(' ') {
+        format!("{s}%END")
+    } else if s.is_empty() {
+        "%END".to_string()
+    } else {
+        s.to_string()
+    }
 }
 fn from_safe_path(path: &Path) -> Option<String> {
     let path: Vec<String> = path
