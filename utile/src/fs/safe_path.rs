@@ -2,10 +2,10 @@ use std::path::{Component, Path, PathBuf};
 
 use url::Url;
 
-const RESERVED_NAMES_WINDOWS: [&str; 28] = [
+const RESERVED_NAMES_WINDOWS: [&str; 30] = [
     "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
     "COM9", "COM¹", "COM²", "COM³", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8",
-    "LPT9", "LPT¹", "LPT²", "LPT³",
+    "LPT9", "LPT¹", "LPT²", "LPT³", "CONIN$", "CONOUT$",
 ];
 const RESERVED_NAMES_UNIX: [&str; 2] = [".", ".."];
 
@@ -13,6 +13,7 @@ const RESERVED_NAMES_UNIX: [&str; 2] = [".", ".."];
 const PERCENT: (char, &str) = ('%', "%25");
 
 // https://stackoverflow.com/questions/1976007/what-characters-are-forbidden-in-windows-and-linux-directory-names
+// https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
 const ESCAPED_CHARS: [(char, &str); 40] = [
     ('\0', "%00"),     // NUL
     ('\u{01}', "%01"), // SOH
@@ -91,7 +92,7 @@ impl SafePath for Url {
     }
 
     fn from_safe_path(path: &Path) -> Option<Self> {
-        let scheme = path.components().next()?.as_os_str().to_str()?;
+        let scheme = decode_component(path.components().next()?.as_os_str().to_str()?);
         let rest: PathBuf = path.components().skip(1).collect();
         let rest = from_safe_path(&rest)?;
         Self::parse(&if let Some(scheme) = scheme.strip_suffix('!') {
@@ -117,23 +118,22 @@ fn to_safe_path(input: &str) -> PathBuf {
     fragments.join("/").into()
 }
 fn encode_component(s: &str) -> String {
-    let uppercase = s.to_uppercase();
-    if RESERVED_NAMES_WINDOWS.contains(&&*uppercase)
-        || RESERVED_NAMES_WINDOWS.iter().any(|r| {
-            uppercase
-                .strip_prefix(r)
-                .is_some_and(|s| s.starts_with('.'))
-        })
-        || RESERVED_NAMES_UNIX.contains(&&*uppercase)
-    {
-        format!("%{s}")
-    } else if s.ends_with('.') || s.ends_with(' ') {
-        format!("{s}%END")
-    } else if s.is_empty() {
-        "%END".to_string()
-    } else {
-        s.to_string()
+    let mut result = s.to_string();
+
+    if is_reserved_component(s) {
+        result.insert(0, '%');
     }
+    if s.is_empty() || s.ends_with('.') || s.ends_with(' ') {
+        result.push_str("%END");
+    }
+
+    result
+}
+fn is_reserved_component(s: &str) -> bool {
+    let uppercase = s.to_uppercase();
+    let stem = uppercase.split('.').next().unwrap();
+
+    RESERVED_NAMES_WINDOWS.contains(&stem) || RESERVED_NAMES_UNIX.contains(&uppercase.as_str())
 }
 fn from_safe_path(path: &Path) -> Option<String> {
     let path: Vec<String> = path
@@ -160,22 +160,15 @@ fn from_safe_path(path: &Path) -> Option<String> {
     Some(result)
 }
 fn decode_component(c: &str) -> String {
-    let mut c = c.replace("%END", "");
+    let c = c.strip_suffix("%END").unwrap_or(c);
 
     if let Some(s) = c.strip_prefix('%')
-        && let uppercase = s.to_uppercase()
-        && (RESERVED_NAMES_WINDOWS.contains(&&*uppercase)
-            || RESERVED_NAMES_WINDOWS.iter().any(|r| {
-                uppercase
-                    .strip_prefix(r)
-                    .is_some_and(|s| s.starts_with('.'))
-            })
-            || RESERVED_NAMES_UNIX.contains(&&*uppercase))
+        && is_reserved_component(s)
     {
-        c = s.to_owned();
+        s.to_owned()
+    } else {
+        c.to_owned()
     }
-
-    c
 }
 
 #[cfg(test)]
@@ -240,11 +233,13 @@ mod tests {
                 .collect(),
             1 => {
                 let reserved = RESERVED_NAMES_WINDOWS.choose(rng).unwrap();
-                if rng.random_bool(0.5) {
+                let mut component = if rng.random_bool(0.5) {
                     reserved.to_ascii_lowercase()
                 } else {
                     reserved.to_string()
-                }
+                };
+                component.push_str(["", ".txt", ".", " "].choose(rng).unwrap());
+                component
             }
             2 => RESERVED_NAMES_UNIX.choose(rng).unwrap().to_string(),
             3 => {
@@ -298,7 +293,7 @@ mod tests {
         (
             "https://example.com/CON/PRN/aux/nul.txt",
             None,
-            "https/example.com/%CON/%PRN/%aux/nul.txt",
+            "https/example.com/%CON/%PRN/%aux/%nul.txt",
         ),
         (
             "https:example",
