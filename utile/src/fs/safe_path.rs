@@ -117,8 +117,14 @@ fn to_safe_path(input: &str) -> PathBuf {
     fragments.join("/").into()
 }
 fn encode_component(s: &str) -> String {
-    if RESERVED_NAMES_WINDOWS.contains(&s.to_uppercase().as_str())
-        || RESERVED_NAMES_UNIX.contains(&s.to_uppercase().as_str())
+    let uppercase = s.to_uppercase();
+    if RESERVED_NAMES_WINDOWS.contains(&&*uppercase)
+        || RESERVED_NAMES_WINDOWS.iter().any(|r| {
+            uppercase
+                .strip_prefix(r)
+                .is_some_and(|s| s.starts_with('.'))
+        })
+        || RESERVED_NAMES_UNIX.contains(&&*uppercase)
     {
         format!("%{s}")
     } else if s.ends_with('.') || s.ends_with(' ') {
@@ -157,8 +163,14 @@ fn decode_component(c: &str) -> String {
     let mut c = c.replace("%END", "");
 
     if let Some(s) = c.strip_prefix('%')
-        && (RESERVED_NAMES_WINDOWS.contains(&s.to_uppercase().as_str())
-            || RESERVED_NAMES_UNIX.contains(&s.to_uppercase().as_str()))
+        && let uppercase = s.to_uppercase()
+        && (RESERVED_NAMES_WINDOWS.contains(&&*uppercase)
+            || RESERVED_NAMES_WINDOWS.iter().any(|r| {
+                uppercase
+                    .strip_prefix(r)
+                    .is_some_and(|s| s.starts_with('.'))
+            })
+            || RESERVED_NAMES_UNIX.contains(&&*uppercase))
     {
         c = s.to_owned();
     }
