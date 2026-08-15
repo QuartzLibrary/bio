@@ -206,6 +206,109 @@ mod tests {
     }
 
     #[test]
+    fn windows_reserved_names_are_safe_and_round_trip() {
+        for reserved in RESERVED_NAMES_WINDOWS {
+            let mixed_case = reserved
+                .chars()
+                .enumerate()
+                .map(|(index, char)| {
+                    if index % 2 == 0 {
+                        char.to_ascii_lowercase()
+                    } else {
+                        char
+                    }
+                })
+                .collect();
+
+            for name in [
+                reserved.to_string(),
+                reserved.to_ascii_lowercase(),
+                mixed_case,
+            ] {
+                for suffix in ["", ".txt", ".tar.gz", ".", ".txt.", ".txt "] {
+                    assert_safe_round_trip(&format!("{name}{suffix}"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn path_components_are_safe_and_round_trip() {
+        for input in [
+            "",
+            "/",
+            "//",
+            "/leading",
+            "trailing/",
+            "two//components",
+            ".",
+            "..",
+            "...",
+            "name.",
+            "name ",
+            "name. ",
+            "./../",
+            "C:",
+            "C:/path",
+            "\\\\server\\share",
+            "\\\\?\\C:\\path",
+        ] {
+            assert_safe_round_trip(input);
+        }
+    }
+
+    #[test]
+    fn codec_markers_are_safe_and_round_trip() {
+        for marker in [PERCENT.1, "%END"]
+            .into_iter()
+            .chain(ESCAPED_CHARS.map(|(_, encoded)| encoded))
+        {
+            assert_safe_round_trip(marker);
+            assert_safe_round_trip(&format!("prefix{marker}suffix"));
+            assert_safe_round_trip(&format!("{marker}."));
+        }
+    }
+
+    #[test]
+    fn forbidden_characters_are_escaped_and_round_trip() {
+        for forbidden in (0..=31)
+            .map(char::from)
+            .chain(['<', '>', ':', '"', '\\', '|', '?', '*'])
+        {
+            assert_safe_round_trip(&format!("before{forbidden}after"));
+        }
+    }
+
+    #[test]
+    fn urls_with_windows_unsafe_schemes_are_safe_and_round_trip() {
+        for scheme in RESERVED_NAMES_WINDOWS
+            .into_iter()
+            .filter(|name| name.chars().all(|char| char.is_ascii_alphanumeric()))
+        {
+            for suffix in ["", ".device", "."] {
+                let input = Url::parse(&format!(
+                    "{}{suffix}://example.com/path",
+                    scheme.to_ascii_lowercase()
+                ))
+                .unwrap();
+                let encoded = input.to_safe_path();
+
+                assert_safe_path(&encoded);
+                assert_eq!(Url::from_safe_path(&encoded), Some(input));
+            }
+        }
+    }
+
+    #[test]
+    fn url_with_trailing_dot_in_scheme_is_safe_and_round_trips() {
+        let input = Url::parse("custom.://example.com/path").unwrap();
+        let encoded = input.to_safe_path();
+
+        assert_safe_path(&encoded);
+        assert_eq!(Url::from_safe_path(&encoded), Some(input));
+    }
+
+    #[test]
     fn test_fuzz_random_strings() {
         let mut rng = SmallRng::seed_from_u64(42);
 
@@ -216,9 +319,11 @@ mod tests {
             let encoded = to_safe_path(&random_string);
             let decoded = from_safe_path(&encoded).unwrap();
 
+            assert_safe_path(&encoded);
             assert_eq!(decoded, random_string);
         }
     }
+
     fn random_string(rng: &mut impl Rng) -> String {
         let len = rng.random_range(0..5);
         (0..len)
@@ -421,6 +526,7 @@ mod tests {
             }
 
             let encoded = input.to_safe_path();
+            assert_safe_path(&encoded);
             assert_eq!(
                 encoded.to_str().unwrap(),
                 expected,
@@ -436,13 +542,45 @@ mod tests {
     #[test]
     fn test_conversions() {
         for (char, encoded) in ESCAPED_CHARS {
-            assert_roundtrip(char);
+            assert_safe_round_trip(&char.to_string());
             assert_eq!(format!("%{:02x}", char as u8), encoded);
         }
     }
-    const fn assert_roundtrip(char: char) {
-        if char != (char as u8) as char {
-            panic!("Invalid character");
+
+    fn assert_safe_round_trip(input: &str) {
+        let encoded = to_safe_path(input);
+        assert_safe_path(&encoded);
+        assert_eq!(from_safe_path(&encoded).as_deref(), Some(input));
+    }
+
+    fn assert_safe_path(path: &Path) {
+        fn is_known_windows_reserved_name(component: &str) -> bool {
+            let stem = component.split('.').next().unwrap().to_uppercase();
+            RESERVED_NAMES_WINDOWS.contains(&stem.as_str())
+        }
+
+        fn is_forbidden_in_windows_component(char: char) -> bool {
+            char <= '\u{1f}' || matches!(char, '<' | '>' | ':' | '"' | '\\' | '|' | '?' | '*')
+        }
+
+        for component in path.to_str().unwrap().split('/') {
+            assert!(!component.is_empty(), "empty component in {path:?}");
+            assert!(
+                !matches!(component.chars().last(), Some('.' | ' ')),
+                "component ends in a dot or space: {component:?} in {path:?}"
+            );
+            assert!(
+                component != "." && component != "..",
+                "relative component {component:?} in {path:?}"
+            );
+            assert!(
+                !is_known_windows_reserved_name(component),
+                "reserved Windows component {component:?} in {path:?}"
+            );
+            assert!(
+                !component.chars().any(is_forbidden_in_windows_component),
+                "forbidden character in {component:?} in {path:?}"
+            );
         }
     }
 }
