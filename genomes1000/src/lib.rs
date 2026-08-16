@@ -19,7 +19,7 @@ use biocore::{
     location::{ContigPosition, ContigRange},
     vcf::IndexedVcfReader,
 };
-use resource::{RawResource, RawResourceExt, fs::FsCache};
+use resource::{RawResourceExt, Resource, fs::FsCache};
 use utile::{io::FromUtf8Bytes, iter::IteratorExt};
 
 use self::{pedigree::Pedigree, simplified::SimplifiedRecord, source::Genomes1000Resource};
@@ -435,7 +435,7 @@ pub async fn load_contig(
     parse::parse(resource.read()?, sample_reading_function(c))
 }
 
-pub async fn load_pedigree(resource: impl RawResource) -> io::Result<Vec<Pedigree>> {
+pub async fn load_pedigree(resource: impl Resource) -> io::Result<Vec<Pedigree>> {
     Ok(csv::ReaderBuilder::new()
         .delimiter(b' ')
         .from_reader(resource.read()?)
@@ -458,11 +458,11 @@ pub async fn load_pedigree(resource: impl RawResource) -> io::Result<Vec<Pedigre
 /// It should also implement [Seek](std::io::Seek) if random access is needed.
 pub async fn load_grch38_reference_genome<F>(
     fasta: F,
-    index: impl RawResource,
+    index: impl Resource,
 ) -> io::Result<biocore::fasta::IndexedFastaReader<F::Reader>>
 where
-    F: RawResource,
-    <F as RawResource>::Reader: std::io::BufRead,
+    F: Resource,
+    <F as Resource>::Reader: std::io::BufRead,
 {
     biocore::fasta::IndexedFastaReader::new(fasta.read()?, index.decompressed().buffered().read()?)
 }
@@ -471,11 +471,11 @@ where
 /// It should also implement [Seek](std::io::Seek) if random access is needed.
 pub async fn load_grch37_reference_genome<F>(
     fasta: F,
-    index: impl RawResource,
+    index: impl Resource,
 ) -> io::Result<biocore::fasta::IndexedFastaReader<F::Reader>>
 where
-    F: RawResource,
-    <F as RawResource>::Reader: std::io::BufRead,
+    F: Resource,
+    <F as Resource>::Reader: std::io::BufRead,
 {
     biocore::fasta::IndexedFastaReader::new(fasta.read()?, index.decompressed().buffered().read()?)
 }

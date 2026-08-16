@@ -7,14 +7,14 @@ use std::{
 
 use pin_project::pin_project;
 
-use super::{Compression, RawResource, RawResourceExt, ResourceRef};
+use super::{Compression, RawResourceExt, Resource, ResourceRef};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DecompressedResource<R> {
     resource: R,
     compression: Option<Compression>,
 }
-impl<R: RawResource> DecompressedResource<R> {
+impl<R: Resource> DecompressedResource<R> {
     pub fn new(resource: R) -> Self {
         Self {
             resource,
@@ -28,7 +28,7 @@ impl<R: RawResource> DecompressedResource<R> {
         }
     }
 }
-impl<R: RawResource> RawResource for DecompressedResource<R> {
+impl<R: Resource> Resource for DecompressedResource<R> {
     const NAMESPACE: &'static str = "decompressed";
     fn key(&self) -> String {
         let key = self.resource.key();
@@ -149,7 +149,7 @@ pub struct CompressedResource<R> {
     resource: R,
     compression: Compression,
 }
-impl<R: RawResource> CompressedResource<R> {
+impl<R: Resource> CompressedResource<R> {
     pub fn new(resource: R, compression: Compression) -> Self {
         Self {
             resource,
@@ -157,7 +157,7 @@ impl<R: RawResource> CompressedResource<R> {
         }
     }
 }
-impl<R: RawResource> RawResource for CompressedResource<R> {
+impl<R: Resource> Resource for CompressedResource<R> {
     const NAMESPACE: &'static str = "compressed";
     fn key(&self) -> String {
         format!(

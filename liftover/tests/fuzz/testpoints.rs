@@ -5,7 +5,7 @@ use biocore::{
     genome::Contig,
     location::{ContigPosition, ContigRange},
 };
-use resource::{RawResource, RawResourceExt};
+use resource::{RawResourceExt, Resource};
 
 use liftover::{
     Chain, Liftover,

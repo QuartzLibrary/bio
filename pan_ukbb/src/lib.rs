@@ -11,7 +11,7 @@ use ordered_float::NotNan;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use url::Url;
 
-use resource::{RawResource, RawResourceExt, UrlResource};
+use resource::{RawResourceExt, Resource, UrlResource};
 
 const URL_BASE: &str = "https://pan-ukb-us-east-1.s3.amazonaws.com";
 const PHENOTYPE_MANIFEST_KEY: &str = "sumstats_release/phenotype_manifest.tsv.bgz";
@@ -36,7 +36,7 @@ impl PanUKBBS3Resource {
         UrlResource::new(self.url()).unwrap()
     }
 }
-impl RawResource for PanUKBBS3Resource {
+impl Resource for PanUKBBS3Resource {
     const NAMESPACE: &'static str = "pan_ukbb";
 
     fn key(&self) -> String {
@@ -51,7 +51,7 @@ impl RawResource for PanUKBBS3Resource {
         }
     }
 
-    type Reader = <UrlResource as RawResource>::Reader;
+    type Reader = <UrlResource as Resource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -59,7 +59,7 @@ impl RawResource for PanUKBBS3Resource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    type AsyncReader = <UrlResource as Resource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }
@@ -407,7 +407,7 @@ impl PhenotypeManifestEntry {
         Self::load(resource)
     }
 
-    pub fn load(resource: impl RawResource) -> csv::Result<Vec<Self>> {
+    pub fn load(resource: impl Resource) -> csv::Result<Vec<Self>> {
         csv::ReaderBuilder::new()
             .delimiter(b'\t')
             .has_headers(true)
@@ -415,7 +415,7 @@ impl PhenotypeManifestEntry {
             .into_deserialize()
             .try_collect()
     }
-    pub async fn load_async(resource: impl RawResource) -> csv::Result<Vec<Self>> {
+    pub async fn load_async(resource: impl Resource) -> csv::Result<Vec<Self>> {
         csv::ReaderBuilder::new()
             .delimiter(b'\t')
             .has_headers(true)
@@ -607,7 +607,7 @@ pub struct SummaryStats<Contig = GRCh37Contig> {
     pub low_confidence_MID: Option<bool>,
 }
 impl<Contig> SummaryStats<Contig> {
-    pub fn load(resource: impl RawResource) -> io::Result<impl Iterator<Item = csv::Result<Self>>>
+    pub fn load(resource: impl Resource) -> io::Result<impl Iterator<Item = csv::Result<Self>>>
     where
         Contig: DeserializeOwned,
     {

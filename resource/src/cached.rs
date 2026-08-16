@@ -1,7 +1,7 @@
 use std::{fmt, path::PathBuf};
 
 use crate::{
-    Compression, RawResource, RawResourceExt, ResourceRef,
+    Compression, Resource, RawResourceExt, ResourceRef,
     fs::{FsCache, FsCacheEntry},
 };
 
@@ -18,7 +18,7 @@ impl<R> fmt::Display for FsCacheResource<R> {
 impl<R> FsCacheResource<R> {
     pub fn new(cache: &FsCache, resource: R) -> Self
     where
-        R: RawResource,
+        R: Resource,
     {
         Self {
             entry: FsCacheEntry::new(cache, PathBuf::from(R::NAMESPACE).join(resource.key())),
@@ -40,7 +40,7 @@ impl<R> FsCacheResource<R> {
 
     pub fn ensure_cached(self) -> std::io::Result<Self>
     where
-        R: RawResource,
+        R: Resource,
     {
         self.cache()?;
         Ok(self)
@@ -48,7 +48,7 @@ impl<R> FsCacheResource<R> {
     #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn ensure_cached_async(self) -> std::io::Result<Self>
     where
-        R: RawResource,
+        R: Resource,
     {
         self.cache_async().await?;
         Ok(self)
@@ -56,14 +56,14 @@ impl<R> FsCacheResource<R> {
     #[cfg(target_arch = "wasm32")] // TODO
     pub async fn ensure_cached_async(self) -> std::io::Result<Self>
     where
-        R: RawResource,
+        R: Resource,
     {
         panic!("FsCacheResource is not supported on wasm32");
     }
 
     pub fn cache(&self) -> std::io::Result<FsCacheEntry>
     where
-        R: RawResource,
+        R: Resource,
     {
         if !self.try_exists()? {
             self.read()?;
@@ -73,7 +73,7 @@ impl<R> FsCacheResource<R> {
     #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn cache_async(&self) -> std::io::Result<FsCacheEntry>
     where
-        R: RawResource,
+        R: Resource,
     {
         if !self.try_exists_async().await? {
             self.read_async().await?;
@@ -83,7 +83,7 @@ impl<R> FsCacheResource<R> {
     #[cfg(target_arch = "wasm32")] // TODO
     pub async fn cache_async(&self) -> std::io::Result<FsCacheEntry>
     where
-        R: RawResource,
+        R: Resource,
     {
         panic!("FsCacheResource is not supported on wasm32");
     }
@@ -100,7 +100,7 @@ impl<R> FsCacheResource<R> {
         panic!("FsCacheResource is not supported on wasm32");
     }
 }
-impl<R: RawResource> RawResource for FsCacheResource<R> {
+impl<R: Resource> Resource for FsCacheResource<R> {
     const NAMESPACE: &'static str = R::NAMESPACE;
     fn key(&self) -> String {
         R::key(&self.resource)

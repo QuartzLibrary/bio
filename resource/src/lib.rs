@@ -33,7 +33,7 @@ pub use self::cached::FsCacheResource;
 type JsonStreamDeserializer<R, T> =
     StreamDeserializer<'static, serde_json::de::IoRead<io::BufReader<R>>, T>;
 
-pub trait RawResource {
+pub trait Resource {
     const NAMESPACE: &'static str;
     fn key(&self) -> String;
 
@@ -47,7 +47,7 @@ pub trait RawResource {
     async fn size_async(&self) -> io::Result<u64>;
     async fn read_async(&self) -> io::Result<Self::AsyncReader>;
 }
-pub trait RawResourceExt: RawResource + Sized {
+pub trait RawResourceExt: Resource + Sized {
     fn buffered(self) -> BufferedResource<Self> {
         BufferedResource::new(self)
     }
@@ -121,7 +121,7 @@ pub trait RawResourceExt: RawResource + Sized {
         Ok(stream::try_unfold((), |()| async move { todo!() }))
     }
 }
-impl<T: RawResource> RawResourceExt for T {}
+impl<T: Resource> RawResourceExt for T {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Compression {
@@ -177,12 +177,12 @@ impl Compression {
 struct ResourceRef<'a, R> {
     resource: &'a R,
 }
-impl<'a, R: RawResource> ResourceRef<'a, R> {
+impl<'a, R: Resource> ResourceRef<'a, R> {
     pub fn new(resource: &'a R) -> Self {
         Self { resource }
     }
 }
-impl<'a, R: RawResource> RawResource for ResourceRef<'a, R> {
+impl<'a, R: Resource> Resource for ResourceRef<'a, R> {
     const NAMESPACE: &'static str = R::NAMESPACE;
     fn key(&self) -> String {
         R::key(self.resource)

@@ -8,7 +8,7 @@ use std::{
 };
 
 use biocore::{genome::ArcContig, location::orientation::Stranded};
-use resource::{RawResource, RawResourceExt};
+use resource::{Resource, RawResourceExt};
 use utile::io::read_ext::AsyncReadInto;
 
 use super::{
@@ -16,10 +16,10 @@ use super::{
 };
 
 impl Liftover<ArcContig, ArcContig> {
-    pub fn load(resource: impl RawResource) -> anyhow::Result<Self> {
+    pub fn load(resource: impl Resource) -> anyhow::Result<Self> {
         Ok(Self::read(resource.decompressed().buffered().read()?)?)
     }
-    pub async fn load_async(resource: impl RawResource) -> anyhow::Result<Self> {
+    pub async fn load_async(resource: impl Resource) -> anyhow::Result<Self> {
         Ok(Self::read(
             &*resource
                 .decompressed()

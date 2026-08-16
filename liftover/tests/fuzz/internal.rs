@@ -4,7 +4,7 @@ use liftover::{
     Liftover, LiftoverIndexed,
     sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
 };
-use resource::{RawResource, RawResourceExt};
+use resource::{Resource, RawResourceExt};
 
 #[ignore]
 #[test]

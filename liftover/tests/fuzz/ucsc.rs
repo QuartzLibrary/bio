@@ -7,7 +7,7 @@ use liftover::{
     bindings::{self, ucsc::UcscLiftoverSettings},
     sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
 };
-use resource::{RawResource, RawResourceExt};
+use resource::{Resource, RawResourceExt};
 
 #[ignore]
 #[tokio::test]

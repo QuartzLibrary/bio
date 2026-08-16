@@ -1,6 +1,6 @@
 use utile::jsonl::JsonLinesReader;
 
-use super::RawResource;
+use super::Resource;
 
 pub struct IterToJsonLinesResource<I, T> {
     key: String,
@@ -18,7 +18,7 @@ where
         }
     }
 }
-impl<I, T> RawResource for IterToJsonLinesResource<I, T>
+impl<I, T> Resource for IterToJsonLinesResource<I, T>
 where
     I: Iterator<Item = T> + Clone,
     T: serde::Serialize,

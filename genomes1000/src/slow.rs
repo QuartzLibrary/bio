@@ -1,4 +1,4 @@
-use resource::{RawResource, RawResourceExt};
+use resource::{RawResourceExt, Resource};
 use std::{collections::HashMap, io::Read};
 
 use crate::source::Genomes1000Resource;

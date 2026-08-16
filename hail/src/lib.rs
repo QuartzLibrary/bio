@@ -3,7 +3,7 @@
 pub mod contig;
 pub mod source;
 
-use resource::{RawResource, RawResourceExt};
+use resource::{RawResourceExt, Resource};
 use source::HailCommonResource;
 
 pub async fn load_grch38_reference_genome()

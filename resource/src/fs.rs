@@ -8,7 +8,7 @@ use directories::ProjectDirs;
 
 use utile::io::not_found_error;
 
-use crate::RawResource;
+use crate::Resource;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FsCache {
@@ -143,7 +143,7 @@ impl FsCacheEntry {
         tokio::fs::remove_file(&self).await
     }
 }
-impl RawResource for FsCacheEntry {
+impl Resource for FsCacheEntry {
     const NAMESPACE: &'static str = "fs_cache";
     fn key(&self) -> String {
         self.path.to_string_lossy().as_ref().to_owned()

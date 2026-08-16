@@ -12,7 +12,7 @@ use url::Url;
 
 use utile::io::{get_filesize_from_headers, reqwest_error};
 
-use super::{Compression, RawResource};
+use super::{Compression, Resource};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UrlResource(Url);
@@ -83,7 +83,7 @@ impl UrlResource {
         unreachable!()
     }
 }
-impl RawResource for UrlResource {
+impl Resource for UrlResource {
     const NAMESPACE: &'static str = "url";
     fn key(&self) -> String {
         self.0.to_string()
