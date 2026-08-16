@@ -2,7 +2,7 @@ use std::{fmt, path::PathBuf};
 
 use crate::{
     Compression, ReadResource, Resource,
-    fs::{FsCache, FsCacheEntry},
+    cache::fs::{FsCache, FsCacheEntry},
 };
 #[cfg(not(target_arch = "wasm32"))]
 use crate::{ResourceExt, ResourceRef, WriteResource};

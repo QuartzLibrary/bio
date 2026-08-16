@@ -231,7 +231,7 @@ pub mod cache {
     use std::path::PathBuf;
 
     use liftover::Liftover;
-    use resource::{ReadResource, WriteResource, fs::FsCacheEntry};
+    use resource::{ReadResource, WriteResource, cache::fs::FsCacheEntry};
 
     pub fn store(liftover: &Liftover, prefix: &str, key: &str) {
         let (snps, ranges) = super::get(liftover);

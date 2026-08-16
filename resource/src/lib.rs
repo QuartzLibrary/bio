@@ -1,9 +1,9 @@
 #![expect(async_fn_in_trait)] // TODO
 
 pub mod buffered;
+pub mod cache;
 pub mod cached;
 pub mod compression;
-pub mod fs;
 pub mod iter;
 pub mod progress;
 pub mod uri;
@@ -168,11 +168,11 @@ pub trait ResourceExt: Resource + Sized {
         BufferedResource::new(self)
     }
 
-    fn with_fs_cache(self, cache: &crate::fs::FsCache) -> FsCacheResource<Self> {
+    fn with_fs_cache(self, cache: &crate::cache::fs::FsCache) -> FsCacheResource<Self> {
         FsCacheResource::new(cache, self)
     }
     fn with_global_fs_cache(self) -> FsCacheResource<Self> {
-        FsCacheResource::new(&crate::fs::FsCache::global(), self)
+        FsCacheResource::new(&crate::cache::fs::FsCache::global(), self)
     }
 
     fn log_progress(self) -> ProgressResource<Self> {
