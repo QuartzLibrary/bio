@@ -11,7 +11,7 @@ use simplified::SimplificationError;
 use url::Url;
 
 use biocore::dna::DnaSequence;
-use resource::{Resource, RawResourceExt, UrlResource};
+use resource::{Resource, ResourceExt, UrlResource};
 
 pub use ids::{pgs::PgsId, rs::RsId};
 

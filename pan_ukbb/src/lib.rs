@@ -11,7 +11,7 @@ use ordered_float::NotNan;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use url::Url;
 
-use resource::{RawResourceExt, Resource, UrlResource};
+use resource::{ResourceExt, Resource, UrlResource};
 
 const URL_BASE: &str = "https://pan-ukb-us-east-1.s3.amazonaws.com";
 const PHENOTYPE_MANIFEST_KEY: &str = "sumstats_release/phenotype_manifest.tsv.bgz";

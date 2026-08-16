@@ -7,7 +7,7 @@ use std::{
 
 use pin_project::pin_project;
 
-use super::{Compression, RawResourceExt, Resource, ResourceRef};
+use super::{Compression, ResourceExt, Resource, ResourceRef};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DecompressedResource<R> {

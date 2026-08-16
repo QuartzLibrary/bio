@@ -47,7 +47,7 @@ pub trait Resource {
     async fn size_async(&self) -> io::Result<u64>;
     async fn read_async(&self) -> io::Result<Self::AsyncReader>;
 }
-pub trait RawResourceExt: Resource + Sized {
+pub trait ResourceExt: Resource + Sized {
     fn buffered(self) -> BufferedResource<Self> {
         BufferedResource::new(self)
     }
@@ -121,7 +121,7 @@ pub trait RawResourceExt: Resource + Sized {
         Ok(stream::try_unfold((), |()| async move { todo!() }))
     }
 }
-impl<T: Resource> RawResourceExt for T {}
+impl<T: Resource> ResourceExt for T {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Compression {

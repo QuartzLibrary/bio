@@ -8,7 +8,7 @@ use std::{
 };
 
 use biocore::{genome::ArcContig, location::orientation::Stranded};
-use resource::{Resource, RawResourceExt};
+use resource::{Resource, ResourceExt};
 use utile::io::read_ext::AsyncReadInto;
 
 use super::{

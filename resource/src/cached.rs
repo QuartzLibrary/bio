@@ -1,7 +1,7 @@
 use std::{fmt, path::PathBuf};
 
 use crate::{
-    Compression, Resource, RawResourceExt, ResourceRef,
+    Compression, Resource, ResourceExt, ResourceRef,
     fs::{FsCache, FsCacheEntry},
 };
 

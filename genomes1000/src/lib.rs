@@ -19,7 +19,7 @@ use biocore::{
     location::{ContigPosition, ContigRange},
     vcf::IndexedVcfReader,
 };
-use resource::{RawResourceExt, Resource, fs::FsCache};
+use resource::{ResourceExt, Resource, fs::FsCache};
 use utile::{io::FromUtf8Bytes, iter::IteratorExt};
 
 use self::{pedigree::Pedigree, simplified::SimplifiedRecord, source::Genomes1000Resource};

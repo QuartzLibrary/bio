@@ -4,7 +4,7 @@ use liftover::{
     Liftover, LiftoverIndexed,
     sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
 };
-use resource::{Resource, RawResourceExt};
+use resource::{Resource, ResourceExt};
 
 #[ignore]
 #[test]
@@ -170,7 +170,7 @@ pub mod cache {
     use std::path::PathBuf;
 
     use biocore::location::{ContigPosition, ContigRange};
-    use resource::{RawResourceExt, fs::FsCacheEntry};
+    use resource::{ResourceExt, fs::FsCacheEntry};
 
     pub fn store(
         snps_internal: Vec<Vec<ContigPosition>>,

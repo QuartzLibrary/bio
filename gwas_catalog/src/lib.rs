@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use biocore::location::ContigPosition;
-use resource::{Resource, RawResourceExt, UrlResource};
+use resource::{Resource, ResourceExt, UrlResource};
 use utile::io::reqwest_error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
