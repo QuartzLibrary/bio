@@ -1,4 +1,3 @@
-#![feature(impl_trait_in_assoc_type)]
 #![expect(async_fn_in_trait)] // TODO
 
 pub mod buffered;
