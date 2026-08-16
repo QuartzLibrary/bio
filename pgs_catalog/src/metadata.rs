@@ -11,7 +11,7 @@ use ids::{
     pgs::{PgsId, pgp::PgpId, ppm::PpmId, pss::PssId},
     pubmed::PubmedId,
 };
-use resource::{Resource, ResourceExt};
+use resource::{ReadResource, ResourceExt};
 use url::Url;
 
 use crate::{PgsCatalogResource, WeightType};

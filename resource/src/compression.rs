@@ -7,7 +7,7 @@ use std::{
 
 use pin_project::pin_project;
 
-use super::{Compression, ResourceExt, Resource, ResourceRef};
+use super::{Compression, ReadResource, Resource, ResourceExt, ResourceRef};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DecompressedResource<R> {
@@ -41,7 +41,8 @@ impl<R: Resource> Resource for DecompressedResource<R> {
     fn compression(&self) -> Option<Compression> {
         None
     }
-
+}
+impl<R: ReadResource> ReadResource for DecompressedResource<R> {
     type Reader = DecompressedReader<R::Reader>;
     fn size(&self) -> std::io::Result<u64> {
         Err(std::io::Error::new(
@@ -170,7 +171,8 @@ impl<R: Resource> Resource for CompressedResource<R> {
     fn compression(&self) -> Option<Compression> {
         Some(self.compression)
     }
-
+}
+impl<R: ReadResource> ReadResource for CompressedResource<R> {
     type Reader = CompressedReader<R::Reader>;
 
     fn size(&self) -> std::io::Result<u64> {

@@ -1,4 +1,4 @@
-use resource::{Resource, UrlResource};
+use resource::{ReadResource, Resource, UrlResource};
 use url::Url;
 
 use crate::contig::GRCh38Contig;
@@ -172,8 +172,9 @@ impl Resource for Genomes1000Resource {
             resource::Compression::infer(&self.key)
         }
     }
-
-    type Reader = <UrlResource as Resource>::Reader;
+}
+impl ReadResource for Genomes1000Resource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -181,7 +182,7 @@ impl Resource for Genomes1000Resource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as Resource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }

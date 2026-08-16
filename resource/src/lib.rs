@@ -38,7 +38,8 @@ pub trait Resource {
     fn key(&self) -> String;
 
     fn compression(&self) -> Option<Compression>;
-
+}
+pub trait ReadResource: Resource {
     type Reader: io::Read;
     fn size(&self) -> io::Result<u64>;
     fn read(&self) -> io::Result<Self::Reader>;
@@ -46,36 +47,6 @@ pub trait Resource {
     type AsyncReader: tokio::io::AsyncRead;
     async fn size_async(&self) -> io::Result<u64>;
     async fn read_async(&self) -> io::Result<Self::AsyncReader>;
-}
-pub trait ResourceExt: Resource + Sized {
-    fn buffered(self) -> BufferedResource<Self> {
-        BufferedResource::new(self)
-    }
-
-    fn with_fs_cache(self, cache: &crate::fs::FsCache) -> FsCacheResource<Self> {
-        FsCacheResource::new(cache, self)
-    }
-    fn with_global_fs_cache(self) -> FsCacheResource<Self> {
-        FsCacheResource::new(&crate::fs::FsCache::global(), self)
-    }
-
-    fn log_progress(self) -> ProgressResource<Self> {
-        ProgressResource::new(self)
-    }
-
-    fn decompressed(self) -> DecompressedResource<Self> {
-        DecompressedResource::new(self)
-    }
-    fn decompressed_with(self, compression: Compression) -> DecompressedResource<Self> {
-        DecompressedResource::new_with(self, compression)
-    }
-
-    fn compressed(self) -> CompressedResource<Self> {
-        CompressedResource::new(self, Compression::Gzip)
-    }
-    fn compressed_with(self, compression: Compression) -> CompressedResource<Self> {
-        CompressedResource::new(self, compression)
-    }
 
     fn read_vec(&self) -> io::Result<Vec<u8>> {
         let mut reader = ResourceRef::new(self).read()?;
@@ -119,6 +90,36 @@ pub trait ResourceExt: Resource + Sized {
         &self,
     ) -> io::Result<impl Stream<Item = io::Result<T>>> {
         Ok(stream::try_unfold((), |()| async move { todo!() }))
+    }
+}
+pub trait ResourceExt: Resource + Sized {
+    fn buffered(self) -> BufferedResource<Self> {
+        BufferedResource::new(self)
+    }
+
+    fn with_fs_cache(self, cache: &crate::fs::FsCache) -> FsCacheResource<Self> {
+        FsCacheResource::new(cache, self)
+    }
+    fn with_global_fs_cache(self) -> FsCacheResource<Self> {
+        FsCacheResource::new(&crate::fs::FsCache::global(), self)
+    }
+
+    fn log_progress(self) -> ProgressResource<Self> {
+        ProgressResource::new(self)
+    }
+
+    fn decompressed(self) -> DecompressedResource<Self> {
+        DecompressedResource::new(self)
+    }
+    fn decompressed_with(self, compression: Compression) -> DecompressedResource<Self> {
+        DecompressedResource::new_with(self, compression)
+    }
+
+    fn compressed(self) -> CompressedResource<Self> {
+        CompressedResource::new(self, Compression::Gzip)
+    }
+    fn compressed_with(self, compression: Compression) -> CompressedResource<Self> {
+        CompressedResource::new(self, compression)
     }
 }
 impl<T: Resource> ResourceExt for T {}
@@ -174,15 +175,15 @@ impl Compression {
 /// or requiring a `Clone` bound in some places.
 /// (The blanket impl would allow the builder api to take a reference
 /// which in practice can cause annoying lifetime issues.)
-struct ResourceRef<'a, R> {
+struct ResourceRef<'a, R: ?Sized> {
     resource: &'a R,
 }
-impl<'a, R: Resource> ResourceRef<'a, R> {
+impl<'a, R: Resource + ?Sized> ResourceRef<'a, R> {
     pub fn new(resource: &'a R) -> Self {
         Self { resource }
     }
 }
-impl<'a, R: Resource> Resource for ResourceRef<'a, R> {
+impl<'a, R: Resource + ?Sized> Resource for ResourceRef<'a, R> {
     const NAMESPACE: &'static str = R::NAMESPACE;
     fn key(&self) -> String {
         R::key(self.resource)
@@ -190,7 +191,8 @@ impl<'a, R: Resource> Resource for ResourceRef<'a, R> {
     fn compression(&self) -> Option<Compression> {
         R::compression(self.resource)
     }
-
+}
+impl<'a, R: ReadResource + ?Sized> ReadResource for ResourceRef<'a, R> {
     type Reader = R::Reader;
     fn size(&self) -> io::Result<u64> {
         R::size(self.resource)

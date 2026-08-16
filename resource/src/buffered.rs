@@ -1,4 +1,4 @@
-use super::{Compression, Resource};
+use super::{Compression, ReadResource, Resource};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BufferedResource<R> {
@@ -17,7 +17,8 @@ impl<R: Resource> Resource for BufferedResource<R> {
     fn compression(&self) -> Option<Compression> {
         self.resource.compression()
     }
-
+}
+impl<R: ReadResource> ReadResource for BufferedResource<R> {
     type Reader = std::io::BufReader<R::Reader>;
     fn size(&self) -> std::io::Result<u64> {
         self.resource.size()

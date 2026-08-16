@@ -8,7 +8,7 @@ use directories::ProjectDirs;
 
 use utile::io::not_found_error;
 
-use crate::Resource;
+use crate::{ReadResource, Resource};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FsCache {
@@ -152,7 +152,8 @@ impl Resource for FsCacheEntry {
     fn compression(&self) -> Option<crate::Compression> {
         None
     }
-
+}
+impl ReadResource for FsCacheEntry {
     type Reader = std::fs::File;
     fn size(&self) -> std::io::Result<u64> {
         std::fs::metadata(self).map(|m| m.len())

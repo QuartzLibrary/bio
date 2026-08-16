@@ -12,7 +12,7 @@ use url::Url;
 
 use utile::io::{get_filesize_from_headers, reqwest_error};
 
-use super::{Compression, Resource};
+use super::{Compression, ReadResource, Resource};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UrlResource(Url);
@@ -92,7 +92,8 @@ impl Resource for UrlResource {
     fn compression(&self) -> Option<Compression> {
         None
     }
-
+}
+impl ReadResource for UrlResource {
     #[cfg(not(target_arch = "wasm32"))]
     type Reader = reqwest::blocking::Response;
     #[cfg(not(target_arch = "wasm32"))]

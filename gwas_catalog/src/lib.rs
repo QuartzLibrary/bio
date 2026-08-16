@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use biocore::location::ContigPosition;
-use resource::{Resource, ResourceExt, UrlResource};
+use resource::{ReadResource, Resource, ResourceExt, UrlResource};
 use utile::io::reqwest_error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -49,8 +49,9 @@ impl Resource for GwasCatalogResource {
     fn compression(&self) -> Option<resource::Compression> {
         None
     }
-
-    type Reader = <UrlResource as Resource>::Reader;
+}
+impl ReadResource for GwasCatalogResource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         Ok(self.size)
     }
@@ -59,7 +60,7 @@ impl Resource for GwasCatalogResource {
         UrlResource::new(self.url).unwrap().read()
     }
 
-    type AsyncReader = <UrlResource as Resource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         Ok(self.size)
     }

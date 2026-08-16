@@ -1,6 +1,6 @@
 use url::Url;
 
-use resource::{Compression, Resource, UrlResource};
+use resource::{Compression, ReadResource, Resource, UrlResource};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnsemblResource {
@@ -55,8 +55,9 @@ impl Resource for EnsemblResource {
             None
         }
     }
-
-    type Reader = <UrlResource as Resource>::Reader;
+}
+impl ReadResource for EnsemblResource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -64,7 +65,7 @@ impl Resource for EnsemblResource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as Resource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }
@@ -144,8 +145,9 @@ impl Resource for UcscResource {
             None
         }
     }
-
-    type Reader = <UrlResource as Resource>::Reader;
+}
+impl ReadResource for UcscResource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -153,7 +155,7 @@ impl Resource for UcscResource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as Resource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }

@@ -1,4 +1,4 @@
-use resource::{Resource, UrlResource};
+use resource::{ReadResource, Resource, UrlResource};
 use url::Url;
 
 const GRCH38_REFERENCE_GENOME_INDEXED: &str =
@@ -116,8 +116,9 @@ impl Resource for EnsemblResource {
     fn compression(&self) -> Option<resource::Compression> {
         resource::Compression::infer(&self.key)
     }
-
-    type Reader = <UrlResource as Resource>::Reader;
+}
+impl ReadResource for EnsemblResource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -125,7 +126,7 @@ impl Resource for EnsemblResource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as Resource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }

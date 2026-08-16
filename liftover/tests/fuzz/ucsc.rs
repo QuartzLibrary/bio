@@ -171,7 +171,7 @@ pub mod cache {
     use std::path::PathBuf;
 
     use biocore::location::{ContigPosition, ContigRange};
-    use resource::{ResourceExt, fs::FsCacheEntry};
+    use resource::{ReadResource, fs::FsCacheEntry};
 
     pub fn get(prefix: &str, key: &str) -> (Vec<Vec<ContigPosition>>, Vec<Vec<ContigRange>>) {
         (

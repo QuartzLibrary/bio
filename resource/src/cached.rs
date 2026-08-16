@@ -1,7 +1,7 @@
 use std::{fmt, path::PathBuf};
 
 use crate::{
-    Compression, Resource, ResourceExt, ResourceRef,
+    Compression, ReadResource, Resource, ResourceExt, ResourceRef,
     fs::{FsCache, FsCacheEntry},
 };
 
@@ -40,7 +40,7 @@ impl<R> FsCacheResource<R> {
 
     pub fn ensure_cached(self) -> std::io::Result<Self>
     where
-        R: Resource,
+        R: ReadResource,
     {
         self.cache()?;
         Ok(self)
@@ -48,7 +48,7 @@ impl<R> FsCacheResource<R> {
     #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn ensure_cached_async(self) -> std::io::Result<Self>
     where
-        R: Resource,
+        R: ReadResource,
     {
         self.cache_async().await?;
         Ok(self)
@@ -56,14 +56,14 @@ impl<R> FsCacheResource<R> {
     #[cfg(target_arch = "wasm32")] // TODO
     pub async fn ensure_cached_async(self) -> std::io::Result<Self>
     where
-        R: Resource,
+        R: ReadResource,
     {
         panic!("FsCacheResource is not supported on wasm32");
     }
 
     pub fn cache(&self) -> std::io::Result<FsCacheEntry>
     where
-        R: Resource,
+        R: ReadResource,
     {
         if !self.try_exists()? {
             self.read()?;
@@ -73,7 +73,7 @@ impl<R> FsCacheResource<R> {
     #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn cache_async(&self) -> std::io::Result<FsCacheEntry>
     where
-        R: Resource,
+        R: ReadResource,
     {
         if !self.try_exists_async().await? {
             self.read_async().await?;
@@ -83,7 +83,7 @@ impl<R> FsCacheResource<R> {
     #[cfg(target_arch = "wasm32")] // TODO
     pub async fn cache_async(&self) -> std::io::Result<FsCacheEntry>
     where
-        R: Resource,
+        R: ReadResource,
     {
         panic!("FsCacheResource is not supported on wasm32");
     }
@@ -109,7 +109,9 @@ impl<R: Resource> Resource for FsCacheResource<R> {
     fn compression(&self) -> Option<Compression> {
         self.resource.compression()
     }
-
+}
+#[cfg(not(target_arch = "wasm32"))] // TODO
+impl<R: ReadResource> ReadResource for FsCacheResource<R> {
     type Reader = std::fs::File;
     fn size(&self) -> std::io::Result<u64> {
         if let Ok(size) = self.entry.size() {
@@ -134,9 +136,7 @@ impl<R: Resource> Resource for FsCacheResource<R> {
         self.entry.read()
     }
 
-    #[cfg(not(target_arch = "wasm32"))] // TODO
     type AsyncReader = tokio::fs::File;
-    #[cfg(not(target_arch = "wasm32"))] // TODO
     async fn size_async(&self) -> std::io::Result<u64> {
         if let Ok(size) = self.entry.size_async().await {
             Ok(size)
@@ -144,7 +144,7 @@ impl<R: Resource> Resource for FsCacheResource<R> {
             self.resource.size_async().await
         }
     }
-    #[cfg(not(target_arch = "wasm32"))] // TODO
+
     async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
         if self.try_exists_async().await? {
             log::info!("Cache hit at {self}");
@@ -166,13 +166,21 @@ impl<R: Resource> Resource for FsCacheResource<R> {
 
         self.entry.read_async().await
     }
-    #[cfg(target_arch = "wasm32")] // TODO
+}
+#[cfg(target_arch = "wasm32")] // TODO
+impl<R: ReadResource> ReadResource for FsCacheResource<R> {
+    type Reader = std::fs::File;
+    fn size(&self) -> std::io::Result<u64> {
+        panic!("FsCacheResource is not supported on wasm32");
+    }
+    fn read(&self) -> std::io::Result<Self::Reader> {
+        panic!("FsCacheResource is not supported on wasm32");
+    }
+
     type AsyncReader = std::io::Cursor<&'static [u8]>;
-    #[cfg(target_arch = "wasm32")] // TODO
     async fn size_async(&self) -> std::io::Result<u64> {
         panic!("FsCacheResource is not supported on wasm32");
     }
-    #[cfg(target_arch = "wasm32")] // TODO
     async fn read_async(&self) -> std::io::Result<Self::AsyncReader> {
         panic!("FsCacheResource is not supported on wasm32");
     }

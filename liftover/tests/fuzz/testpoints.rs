@@ -5,7 +5,7 @@ use biocore::{
     genome::Contig,
     location::{ContigPosition, ContigRange},
 };
-use resource::{ResourceExt, Resource};
+use resource::{Resource, ResourceExt};
 
 use liftover::{
     Chain, Liftover,
@@ -231,7 +231,7 @@ pub mod cache {
     use std::path::PathBuf;
 
     use liftover::Liftover;
-    use resource::{ResourceExt, fs::FsCacheEntry};
+    use resource::{ReadResource, fs::FsCacheEntry};
 
     pub fn store(liftover: &Liftover, prefix: &str, key: &str) {
         let (snps, ranges) = super::get(liftover);
