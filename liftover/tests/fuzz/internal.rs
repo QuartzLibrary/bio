@@ -170,7 +170,7 @@ pub mod cache {
     use std::path::PathBuf;
 
     use biocore::location::{ContigPosition, ContigRange};
-    use resource::{ReadResource, fs::FsCacheEntry};
+    use resource::{ReadResource, WriteResource, fs::FsCacheEntry};
 
     pub fn store(
         snps_internal: Vec<Vec<ContigPosition>>,

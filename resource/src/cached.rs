@@ -1,9 +1,11 @@
 use std::{fmt, path::PathBuf};
 
 use crate::{
-    Compression, ReadResource, Resource, ResourceExt, ResourceRef,
+    Compression, ReadResource, Resource,
     fs::{FsCache, FsCacheEntry},
 };
+#[cfg(not(target_arch = "wasm32"))]
+use crate::{ResourceExt, ResourceRef, WriteResource};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FsCacheResource<R> {
@@ -129,7 +131,7 @@ impl<R: ReadResource> ReadResource for FsCacheResource<R> {
         log::info!("Cache miss at {self} from {self}");
 
         self.entry
-            .write_file(ResourceRef::new(&self.resource).buffered().read()?)?;
+            .write_resource(&ResourceRef::new(&self.resource).buffered())?;
 
         log::info!("Retrieved {self}");
 
@@ -154,12 +156,7 @@ impl<R: ReadResource> ReadResource for FsCacheResource<R> {
         log::info!("Cache miss at {self} from {self}");
 
         self.entry
-            .write_file_async(
-                ResourceRef::new(&self.resource)
-                    .buffered()
-                    .read_async()
-                    .await?,
-            )
+            .write_resource_async(&ResourceRef::new(&self.resource).buffered())
             .await?;
 
         log::info!("Retrieved {self}");

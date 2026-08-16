@@ -33,4 +33,4 @@ suppaftp = { version = "6", features = ["async"] }
 tokio = { version = "1", features = ["fs", "process"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros"] }
+tokio = { version = "1", features = ["macros", "rt"] }

@@ -1,13 +1,17 @@
 use std::{
-    fmt, io,
+    fmt,
     path::{Path, PathBuf},
     sync::LazyLock,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use std::{io, pin::Pin};
 
 use directories::ProjectDirs;
 
 use utile::io::not_found_error;
 
+#[cfg(not(target_arch = "wasm32"))]
+use crate::WriteResource;
 use crate::{ReadResource, Resource};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -77,60 +81,10 @@ impl FsCacheEntry {
     pub fn try_exists(&self) -> std::io::Result<bool> {
         self.as_ref().try_exists()
     }
+
     #[cfg(not(target_arch = "wasm32"))] // TODO
     pub async fn try_exists_async(&self) -> std::io::Result<bool> {
         tokio::fs::try_exists(&self).await
-    }
-
-    pub fn write_file(&self, mut data: impl std::io::BufRead) -> std::io::Result<()> {
-        self.write_file_with(|tmp_file| std::io::copy(&mut data, tmp_file).map(drop))
-    }
-    pub fn write_file_with(
-        &self,
-        f: impl FnOnce(&mut tempfile::NamedTempFile) -> std::io::Result<()>,
-    ) -> std::io::Result<()> {
-        std::fs::create_dir_all(self.path.parent().unwrap())?;
-
-        let mut tmp_file = tempfile::Builder::new()
-            .prefix("tempfile_")
-            .suffix("_utile")
-            .tempfile_in(self.path.parent().unwrap())?;
-        f(&mut tmp_file)?;
-
-        rename_or_copy(tmp_file, self)?;
-
-        Ok(())
-    }
-    #[cfg(not(target_arch = "wasm32"))] // TODO
-    pub async fn write_file_async(
-        &self,
-        data: impl tokio::io::AsyncBufRead,
-    ) -> std::io::Result<()> {
-        tokio::fs::create_dir_all(self.path.parent().unwrap()).await?;
-
-        let tmp_file = tempfile::Builder::new()
-            .prefix("tempfile_")
-            .suffix("_utile")
-            .tempfile_in(self.path.parent().unwrap())?;
-        tokio::io::copy(
-            &mut std::pin::pin!(data),
-            &mut tokio::fs::File::create(tmp_file.path()).await?,
-        )
-        .await?;
-
-        rename_or_copy_async(tmp_file, &self).await?;
-
-        Ok(())
-    }
-
-    pub fn write_json<T: serde::Serialize>(&self, data: &T) -> std::io::Result<()> {
-        self.write_file_with(|file| Ok(serde_json::to_writer(file, data)?))
-    }
-    pub fn write_json_lines<T: serde::Serialize>(
-        &self,
-        data: impl IntoIterator<Item = T>,
-    ) -> std::io::Result<()> {
-        self.write_file(utile::jsonl::JsonLinesReader::new(data.into_iter()))
     }
 
     /// Unfortunately some sources aren't pure.
@@ -185,29 +139,58 @@ impl ReadResource for FsCacheEntry {
         panic!("FsCacheEntry is not supported on wasm32");
     }
 }
+#[cfg(not(target_arch = "wasm32"))]
+impl WriteResource for FsCacheEntry {
+    type Writer = tempfile::NamedTempFile;
+    fn write_with(&self, f: impl FnOnce(&mut Self::Writer) -> io::Result<()>) -> io::Result<()> {
+        std::fs::create_dir_all(self.path.parent().unwrap())?;
 
-// Add these new helper functions
-fn rename_or_copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> std::io::Result<()> {
-    match std::fs::rename(from.as_ref(), to.as_ref()) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
-            std::fs::copy(from.as_ref(), to.as_ref())?;
-            std::fs::remove_file(from.as_ref())?;
-            Ok(())
-        }
-        Err(e) => Err(e),
+        let mut tmp_file = tempfile::Builder::new()
+            .prefix("tempfile_")
+            .tempfile_in(self.path.parent().unwrap())?;
+        f(&mut tmp_file)?;
+
+        rename_or_copy(tmp_file, self)
+    }
+
+    type AsyncWriter = tokio::fs::File;
+    async fn write_async_with(
+        &self,
+        f: impl AsyncFnOnce(Pin<&mut Self::AsyncWriter>) -> io::Result<()>,
+    ) -> io::Result<()> {
+        tokio::fs::create_dir_all(self.path.parent().unwrap()).await?;
+
+        let tmp_file = tempfile::Builder::new()
+            .prefix("tempfile_")
+            .tempfile_in(self.path.parent().unwrap())?;
+        let mut writer = tokio::fs::File::create(tmp_file.path()).await?;
+        f(Pin::new(&mut writer)).await?;
+        drop(writer);
+
+        rename_or_copy_async(tmp_file, self).await
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))] // TODO
-async fn rename_or_copy_async(from: impl AsRef<Path>, to: impl AsRef<Path>) -> std::io::Result<()> {
+#[cfg(not(target_arch = "wasm32"))]
+fn rename_or_copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
+    match std::fs::rename(from.as_ref(), to.as_ref()) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::CrossesDevices => {
+            std::fs::copy(from.as_ref(), to.as_ref())?;
+            std::fs::remove_file(from.as_ref())
+        }
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn rename_or_copy_async(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
     match tokio::fs::rename(from.as_ref(), to.as_ref()).await {
         Ok(()) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::CrossesDevices => {
+        Err(error) if error.kind() == io::ErrorKind::CrossesDevices => {
             tokio::fs::copy(from.as_ref(), to.as_ref()).await?;
-            tokio::fs::remove_file(from.as_ref()).await?;
-            Ok(())
+            tokio::fs::remove_file(from.as_ref()).await
         }
-        Err(e) => Err(e),
+        Err(error) => Err(error),
     }
 }
