@@ -5322,7 +5322,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utile"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "ahash",
  "content_disposition",
@@ -5342,6 +5342,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "sha2",
  "thiserror 2.0.17",
  "tokio",
  "url",

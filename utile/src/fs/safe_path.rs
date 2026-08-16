@@ -1,17 +1,24 @@
+// TODO: explore encoding preserving ordering and prefix validity.
+
 use std::path::{Component, Path, PathBuf};
 
 use url::Url;
 
-const RESERVED_NAMES_WINDOWS: [&str; 22] = [
+const RESERVED_NAMES_WINDOWS: [&str; 30] = [
     "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
-    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    "COM9", "COM¹", "COM²", "COM³", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8",
+    "LPT9", "LPT¹", "LPT²", "LPT³", "CONIN$", "CONOUT$",
 ];
 const RESERVED_NAMES_UNIX: [&str; 2] = [".", ".."];
 
 /// First as it's used by the others.
 const PERCENT: (char, &str) = ('%', "%25");
 
+/// Distinguishes URL slash modes. Raw control characters cannot occur in a serialized URL.
+const URL_SLASH_MARKER: char = '\0';
+
 // https://stackoverflow.com/questions/1976007/what-characters-are-forbidden-in-windows-and-linux-directory-names
+// https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
 const ESCAPED_CHARS: [(char, &str); 40] = [
     ('\0', "%00"),     // NUL
     ('\u{01}', "%01"), // SOH
@@ -55,9 +62,43 @@ const ESCAPED_CHARS: [(char, &str); 40] = [
     ('*', "%2a"),
 ];
 
+/// Encode and decode the value into a path.
+///
+/// - Guaranteed to round-trip.
+/// - Different types might use different schemes to maximize legibility.
+///
+/// Note: while the implementation is guaranteed to round-trip,
+/// case-insensitive filesystems might not preserve the original case.
 pub trait SafePath: Sized {
     fn to_safe_path(&self) -> PathBuf;
     fn from_safe_path(path: &Path) -> Option<Self>;
+
+    /// A prefix that is guaranteed to prefix all encoded values that the original does.
+    ///
+    /// This is not an exact equivalent because correctly encoding for Windows while
+    /// balancing readability causes some values to be conditionally encoded.
+    fn to_loose_prefix(&self) -> PathBuf {
+        fn trailing_separator(path: &Path) -> bool {
+            path.as_os_str()
+                .as_encoded_bytes()
+                .last()
+                .copied()
+                .is_some_and(|s| b"/\\".contains(&s))
+        }
+        let path = self.to_safe_path();
+        if trailing_separator(&path) {
+            path
+        } else {
+            let Some(path) = path.parent() else {
+                return PathBuf::new();
+            };
+            if !trailing_separator(path) {
+                path.join("")
+            } else {
+                path.to_path_buf()
+            }
+        }
+    }
 }
 
 impl SafePath for String {
@@ -72,7 +113,6 @@ impl SafePath for String {
 
 impl SafePath for Url {
     fn to_safe_path(&self) -> PathBuf {
-        // Extract scheme and prepare the rest of the URL
         let scheme = self.scheme();
         let string = self.to_string();
         let rest = string
@@ -80,25 +120,35 @@ impl SafePath for Url {
             .unwrap()
             .strip_prefix(':')
             .unwrap();
-        if let Some(rest) = rest.strip_prefix("//") {
-            to_safe_path(&format!("{scheme}/{rest}"))
-        } else {
-            // Technically possible, just handling it for completeness.
-            // panic!("{}", &format!("{scheme}%/{rest}"));
-            to_safe_path(&format!("{scheme}!/{rest}"))
-        }
+        let leading_slashes = rest.bytes().take_while(|byte| *byte == b'/').count();
+
+        to_safe_path(&match leading_slashes {
+            0 => format!("{scheme}{URL_SLASH_MARKER}{rest}"),
+            1 => format!("{scheme}/{URL_SLASH_MARKER}{}", &rest[1..]),
+            2 => format!("{scheme}/{}", &rest[2..]),
+            _ => format!("{scheme}/{URL_SLASH_MARKER}{rest}"),
+        })
     }
 
     fn from_safe_path(path: &Path) -> Option<Self> {
-        let scheme = path.components().next()?.as_os_str().to_str()?;
-        let rest: PathBuf = path.components().skip(1).collect();
-        let rest = from_safe_path(&rest)?;
-        Self::parse(&if let Some(scheme) = scheme.strip_suffix('!') {
-            format!("{scheme}:{rest}")
+        let decoded = from_safe_path(path)?;
+        let url = if let Some((before_marker, after_marker)) = decoded.split_once(URL_SLASH_MARKER)
+        {
+            if let Some(scheme) = before_marker.strip_suffix('/') {
+                if after_marker.starts_with('/') {
+                    format!("{scheme}:{after_marker}")
+                } else {
+                    format!("{scheme}:/{after_marker}")
+                }
+            } else {
+                format!("{before_marker}:{after_marker}")
+            }
         } else {
+            let (scheme, rest) = decoded.split_once('/')?;
             format!("{scheme}://{rest}")
-        })
-        .ok()
+        };
+
+        Self::parse(&url).ok()
     }
 }
 
@@ -111,24 +161,27 @@ fn to_safe_path(input: &str) -> PathBuf {
         result = result.replace(char, encoded);
     }
 
-    let fragments: Vec<String> = result
-        .split('/')
-        .map(|s| {
-            if RESERVED_NAMES_WINDOWS.contains(&s.to_uppercase().as_str())
-                || RESERVED_NAMES_UNIX.contains(&s.to_uppercase().as_str())
-            {
-                format!("%{s}")
-            } else if s.ends_with('.') || s.ends_with(' ') {
-                format!("{s}%END")
-            } else if s.is_empty() {
-                "%END".to_string()
-            } else {
-                s.to_string()
-            }
-        })
-        .collect();
+    let fragments: Vec<String> = result.split('/').map(encode_component).collect();
 
     fragments.join("/").into()
+}
+fn encode_component(s: &str) -> String {
+    let mut result = s.to_string();
+
+    if is_reserved_component(s) {
+        result.insert(0, '%');
+    }
+    if s.is_empty() || s.ends_with('.') || s.ends_with(' ') {
+        result.push_str("%END");
+    }
+
+    result
+}
+fn is_reserved_component(s: &str) -> bool {
+    let uppercase = s.to_uppercase();
+    let stem = uppercase.split('.').next().unwrap();
+
+    RESERVED_NAMES_WINDOWS.contains(&stem) || RESERVED_NAMES_UNIX.contains(&uppercase.as_str())
 }
 fn from_safe_path(path: &Path) -> Option<String> {
     let path: Vec<String> = path
@@ -155,16 +208,15 @@ fn from_safe_path(path: &Path) -> Option<String> {
     Some(result)
 }
 fn decode_component(c: &str) -> String {
-    let mut c = c.replace("%END", "");
+    let c = c.strip_suffix("%END").unwrap_or(c);
 
     if let Some(s) = c.strip_prefix('%')
-        && (RESERVED_NAMES_WINDOWS.contains(&s.to_uppercase().as_str())
-            || RESERVED_NAMES_UNIX.contains(&s.to_uppercase().as_str()))
+        && is_reserved_component(s)
     {
-        c = s.to_owned();
+        s.to_owned()
+    } else {
+        c.to_owned()
     }
-
-    c
 }
 
 #[cfg(test)]
@@ -173,7 +225,7 @@ mod tests {
 
     use super::*;
 
-    const TEST_CASES: [(&str, &str); 5] = [
+    const STRING_TEST_CASES: [(&str, &str); 5] = [
         ("simple_string", "simple_string"),
         ("path/with/slashes", "path/with/slashes"),
         (
@@ -192,48 +244,73 @@ mod tests {
 
     #[test]
     fn string_unit_tests() {
-        for (input, expected) in TEST_CASES {
+        for (input, expected) in STRING_TEST_CASES {
+            assert_full_string(input);
+
             let encoded = to_safe_path(input);
             assert_eq!(encoded.to_str().unwrap(), expected);
-
-            let round_trip = from_safe_path(&encoded).unwrap();
-            assert_eq!(input, round_trip);
         }
     }
 
     #[test]
-    fn test_fuzz_random_strings() {
-        let mut rng = SmallRng::seed_from_u64(42);
-
-        for _ in 0..100_000 {
-            // Generate random string
-            let random_string = random_string(&mut rng);
-
-            let encoded = to_safe_path(&random_string);
-            let decoded = from_safe_path(&encoded).unwrap();
-
-            assert_eq!(decoded, random_string);
+    fn test_string_examples() {
+        for (char, encoded) in ESCAPED_CHARS {
+            assert_full_string(&char.to_string());
+            assert_eq!(format!("%{:02x}", char as u8), encoded);
         }
-    }
-    fn random_string(rng: &mut impl Rng) -> String {
-        let len = rng.random_range(0..5);
-        (0..len)
-            .map(|_| {
-                (0..rng.random_range(0..10))
-                    .map(|_| random_char(rng))
-                    .collect::<String>()
-            })
-            .collect::<Vec<String>>()
-            .join("/")
-    }
-    fn random_char(rng: &mut impl Rng) -> char {
-        match rng.random_range(0..5) {
-            0 => rng.random(),
-            1 => '%',
-            2 => ' ',
-            3 => '.',
-            4 => ESCAPED_CHARS.choose(rng).unwrap().0,
-            _ => unreachable!(),
+
+        for reserved in RESERVED_NAMES_WINDOWS {
+            for reserved in [
+                reserved.to_string(),
+                reserved_name_mixed_case_windows(reserved),
+                reserved.to_ascii_lowercase(),
+            ] {
+                for suffix in ["", ".txt", ".tar.gz", ".", ".txt.", ".txt "] {
+                    assert_full_string(&format!("{reserved}{suffix}"));
+                }
+            }
+        }
+
+        for reserved in RESERVED_NAMES_UNIX {
+            assert_full_string(reserved);
+        }
+
+        for input in [
+            "",
+            "/",
+            "//",
+            "/leading",
+            "trailing/",
+            "two//components",
+            ".",
+            "..",
+            "...",
+            "name.",
+            "name ",
+            "name. ",
+            "./../",
+            "C:",
+            "C:/path",
+            "\\\\server\\share",
+            "\\\\?\\C:\\path",
+        ] {
+            assert_full_string(input);
+        }
+
+        for marker in [PERCENT.1, "%END"]
+            .into_iter()
+            .chain(ESCAPED_CHARS.map(|(_, encoded)| encoded))
+        {
+            assert_full_string(marker);
+            assert_full_string(&format!("prefix{marker}suffix"));
+            assert_full_string(&format!("{marker}."));
+        }
+
+        for forbidden in (0..=31)
+            .map(char::from)
+            .chain(['<', '>', ':', '"', '\\', '|', '?', '*'])
+        {
+            assert_full_string(&format!("before{forbidden}after"));
         }
     }
 
@@ -261,15 +338,15 @@ mod tests {
         (
             "https://example.com/CON/PRN/aux/nul.txt",
             None,
-            "https/example.com/%CON/%PRN/%aux/nul.txt",
+            "https/example.com/%CON/%PRN/%aux/%nul.txt",
         ),
         (
             "https:example",
             Some("https://example/"),
             "https/example/%END",
         ),
-        ("data:text/plain,Stuff", None, "data!/text/plain,Stuff"),
-        ("unix:/run/foo.socket", None, "unix!/%END/run/foo.socket"),
+        ("data:text/plain,Stuff", None, "data%00text/plain,Stuff"),
+        ("unix:/run/foo.socket", None, "unix/%00run/foo.socket"),
         // URLs with authentication
         (
             "https://user:password@example.com/path",
@@ -308,19 +385,23 @@ mod tests {
             "https/example.com/%END/empty/%END/segments",
         ),
         // File URLs (absolute and relative)
-        ("file:///path/to/file", None, "file/%END/path/to/file"),
+        (
+            "file:///path/to/file",
+            None,
+            "file/%00/%END/%END/path/to/file",
+        ),
         (
             "file://localhost/path/to/file",
             Some("file:///path/to/file"),
-            "file/%END/path/to/file",
+            "file/%00/%END/%END/path/to/file",
         ),
         (
             "file:relative/path",
             Some("file:///relative/path"),
-            "file/%END/relative/path",
+            "file/%00/%END/%END/relative/path",
         ),
         // Mailto URLs
-        ("mailto:user@example.com", None, "mailto!/user@example.com"),
+        ("mailto:user@example.com", None, "mailto%00user@example.com"),
         // URLs with fragments only
         (
             "https://example.com#fragment",
@@ -388,29 +469,299 @@ mod tests {
                 assert_eq!(input.as_str(), raw);
             }
 
-            let encoded = input.to_safe_path();
-            assert_eq!(
-                encoded.to_str().unwrap(),
-                expected,
-                "\n{raw} \n&  {input} \n-> {} \n!= {expected}",
-                encoded.to_str().unwrap()
-            );
+            assert_full_url(&input);
 
-            let round_trip = Url::from_safe_path(&encoded).unwrap();
-            assert_eq!(input, round_trip);
+            let encoded = input.to_safe_path();
+            assert_eq!(encoded.to_str().unwrap(), expected);
         }
     }
 
     #[test]
-    fn test_conversions() {
-        for (char, encoded) in ESCAPED_CHARS {
-            assert_roundtrip(char);
-            assert_eq!(format!("%{:02x}", char as u8), encoded);
+    fn test_url_examples() {
+        for scheme in RESERVED_NAMES_WINDOWS
+            .into_iter()
+            .filter(|name| name.chars().all(|char| char.is_ascii_alphanumeric()))
+        {
+            for suffix in ["", ".device", "."] {
+                let input = Url::parse(&format!(
+                    "{}{suffix}://example.com/path",
+                    scheme.to_ascii_lowercase()
+                ))
+                .unwrap();
+                assert_full_url(&input);
+            }
+        }
+
+        #[expect(clippy::single_element_loop)]
+        for url in [Url::parse("custom.://example.com/path").unwrap()] {
+            assert_full_url(&url);
+        }
+
+        for (raw_prefix, raw_value) in [
+            ("custom:", "custom://example.com/path"),
+            ("custom:/", "custom://example.com/path"),
+            ("m://", "m://example.com/path"),
+            ("m://", "m:///path"),
+        ] {
+            let prefix = Url::parse(raw_prefix).unwrap();
+            let value = Url::parse(raw_value).unwrap();
+            assert!(value.as_str().starts_with(prefix.as_str()));
+
+            assert_full_url(&prefix);
+            assert_full_url(&value);
+
+            let loose_prefix = prefix
+                .to_loose_prefix()
+                .as_os_str()
+                .as_encoded_bytes()
+                .to_vec();
+            let encoded = value.to_safe_path().as_os_str().as_encoded_bytes().to_vec();
+
+            assert!(
+                encoded.starts_with(&loose_prefix),
+                "{value} encoded as {encoded:?}, which does not start with {prefix}'s loose prefix {loose_prefix:?}"
+            );
+        }
+
+        for (raw, expected) in [
+            ("custom:value", "custom%00value"),
+            ("custom:/value", "custom/%00value"),
+            ("custom://example.com/value", "custom/example.com/value"),
+            ("custom:///value", "custom/%00/%END/%END/value"),
+            ("custom:////value", "custom/%00/%END/%END/%END/value"),
+        ] {
+            let url = Url::parse(raw).unwrap();
+            assert_eq!(url.as_str(), raw);
+
+            assert_full_url(&url);
+
+            let encoded = url.to_safe_path();
+            assert_eq!(encoded.to_str(), Some(expected));
+            assert_eq!(Url::from_safe_path(&encoded), Some(url));
         }
     }
-    const fn assert_roundtrip(char: char) {
-        if char != (char as u8) as char {
-            panic!("Invalid character");
+
+    // Fuzz
+
+    #[test]
+    fn test_fuzz_random_strings() {
+        let mut rng = SmallRng::seed_from_u64(42);
+
+        for _ in 0..100_000 {
+            let random_string = random_string(&mut rng);
+            assert_full_string(&random_string);
         }
+    }
+
+    #[test]
+    fn test_fuzz_random_urls() {
+        let mut rng = SmallRng::seed_from_u64(42);
+
+        for _ in 0..10_000 {
+            let value = random_url(&mut rng);
+            assert_full_url(&value);
+        }
+    }
+
+    // Random generation
+
+    fn random_string(rng: &mut impl Rng) -> String {
+        let len = rng.random_range(0..5);
+        (0..len)
+            .map(|_| random_component(rng))
+            .collect::<Vec<String>>()
+            .join("/")
+    }
+    fn random_component(rng: &mut impl Rng) -> String {
+        match rng.random_range(0..6) {
+            0 => (0..rng.random_range(0..10))
+                .map(|_| random_char(rng))
+                .collect(),
+            1 => {
+                let reserved = RESERVED_NAMES_WINDOWS.choose(rng).unwrap();
+                let mut component = if rng.random_bool(0.5) {
+                    reserved.to_ascii_lowercase()
+                } else {
+                    reserved.to_string()
+                };
+                component.push_str(["", ".txt", ".", " "].choose(rng).unwrap());
+                component
+            }
+            2 => RESERVED_NAMES_UNIX.choose(rng).unwrap().to_string(),
+            3 => {
+                let mut component: String = (0..rng.random_range(0..10))
+                    .map(|_| random_char(rng))
+                    .collect();
+                component.push(*['.', ' '].choose(rng).unwrap());
+                component
+            }
+            4 => match rng.random_range(0..ESCAPED_CHARS.len() + 2) {
+                0 => PERCENT.1.to_string(),
+                1 => "%END".to_string(),
+                index => ESCAPED_CHARS[index - 2].1.to_string(),
+            },
+            5 => String::new(),
+            _ => unreachable!(),
+        }
+    }
+    fn random_char(rng: &mut impl Rng) -> char {
+        match rng.random_range(0..5) {
+            0 => rng.random(),
+            1 => '%',
+            2 => ' ',
+            3 => '.',
+            4 => ESCAPED_CHARS.choose(rng).unwrap().0,
+            _ => unreachable!(),
+        }
+    }
+
+    fn random_url(rng: &mut impl Rng) -> Url {
+        let tail = random_url_path(rng);
+        let scheme = match rng.random_range(0..2) {
+            0 => "custom",
+            1 => simple_reserved_names_windows().choose(rng).unwrap(),
+            2 => RESERVED_NAMES_UNIX.choose(rng).unwrap(),
+            _ => unreachable!(),
+        };
+        let raw_value = match rng.random_range(0..5) {
+            0 => format!("{scheme}:{tail}"),
+            1 => format!("{scheme}:/{tail}"),
+            2 => format!("{scheme}://example.com/{tail}"),
+            3 => format!("{scheme}:///{tail}"),
+            4 => format!("{scheme}:////{tail}"),
+            _ => unreachable!(),
+        };
+        Url::parse(&raw_value).unwrap()
+    }
+
+    fn random_url_path(rng: &mut impl Rng) -> String {
+        (0..rng.random_range(0..5))
+            .map(|_| {
+                url::form_urlencoded::byte_serialize(random_component(rng).as_bytes()).collect()
+            })
+            .collect::<Vec<String>>()
+            .join("/")
+    }
+
+    fn reserved_name_mixed_case_windows(name: &str) -> String {
+        name.chars()
+            .enumerate()
+            .map(|(index, char)| {
+                if index % 2 == 0 {
+                    char.to_ascii_lowercase()
+                } else {
+                    char
+                }
+            })
+            .collect()
+    }
+
+    // Assert helpers
+
+    fn assert_full_url(value: &Url) {
+        assert_safe_round_trip(value.clone());
+
+        let encoded = value.to_safe_path();
+        let encoded_bytes = encoded.as_os_str().as_encoded_bytes();
+
+        let mut raw_prefix = value.as_str();
+
+        loop {
+            if let Ok(prefix) = Url::parse(raw_prefix)
+                && value.as_str().starts_with(prefix.as_str())
+            {
+                let loose_prefix = prefix
+                    .to_loose_prefix()
+                    .as_os_str()
+                    .as_encoded_bytes()
+                    .to_vec();
+
+                assert!(
+                    encoded_bytes.starts_with(&loose_prefix),
+                    "{value} encoded as {encoded:?}, which does not start with {prefix}'s loose prefix {loose_prefix:?}"
+                );
+            }
+
+            let Some((index, _)) = raw_prefix.char_indices().next_back() else {
+                break;
+            };
+            raw_prefix = &raw_prefix[..index];
+        }
+    }
+
+    fn assert_full_string(value: &str) {
+        let value = value.to_string();
+
+        assert_safe_round_trip(value.clone());
+
+        let encoded = value.to_safe_path();
+        let encoded = encoded.as_os_str().as_encoded_bytes();
+
+        let mut prefix = value.as_str();
+        loop {
+            let loose_prefix = prefix
+                .to_string()
+                .to_loose_prefix()
+                .as_os_str()
+                .as_encoded_bytes()
+                .to_vec();
+
+            assert!(
+                encoded.starts_with(&loose_prefix),
+                "encoded value does not start with loose prefix: {prefix:?} of {value:?} -> {encoded:?}, expected {loose_prefix:?}"
+            );
+
+            let Some((index, _)) = prefix.char_indices().next_back() else {
+                break;
+            };
+            prefix = &prefix[..index];
+        }
+    }
+
+    fn assert_safe_round_trip(input: impl SafePath + Eq + std::fmt::Debug) {
+        let encoded = input.to_safe_path();
+        assert_safe_path(&encoded);
+        assert_eq!(SafePath::from_safe_path(&encoded), Some(input));
+    }
+
+    fn assert_safe_path(path: &Path) {
+        fn is_known_windows_reserved_name(component: &str) -> bool {
+            let stem = component.split('.').next().unwrap().to_uppercase();
+            RESERVED_NAMES_WINDOWS.contains(&stem.as_str())
+        }
+
+        fn is_forbidden_in_windows_component(char: char) -> bool {
+            char <= '\u{1f}' || matches!(char, '<' | '>' | ':' | '"' | '\\' | '|' | '?' | '*')
+        }
+
+        for component in path.to_str().unwrap().split('/') {
+            assert!(!component.is_empty(), "empty component in {path:?}");
+            assert!(
+                !matches!(component.chars().last(), Some('.' | ' ')),
+                "component ends in a dot or space: {component:?} in {path:?}"
+            );
+            assert!(
+                component != "." && component != "..",
+                "relative component {component:?} in {path:?}"
+            );
+            assert!(
+                !is_known_windows_reserved_name(component),
+                "reserved Windows component {component:?} in {path:?}"
+            );
+            assert!(
+                !component.chars().any(is_forbidden_in_windows_component),
+                "forbidden character in {component:?} in {path:?}"
+            );
+        }
+    }
+
+    // Other helpers
+
+    fn simple_reserved_names_windows() -> Vec<&'static str> {
+        RESERVED_NAMES_WINDOWS
+            .iter()
+            .filter(|name| name.chars().all(|char| char.is_ascii_alphanumeric()))
+            .copied()
+            .collect()
     }
 }
