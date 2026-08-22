@@ -150,7 +150,7 @@ impl WriteResource for FsCacheEntry {
             .tempfile_in(self.path.parent().unwrap())?;
         f(&mut tmp_file)?;
 
-        rename_or_copy(tmp_file, self)
+        std::fs::rename(tmp_file.path(), self)
     }
 
     type AsyncWriter = tokio::fs::File;
@@ -167,30 +167,6 @@ impl WriteResource for FsCacheEntry {
         f(Pin::new(&mut writer)).await?;
         drop(writer);
 
-        rename_or_copy_async(tmp_file, self).await
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn rename_or_copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
-    match std::fs::rename(from.as_ref(), to.as_ref()) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == io::ErrorKind::CrossesDevices => {
-            std::fs::copy(from.as_ref(), to.as_ref())?;
-            std::fs::remove_file(from.as_ref())
-        }
-        Err(error) => Err(error),
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-async fn rename_or_copy_async(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
-    match tokio::fs::rename(from.as_ref(), to.as_ref()).await {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == io::ErrorKind::CrossesDevices => {
-            tokio::fs::copy(from.as_ref(), to.as_ref()).await?;
-            tokio::fs::remove_file(from.as_ref()).await
-        }
-        Err(error) => Err(error),
+        tokio::fs::rename(tmp_file.path(), self).await
     }
 }
