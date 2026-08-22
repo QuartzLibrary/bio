@@ -1,13 +1,18 @@
-use std::{fmt, sync::LazyLock};
+use std::{
+    fmt,
+    pin::Pin,
+    sync::LazyLock,
+    task::{Context, Poll},
+};
 
 use bytes::Bytes;
-use futures::{Stream, TryStreamExt};
+use futures::Stream;
 use reqwest::IntoUrl;
 use url::Url;
 
 use utile::io::{get_filesize_from_headers, reqwest_error};
 
-use super::{Compression, RawResource};
+use super::{Compression, ReadResource, Resource};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UrlResource(Url);
@@ -78,7 +83,7 @@ impl UrlResource {
         unreachable!()
     }
 }
-impl RawResource for UrlResource {
+impl Resource for UrlResource {
     const NAMESPACE: &'static str = "url";
     fn key(&self) -> String {
         self.0.to_string()
@@ -87,7 +92,8 @@ impl RawResource for UrlResource {
     fn compression(&self) -> Option<Compression> {
         None
     }
-
+}
+impl ReadResource for UrlResource {
     #[cfg(not(target_arch = "wasm32"))]
     type Reader = reqwest::blocking::Response;
     #[cfg(not(target_arch = "wasm32"))]
@@ -142,8 +148,7 @@ impl RawResource for UrlResource {
         panic!("UrlResource::read is not supported on wasm32, use the non-blocking version.");
     }
 
-    type AsyncReader =
-        tokio_util::io::StreamReader<impl Stream<Item = std::io::Result<Bytes>>, Bytes>;
+    type AsyncReader = tokio_util::io::StreamReader<UrlByteStream, Bytes>;
     async fn size_async(&self) -> std::io::Result<u64> {
         static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
         let response = CLIENT
@@ -177,8 +182,65 @@ impl RawResource for UrlResource {
             )));
         }
 
-        let stream = response.bytes_stream().map_err(std::io::Error::other);
-        Ok(tokio_util::io::StreamReader::new(stream))
+        Ok(tokio_util::io::StreamReader::new(UrlByteStream::new(
+            response,
+        )))
+    }
+}
+
+/// Mirrors `reqwest::Response::bytes_stream`, which returns an opaque unnameable type.
+pub struct UrlByteStream {
+    #[cfg(not(target_arch = "wasm32"))]
+    body: reqwest::Body,
+    #[cfg(target_arch = "wasm32")]
+    stream: Pin<Box<dyn Stream<Item = std::io::Result<Bytes>>>>,
+}
+impl UrlByteStream {
+    fn new(response: reqwest::Response) -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Self {
+                body: response.into(),
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            use futures::{StreamExt, TryStreamExt};
+            Self {
+                stream: response.bytes_stream().map_err(reqwest_error).boxed_local(),
+            }
+        }
+    }
+}
+impl Stream for UrlByteStream {
+    type Item = std::io::Result<Bytes>;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        use http_body::Body;
+        use std::task::ready;
+
+        // Impl taken from `reqwest::async_impl::body::DataStream`.
+
+        loop {
+            return match ready!(Pin::new(&mut self.body).poll_frame(cx)) {
+                Some(Ok(frame)) => {
+                    // skip non-data frames
+                    if let Ok(buf) = frame.into_data() {
+                        Poll::Ready(Some(Ok(buf)))
+                    } else {
+                        continue;
+                    }
+                }
+                Some(Err(err)) => Poll::Ready(Some(Err(reqwest_error(err)))),
+                None => Poll::Ready(None),
+            };
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.stream).poll_next(cx)
     }
 }
 

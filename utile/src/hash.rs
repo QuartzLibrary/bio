@@ -52,7 +52,7 @@ impl FromStr for Sha256Hash {
             ));
         }
         let mut bytes = [0u8; 32];
-        for (i, chunk) in s.as_bytes().chunks_exact(2).enumerate() {
+        for (i, chunk) in s.as_bytes().as_chunks::<2>().0.iter().enumerate() {
             bytes[i] = u8::from_str_radix(
                 std::str::from_utf8(chunk).map_err(crate::io::invalid_data)?,
                 16,

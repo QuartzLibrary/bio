@@ -1,4 +1,4 @@
-use resource::RawResourceExt;
+use resource::ResourceExt;
 
 use genomes1000::{GRCh38Contig, load_grch38_reference_genome, source::Genomes1000Resource};
 

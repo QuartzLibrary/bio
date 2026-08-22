@@ -1,4 +1,4 @@
-use resource::{RawResource, UrlResource};
+use resource::{ReadResource, Resource, UrlResource};
 use url::Url;
 
 const HAIL_COMMON_BUCKET: &str = "hail-common";
@@ -44,7 +44,7 @@ impl HailCommonResource {
         UrlResource::new(self.url()).unwrap()
     }
 }
-impl RawResource for HailCommonResource {
+impl Resource for HailCommonResource {
     const NAMESPACE: &'static str = "hail_common";
 
     fn key(&self) -> String {
@@ -63,8 +63,9 @@ impl RawResource for HailCommonResource {
             _ => resource::Compression::infer_strict(&self.key),
         }
     }
-
-    type Reader = <UrlResource as RawResource>::Reader;
+}
+impl ReadResource for HailCommonResource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -72,7 +73,7 @@ impl RawResource for HailCommonResource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }

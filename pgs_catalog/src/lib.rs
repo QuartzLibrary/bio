@@ -11,7 +11,7 @@ use simplified::SimplificationError;
 use url::Url;
 
 use biocore::dna::DnaSequence;
-use resource::{RawResource, RawResourceExt, UrlResource};
+use resource::{ReadResource, Resource, ResourceExt, UrlResource};
 
 pub use ids::{pgs::PgsId, rs::RsId};
 
@@ -46,7 +46,7 @@ impl PgsCatalogResource {
         UrlResource::new(self.url()).unwrap()
     }
 }
-impl RawResource for PgsCatalogResource {
+impl Resource for PgsCatalogResource {
     const NAMESPACE: &'static str = "pgs_catalog";
 
     fn key(&self) -> String {
@@ -61,8 +61,9 @@ impl RawResource for PgsCatalogResource {
             None
         }
     }
-
-    type Reader = <UrlResource as RawResource>::Reader;
+}
+impl ReadResource for PgsCatalogResource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -70,7 +71,7 @@ impl RawResource for PgsCatalogResource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }
@@ -566,8 +567,8 @@ impl Study {
         resource: R,
     ) -> io::Result<impl Iterator<Item = csv::Result<StudyAssociation>>>
     where
-        R: RawResource,
-        <R as RawResource>::Reader: io::BufRead,
+        R: ReadResource,
+        <R as ReadResource>::Reader: io::BufRead,
     {
         let mut file = resource.read()?;
         let _header = comments::read(&mut file)?;
@@ -594,8 +595,8 @@ impl HarmonizedStudy {
         resource: R,
     ) -> io::Result<impl Iterator<Item = csv::Result<HarmonizedStudyAssociation>>>
     where
-        R: RawResource,
-        <R as RawResource>::Reader: io::BufRead,
+        R: ReadResource,
+        <R as ReadResource>::Reader: io::BufRead,
     {
         let mut file = resource.read()?;
         let _header = comments::read(&mut file)?;

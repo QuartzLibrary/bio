@@ -1,6 +1,6 @@
 use url::Url;
 
-use resource::{Compression, RawResource, UrlResource};
+use resource::{Compression, ReadResource, Resource, UrlResource};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnsemblResource {
@@ -42,7 +42,7 @@ impl EnsemblResource {
         UrlResource::new(self.url()).unwrap()
     }
 }
-impl RawResource for EnsemblResource {
+impl Resource for EnsemblResource {
     const NAMESPACE: &'static str = "ensembl";
     fn key(&self) -> String {
         self.key.clone()
@@ -55,8 +55,9 @@ impl RawResource for EnsemblResource {
             None
         }
     }
-
-    type Reader = <UrlResource as RawResource>::Reader;
+}
+impl ReadResource for EnsemblResource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -64,7 +65,7 @@ impl RawResource for EnsemblResource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }
@@ -131,7 +132,7 @@ impl UcscResource {
         UrlResource::new(self.url()).unwrap()
     }
 }
-impl RawResource for UcscResource {
+impl Resource for UcscResource {
     const NAMESPACE: &'static str = "ucsc";
     fn key(&self) -> String {
         self.key.clone()
@@ -144,8 +145,9 @@ impl RawResource for UcscResource {
             None
         }
     }
-
-    type Reader = <UrlResource as RawResource>::Reader;
+}
+impl ReadResource for UcscResource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -153,7 +155,7 @@ impl RawResource for UcscResource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }

@@ -1,5 +1,5 @@
+use resource::{ReadResource, Resource, UrlResource};
 use url::Url;
-use resource::{RawResource, UrlResource};
 
 const GRCH38_REFERENCE_GENOME_INDEXED: &str =
     "fasta/homo_sapiens/dna_index/Homo_sapiens.GRCh38.dna.toplevel.fa.gz";
@@ -106,7 +106,7 @@ impl EnsemblResource {
         UrlResource::new(self.url()).unwrap()
     }
 }
-impl RawResource for EnsemblResource {
+impl Resource for EnsemblResource {
     const NAMESPACE: &'static str = "ensembl";
 
     fn key(&self) -> String {
@@ -116,8 +116,9 @@ impl RawResource for EnsemblResource {
     fn compression(&self) -> Option<resource::Compression> {
         resource::Compression::infer(&self.key)
     }
-
-    type Reader = <UrlResource as RawResource>::Reader;
+}
+impl ReadResource for EnsemblResource {
+    type Reader = <UrlResource as ReadResource>::Reader;
     fn size(&self) -> std::io::Result<u64> {
         self.url_resource().size()
     }
@@ -125,7 +126,7 @@ impl RawResource for EnsemblResource {
         self.url_resource().read()
     }
 
-    type AsyncReader = <UrlResource as RawResource>::AsyncReader;
+    type AsyncReader = <UrlResource as ReadResource>::AsyncReader;
     async fn size_async(&self) -> std::io::Result<u64> {
         self.url_resource().size_async().await
     }

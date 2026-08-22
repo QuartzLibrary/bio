@@ -7,14 +7,14 @@ use std::{
 
 use pin_project::pin_project;
 
-use super::{Compression, RawResource, RawResourceExt, ResourceRef};
+use super::{Compression, ReadResource, Resource, ResourceExt, ResourceRef};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DecompressedResource<R> {
     resource: R,
     compression: Option<Compression>,
 }
-impl<R: RawResource> DecompressedResource<R> {
+impl<R: Resource> DecompressedResource<R> {
     pub fn new(resource: R) -> Self {
         Self {
             resource,
@@ -28,7 +28,7 @@ impl<R: RawResource> DecompressedResource<R> {
         }
     }
 }
-impl<R: RawResource> RawResource for DecompressedResource<R> {
+impl<R: Resource> Resource for DecompressedResource<R> {
     const NAMESPACE: &'static str = "decompressed";
     fn key(&self) -> String {
         let key = self.resource.key();
@@ -41,7 +41,8 @@ impl<R: RawResource> RawResource for DecompressedResource<R> {
     fn compression(&self) -> Option<Compression> {
         None
     }
-
+}
+impl<R: ReadResource> ReadResource for DecompressedResource<R> {
     type Reader = DecompressedReader<R::Reader>;
     fn size(&self) -> std::io::Result<u64> {
         Err(std::io::Error::new(
@@ -149,7 +150,7 @@ pub struct CompressedResource<R> {
     resource: R,
     compression: Compression,
 }
-impl<R: RawResource> CompressedResource<R> {
+impl<R: Resource> CompressedResource<R> {
     pub fn new(resource: R, compression: Compression) -> Self {
         Self {
             resource,
@@ -157,7 +158,7 @@ impl<R: RawResource> CompressedResource<R> {
         }
     }
 }
-impl<R: RawResource> RawResource for CompressedResource<R> {
+impl<R: Resource> Resource for CompressedResource<R> {
     const NAMESPACE: &'static str = "compressed";
     fn key(&self) -> String {
         format!(
@@ -170,7 +171,8 @@ impl<R: RawResource> RawResource for CompressedResource<R> {
     fn compression(&self) -> Option<Compression> {
         Some(self.compression)
     }
-
+}
+impl<R: ReadResource> ReadResource for CompressedResource<R> {
     type Reader = CompressedReader<R::Reader>;
 
     fn size(&self) -> std::io::Result<u64> {

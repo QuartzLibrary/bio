@@ -2,7 +2,7 @@ use liftover::{
     Liftover,
     sources::{EnsemblHG, EnsemblResource, UcscHG, UcscResource},
 };
-use resource::RawResourceExt;
+use resource::ResourceExt;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

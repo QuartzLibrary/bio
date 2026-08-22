@@ -4002,6 +4002,7 @@ dependencies = [
  "directories",
  "flate2",
  "futures",
+ "http-body",
  "indicatif",
  "log",
  "pin-project",

@@ -1,15 +1,15 @@
-use super::{Compression, RawResource};
+use super::{Compression, ReadResource, Resource};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BufferedResource<R> {
     resource: R,
 }
-impl<R: RawResource> BufferedResource<R> {
+impl<R: Resource> BufferedResource<R> {
     pub fn new(resource: R) -> Self {
         Self { resource }
     }
 }
-impl<R: RawResource> RawResource for BufferedResource<R> {
+impl<R: Resource> Resource for BufferedResource<R> {
     const NAMESPACE: &'static str = R::NAMESPACE;
     fn key(&self) -> String {
         R::key(&self.resource)
@@ -17,7 +17,8 @@ impl<R: RawResource> RawResource for BufferedResource<R> {
     fn compression(&self) -> Option<Compression> {
         self.resource.compression()
     }
-
+}
+impl<R: ReadResource> ReadResource for BufferedResource<R> {
     type Reader = std::io::BufReader<R::Reader>;
     fn size(&self) -> std::io::Result<u64> {
         self.resource.size()

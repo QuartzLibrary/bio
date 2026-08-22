@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 use indicatif::ProgressStyle;
 
-use super::{Compression, RawResource};
+use super::{Compression, ReadResource, Resource};
 
 const PROGRESS_BAR_STYLE: &str =
     "{spinner} {bytes} ({percent}%) of {total_bytes} | {bytes_per_sec} {wide_bar} {eta}";
@@ -11,12 +11,12 @@ const PROGRESS_BAR_STYLE: &str =
 pub struct ProgressResource<R> {
     resource: R,
 }
-impl<R: RawResource> ProgressResource<R> {
+impl<R: Resource> ProgressResource<R> {
     pub fn new(resource: R) -> Self {
         Self { resource }
     }
 }
-impl<R: RawResource> RawResource for ProgressResource<R> {
+impl<R: Resource> Resource for ProgressResource<R> {
     const NAMESPACE: &'static str = R::NAMESPACE;
     fn key(&self) -> String {
         R::key(&self.resource)
@@ -25,7 +25,8 @@ impl<R: RawResource> RawResource for ProgressResource<R> {
     fn compression(&self) -> Option<Compression> {
         self.resource.compression()
     }
-
+}
+impl<R: ReadResource> ReadResource for ProgressResource<R> {
     type Reader = indicatif::ProgressBarIter<R::Reader>;
     fn size(&self) -> std::io::Result<u64> {
         self.resource.size()

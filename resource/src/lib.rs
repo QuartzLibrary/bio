@@ -1,24 +1,23 @@
-#![feature(impl_trait_in_assoc_type)]
 #![expect(async_fn_in_trait)] // TODO
 
 pub mod buffered;
+pub mod cache;
 pub mod cached;
 pub mod compression;
-pub mod fs;
 pub mod iter;
 pub mod progress;
 pub mod uri;
 
 use std::{
     fmt::Debug,
-    io::{self, Read},
-    pin::pin,
+    io::{self, Read, Write as _},
+    pin::{Pin, pin},
 };
 
-use futures::{Stream, stream};
+use futures::{Stream, StreamExt as _, stream};
 use serde::de::DeserializeOwned;
 use serde_json::StreamDeserializer;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt as _};
 
 use utile::io::read_ext::AsyncReadInto;
 
@@ -34,12 +33,13 @@ pub use self::cached::FsCacheResource;
 type JsonStreamDeserializer<R, T> =
     StreamDeserializer<'static, serde_json::de::IoRead<io::BufReader<R>>, T>;
 
-pub trait RawResource {
+pub trait Resource {
     const NAMESPACE: &'static str;
     fn key(&self) -> String;
 
     fn compression(&self) -> Option<Compression>;
-
+}
+pub trait ReadResource: Resource {
     type Reader: io::Read;
     fn size(&self) -> io::Result<u64>;
     fn read(&self) -> io::Result<Self::Reader>;
@@ -47,36 +47,6 @@ pub trait RawResource {
     type AsyncReader: tokio::io::AsyncRead;
     async fn size_async(&self) -> io::Result<u64>;
     async fn read_async(&self) -> io::Result<Self::AsyncReader>;
-}
-pub trait RawResourceExt: RawResource + Sized {
-    fn buffered(self) -> BufferedResource<Self> {
-        BufferedResource::new(self)
-    }
-
-    fn with_fs_cache(self, cache: &crate::fs::FsCache) -> FsCacheResource<Self> {
-        FsCacheResource::new(cache, self)
-    }
-    fn with_global_fs_cache(self) -> FsCacheResource<Self> {
-        FsCacheResource::new(&crate::fs::FsCache::global(), self)
-    }
-
-    fn log_progress(self) -> ProgressResource<Self> {
-        ProgressResource::new(self)
-    }
-
-    fn decompressed(self) -> DecompressedResource<Self> {
-        DecompressedResource::new(self)
-    }
-    fn decompressed_with(self, compression: Compression) -> DecompressedResource<Self> {
-        DecompressedResource::new_with(self, compression)
-    }
-
-    fn compressed(self) -> CompressedResource<Self> {
-        CompressedResource::new(self, Compression::Gzip)
-    }
-    fn compressed_with(self, compression: Compression) -> CompressedResource<Self> {
-        CompressedResource::new(self, compression)
-    }
 
     fn read_vec(&self) -> io::Result<Vec<u8>> {
         let mut reader = ResourceRef::new(self).read()?;
@@ -122,7 +92,108 @@ pub trait RawResourceExt: RawResource + Sized {
         Ok(stream::try_unfold((), |()| async move { todo!() }))
     }
 }
-impl<T: RawResource> RawResourceExt for T {}
+pub trait WriteResource: Resource {
+    type Writer: io::Write;
+    fn write_with(&self, f: impl FnOnce(&mut Self::Writer) -> io::Result<()>) -> io::Result<()>;
+
+    type AsyncWriter: tokio::io::AsyncWrite;
+    async fn write_async_with(
+        &self,
+        f: impl AsyncFnOnce(Pin<&mut Self::AsyncWriter>) -> io::Result<()>,
+    ) -> io::Result<()>;
+
+    fn write_resource(&self, resource: &impl ReadResource) -> io::Result<()> {
+        self.write_with(|writer| std::io::copy(&mut resource.read()?, writer).map(drop))
+    }
+    async fn write_resource_async(&self, resource: &impl ReadResource) -> io::Result<()> {
+        self.write_async_with(async |mut writer| {
+            tokio::io::copy(&mut pin!(resource.read_async().await?), &mut writer)
+                .await
+                .map(drop)
+        })
+        .await
+    }
+
+    fn write_slice(&self, data: &[u8]) -> io::Result<()> {
+        self.write_with(|writer| writer.write_all(data))
+    }
+    async fn write_slice_async(&self, data: &[u8]) -> io::Result<()> {
+        self.write_async_with(async |mut writer| writer.write_all(data).await)
+            .await
+    }
+
+    fn write_json<T: serde::Serialize>(&self, data: &T) -> std::io::Result<()> {
+        self.write_with(|writer| Ok(serde_json::to_writer(writer, data)?))
+    }
+    async fn write_json_async<T: serde::Serialize>(&self, data: &T) -> std::io::Result<()> {
+        // TODO: avoid buffering in memory
+        let data = serde_json::to_vec(data)?;
+        self.write_slice_async(&data).await
+    }
+
+    fn write_json_lines<T: serde::Serialize>(
+        &self,
+        data: impl IntoIterator<Item = T>,
+    ) -> std::io::Result<()> {
+        self.write_with(|writer| {
+            std::io::copy(
+                &mut utile::jsonl::JsonLinesReader::new(data.into_iter()),
+                writer,
+            )
+            .map(drop)
+        })
+    }
+    async fn write_json_lines_async<T: serde::Serialize>(
+        &self,
+        data: impl IntoIterator<Item = T>,
+    ) -> io::Result<()> {
+        self.write_async_with(async |mut writer| {
+            let items = stream::iter(data);
+            let mut items = pin!(items);
+
+            let mut vec = Vec::new();
+            while let Some(item) = items.next().await {
+                vec.clear();
+                serde_json::to_writer(&mut vec, &item)?;
+                vec.push(b'\n');
+                writer.write_all(&vec).await?;
+            }
+            Ok(())
+        })
+        .await
+    }
+}
+pub trait ResourceExt: Resource + Sized {
+    fn buffered(self) -> BufferedResource<Self> {
+        BufferedResource::new(self)
+    }
+
+    fn with_fs_cache(self, cache: &crate::cache::fs::FsCache) -> FsCacheResource<Self> {
+        FsCacheResource::new(cache, self)
+    }
+    fn with_global_fs_cache(self) -> FsCacheResource<Self> {
+        FsCacheResource::new(&crate::cache::fs::FsCache::global(), self)
+    }
+
+    fn log_progress(self) -> ProgressResource<Self> {
+        ProgressResource::new(self)
+    }
+
+    fn decompressed(self) -> DecompressedResource<Self> {
+        DecompressedResource::new(self)
+    }
+    fn decompressed_with(self, compression: Compression) -> DecompressedResource<Self> {
+        DecompressedResource::new_with(self, compression)
+    }
+
+    fn compressed(self) -> CompressedResource<Self> {
+        CompressedResource::new(self, Compression::Gzip)
+    }
+    fn compressed_with(self, compression: Compression) -> CompressedResource<Self> {
+        CompressedResource::new(self, compression)
+    }
+}
+impl<T: Resource> ResourceExt for T {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Compression {
@@ -175,15 +246,15 @@ impl Compression {
 /// or requiring a `Clone` bound in some places.
 /// (The blanket impl would allow the builder api to take a reference
 /// which in practice can cause annoying lifetime issues.)
-struct ResourceRef<'a, R> {
+struct ResourceRef<'a, R: ?Sized> {
     resource: &'a R,
 }
-impl<'a, R: RawResource> ResourceRef<'a, R> {
+impl<'a, R: Resource + ?Sized> ResourceRef<'a, R> {
     pub fn new(resource: &'a R) -> Self {
         Self { resource }
     }
 }
-impl<'a, R: RawResource> RawResource for ResourceRef<'a, R> {
+impl<'a, R: Resource + ?Sized> Resource for ResourceRef<'a, R> {
     const NAMESPACE: &'static str = R::NAMESPACE;
     fn key(&self) -> String {
         R::key(self.resource)
@@ -191,7 +262,8 @@ impl<'a, R: RawResource> RawResource for ResourceRef<'a, R> {
     fn compression(&self) -> Option<Compression> {
         R::compression(self.resource)
     }
-
+}
+impl<'a, R: ReadResource + ?Sized> ReadResource for ResourceRef<'a, R> {
     type Reader = R::Reader;
     fn size(&self) -> io::Result<u64> {
         R::size(self.resource)
