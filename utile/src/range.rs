@@ -124,7 +124,8 @@ where
         let s = self.clone().normalize();
         let o = other.clone().normalize();
 
-        &T::forward(s.end().clone(), 1) == o.start() || &T::forward(o.end().clone(), 1) == s.start()
+        T::forward_checked(s.end().clone(), 1).as_ref() == Some(o.start())
+            || T::forward_checked(o.end().clone(), 1).as_ref() == Some(s.start())
     }
     fn contains_range(&self, other: &Self) -> bool {
         let s = self.clone().normalize();
