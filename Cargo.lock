@@ -5334,6 +5334,7 @@ dependencies = [
  "gloo-timers",
  "log",
  "nohash-hasher",
+ "num-traits",
  "pin-project",
  "plotly",
  "rand 0.10.2",

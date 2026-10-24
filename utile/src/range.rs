@@ -4,6 +4,8 @@ use std::iter::Step;
 use std::ops::RangeInclusive;
 use std::ops::{Add, Range, Sub};
 
+use num_traits::Zero;
+
 /// Some helper methods for ranges.
 ///
 /// 'Malformed' (r.end < r.start) ranges are assumed to be empty and 'based' on their start position.
@@ -17,7 +19,7 @@ pub trait RangeExt: Sized {
 
     /// Would the slices returned by indexing these ranges overlap?
     ///
-    /// Note: might still overlap even if the ranges are empty (for example `1..1` overlaps `0..3` and `1..1)
+    /// Note: might still overlap even if the ranges are empty (for example `1..1` overlaps `0..3` and `1..1`)
     ///
     /// You can use `range.intersection(other).is_empty()` to check if any actual elements overlap.
     fn overlaps(&self, other: &Self) -> bool;
@@ -33,6 +35,11 @@ pub trait RangeExt: Sized {
     fn intersection(self, other: Self) -> Self;
     /// `self.union(other) == other.union(self)`
     fn union(self, other: Self) -> Option<Self>;
+
+    /// Moves both ends of the range up by `by`.
+    fn shift_up_by(self, by: Self::Item) -> Self;
+    /// Moves both ends of the range down by `by`.
+    fn shift_down_by(self, by: Self::Item) -> Self;
 }
 impl<T> RangeExt for Range<T>
 where
@@ -62,7 +69,9 @@ where
         s.end == o.start || o.end == s.start
     }
     fn contains_range(&self, other: &Self) -> bool {
-        self.start <= other.start && other.end <= self.end
+        let s = self.clone().normalize();
+        let o = other.clone().normalize();
+        s.start <= o.start && o.end <= s.end
     }
 
     fn intersection(self, other: Self) -> Self {
@@ -90,11 +99,18 @@ where
             (false, false) => return None,
         })
     }
+
+    fn shift_up_by(self, by: Self::Item) -> Self {
+        self.start + by.clone()..self.end + by
+    }
+    fn shift_down_by(self, by: Self::Item) -> Self {
+        self.start - by.clone()..self.end - by
+    }
 }
 #[cfg(feature = "nightly")]
 impl<T> RangeExt for RangeInclusive<T>
 where
-    T: Ord + Step + Clone + std::fmt::Debug,
+    T: Ord + Step + Add<Output = T> + Sub<Output = T> + Clone + std::fmt::Debug,
 {
     type Item = T;
 
@@ -122,10 +138,13 @@ where
         let s = self.clone().normalize();
         let o = other.clone().normalize();
 
-        &T::forward(s.end().clone(), 1) == o.start() || &T::forward(o.end().clone(), 1) == s.start()
+        T::forward_checked(s.end().clone(), 1).as_ref() == Some(o.start())
+            || T::forward_checked(o.end().clone(), 1).as_ref() == Some(s.start())
     }
     fn contains_range(&self, other: &Self) -> bool {
-        self.start() <= other.start() && other.end() <= self.end()
+        let s = self.clone().normalize();
+        let o = other.clone().normalize();
+        s.start() <= o.start() && o.end() <= s.end()
     }
 
     fn intersection(self, other: Self) -> Self {
@@ -149,36 +168,34 @@ where
             (false, false) => return None,
         })
     }
+
+    fn shift_up_by(self, by: Self::Item) -> Self {
+        let (start, end) = self.into_inner();
+        start + by.clone()..=end + by
+    }
+    fn shift_down_by(self, by: Self::Item) -> Self {
+        let (start, end) = self.into_inner();
+        start - by.clone()..=end - by
+    }
 }
 pub trait RangeLen {
     type Output;
     // NOTE: named `range_len` instead of `len` to avoid name collisions.
     fn range_len(&self) -> Self::Output;
 }
-macro_rules! range_len {
-    ($t:ty) => {
-        impl RangeLen for Range<$t> {
-            type Output = $t;
-            fn range_len(&self) -> Self::Output {
-                if self.is_empty() {
-                    0
-                } else {
-                    self.end - self.start
-                }
-            }
+impl<T> RangeLen for Range<T>
+where
+    T: Zero + Sub<Output = T> + PartialOrd + Clone,
+{
+    type Output = T;
+    fn range_len(&self) -> Self::Output {
+        if self.is_empty() {
+            T::zero()
+        } else {
+            self.end.clone() - self.start.clone()
         }
-    };
+    }
 }
-range_len!(u8);
-range_len!(u16);
-range_len!(u32);
-range_len!(u64);
-range_len!(usize);
-range_len!(i8);
-range_len!(i16);
-range_len!(i32);
-range_len!(i64);
-range_len!(isize);
 
 #[cfg(test)]
 mod tests {
@@ -186,7 +203,47 @@ mod tests {
 
     use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
-    use crate::range::RangeExt;
+    use crate::range::{RangeExt, RangeLen};
+
+    #[test]
+    #[allow(clippy::reversed_empty_ranges)]
+    fn test_range_shift() {
+        assert_eq!((2u32..5).shift_up_by(3), 5..8);
+        assert_eq!((2u32..5).shift_down_by(2), 0..3);
+        assert_eq!((-2i32..5).shift_down_by(3), -5..2);
+        assert_eq!((5u32..3).shift_up_by(1), 6..4);
+    }
+
+    #[test]
+    #[allow(clippy::reversed_empty_ranges)]
+    fn test_range_len() {
+        assert_eq!((2u32..5).range_len(), 3);
+        assert_eq!((5u32..2).range_len(), 0);
+        assert_eq!((-3i64..3).range_len(), 6);
+        assert_eq!((1.0f64..2.5).range_len(), 1.5);
+    }
+
+    #[test]
+    #[allow(clippy::reversed_empty_ranges)]
+    fn test_range_contains_malformed() {
+        // `7..3` ~ `7..7`, which is outside `0..5`.
+        assert!(!(0..5).contains_range(&(7..3)));
+        // `5..3` ~ `5..5`.
+        assert!((5..3).contains_range(&(5..5)));
+        assert!((0..5).contains_range(&(1..3)));
+        assert!(!(0..5).contains_range(&(1..6)));
+    }
+
+    #[cfg(feature = "nightly")]
+    #[test]
+    #[allow(clippy::reversed_empty_ranges)]
+    fn test_range_inclusive_extremes() {
+        assert!(!(0u8..=255).is_adjacent(&(0..=0)));
+        assert!((0u8..=254).is_adjacent(&(255..=255)));
+        assert!(!(0..=5).contains_range(&(7..=3)));
+        assert_eq!((2u32..=5).shift_up_by(3), 5..=8);
+        assert_eq!((2u32..=5).shift_down_by(2), 0..=3);
+    }
 
     #[test]
     fn test_range_random_intersection() {
