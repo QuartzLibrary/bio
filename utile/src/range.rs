@@ -62,7 +62,9 @@ where
         s.end == o.start || o.end == s.start
     }
     fn contains_range(&self, other: &Self) -> bool {
-        self.start <= other.start && other.end <= self.end
+        let s = self.clone().normalize();
+        let o = other.clone().normalize();
+        s.start <= o.start && o.end <= s.end
     }
 
     fn intersection(self, other: Self) -> Self {
@@ -125,7 +127,9 @@ where
         &T::forward(s.end().clone(), 1) == o.start() || &T::forward(o.end().clone(), 1) == s.start()
     }
     fn contains_range(&self, other: &Self) -> bool {
-        self.start() <= other.start() && other.end() <= self.end()
+        let s = self.clone().normalize();
+        let o = other.clone().normalize();
+        s.start() <= o.start() && o.end() <= s.end()
     }
 
     fn intersection(self, other: Self) -> Self {
